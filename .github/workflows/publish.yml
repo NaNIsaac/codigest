@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'  # v0.3.0 태그 푸시 시 배포 실행
-    # branches:
-    #   - main  # main 브랜치 푸시 시 문서 배포 실행 (옵션)
 
 jobs:
   build-n-publish:

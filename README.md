@@ -1,32 +1,60 @@
 # Codigest
 
-Codigest is a CLI tool designed to extract, structure, and track the context of your codebase for Large Language Models (LLMs).
+Codigest is a standalone CLI tool designed to extract, structure, and track the context of your codebase for Large Language Models (LLMs).
 
 Unlike simple copy-paste tools, Codigest employs a **Context Anchor** system (Shadow Git) to track changes locally without polluting your main version control history. It also features **Semantic Analysis** to detect structural changes in your code.
 
 ## Core Philosophy
 
-* **Read-Only & Safe**: Codigest never modifies your source code. It only reads, analyzes, and formats context.
-* **Context-Aware**: Instead of dumping raw text, it structures code into XML snapshots designed for LLM comprehension.
-* **Session-Based Tracking**: It maintains an internal anchor to track "work-in-progress" changes independently of your Git commits.
-* **Python 3.14 Native**: Built using modern Python features including PEP 750 Tag Strings for safe XML generation.
+  * **Read-Only & Safe**: Codigest never modifies your source code. It only reads, analyzes, and formats context.
+  * **Context-Aware**: Instead of dumping raw text, it structures code into XML snapshots designed for LLM comprehension.
+  * **Session-Based Tracking**: It maintains an internal anchor to track "work-in-progress" changes independently of your Git commits.
+  * **Environment Isolated**: Runs in its own isolated Python 3.14 environment via `uv`, ensuring it never conflicts with your project's dependencies.
 
 ## Installation
 
-Requires **Python 3.14+**.
+Codigest runs as a global tool. You don't need to add it to your project's `requirements.txt`.
+We strongly recommend using **uv** for the best experience.
+
+### Step 1: Install `uv`
+
+If you don't have `uv` installed, use **Winget** (Windows) or curl (macOS/Linux).
+
+```powershell
+# Windows (via Winget)
+winget install --id astral-sh.uv
+
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Step 2: Install `codigest`
+
+Install Codigest globally. `uv` will automatically manage the required Python 3.14 environment for you.
 
 ```bash
-# Install via uv
-git clone https://github.com/SJB7777/codigest.git
-cd codigest
-uv tool install .
-````
+uv tool install codigest
+```
+
+### Step 3: Update Path (Important\!)
+
+To run `codigest` from any terminal, ensure your tools directory is in your PATH.
+
+```bash
+uv tool update-shell
+```
+
+*\> **Note:** Restart your terminal (or VS Code) after this step to apply changes.*
+
+-----
 
 ## Workflow & Commands
 
+Once installed, you can use `codigest` command anywhere.
+
 ### 1\. Initialization
 
-Sets up the `.codigest` directory and captures the initial baseline anchor.
+Sets up the `.codigest` directory and captures the initial baseline anchor. 
 
 ```bash
 codigest init
@@ -41,7 +69,7 @@ Scans the entire codebase and generates a structured XML snapshot.
   * **Side Effect:** Updates the internal Context Anchor to the current state.
 
 ```bash
-codigest scan --m " Python 3.14 project. Do NOT use typing. List/Dict."
+codigest scan --message "Initial project context"
 ```
 
 ### 3\. Incremental Changes (`diff`)
@@ -51,6 +79,7 @@ Tracks text-based changes between the last `scan` and the current working tree.
   * **Output:** `.codigest/changes.diff`
   * **Use Case:** "I modified 3 files. Here is exactly what changed since the last snapshot."
   * **Note:** This is based on the internal Shadow Git, not your project's Git history.
+
 
 ```bash
 codigest diff
@@ -64,6 +93,7 @@ Analyzes **structural changes** (AST-based) rather than line-by-line text differ
   * **Use Case:** "I refactored the API. Show me which functions were added, removed, or had their signatures changed."
   * **Benefit:** Significantly reduces token usage compared to raw diffs by ignoring formatting/comment changes.
 
+
 ```bash
 codigest semdiff
 ```
@@ -75,11 +105,12 @@ Generates a high-level outline of the project structure (Classes, Functions, Met
   * **Output:** `.codigest/digest.xml`
   * **Use Case:** "Don't read the implementation details. Just understand the class hierarchy and available methods."
 
-<!-- end list -->
 
 ```bash
 codigest digest
 ```
+
+-----
 
 ## Configuration
 
