@@ -12,6 +12,15 @@ console = Console()
 
 @app.callback(invoke_without_command=True)
 def handle(
+    # [변경 1] target 인자 추가
+    target: Path = typer.Argument(
+        Path.cwd(), 
+        help="Target directory to check diff",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True
+    ),
     copy: bool = typer.Option(True, help="Auto-copy to clipboard"),
     save: bool = typer.Option(True, help="Save to .codigest/changes.diff"),
     message: str = typer.Option("", "--message", "-m", help="Add specific instruction context"),
@@ -20,7 +29,7 @@ def handle(
     [Context Update] Shows changes since the last 'codigest scan'.
     Useful for updating LLM context without re-uploading everything.
     """
-    root_path = Path.cwd()
+    root_path = target
     anchor = shadow.ContextAnchor(root_path)
     
     # 1. Check Baseline Existence

@@ -16,11 +16,18 @@ ALWAYS_IGNORE = [
 ]
 
 class ProjectScanner:
-    def __init__(self, root_path: Path, extensions: Optional[set[str]] = None, extra_ignores: Optional[list[str]] = None):
+    def __init__(
+            self,
+            root_path: Path,
+            extensions: Optional[set[str]] = None,
+            extra_ignores: Optional[list[str]] = None,
+            include_paths: Optional[list[Path]] = None
+            ):
         self.root_path = root_path
         self.extensions = extensions
         self.extra_ignores = extra_ignores or []
         self.ignore_spec = self._load_gitignore()
+        self.include_paths = include_paths
 
     def _load_gitignore(self) -> pathspec.PathSpec:
         """Loads .gitignore and combines with ALWAYS_IGNORE and extra_ignores."""
@@ -56,17 +63,36 @@ class ProjectScanner:
             
         return self.ignore_spec.match_file(rel_path)
 
+    def _is_included(self, entry: Path) -> bool:
+        """파일이 지정된 include_paths 범위 안에 있는지 확인"""
+        if not self.include_paths:
+            return True
+            
+        for path in self.include_paths:
+            try:
+                entry.relative_to(path)
+                return True
+            except ValueError:
+                continue
+        return False
+
     def scan(self) -> list[Path]:
         """
         Walks the directory tree and returns valid files.
         (Modernized from old core.py's stack-based approach)
         """
         valid_files = []
-        
+        start_dirs = self.include_paths if self.include_paths else [self.root_path]
         # Use rglob for simplicity, but we must manually filter dirs to respect gitignore
         # For better performance on large repos, we use a manual walk similar to the old code
-        dirs_stack = [self.root_path]
-        
+        dirs_stack = []
+        for p in start_dirs:
+            if p.is_file():
+                if not self.is_ignored(p):
+                    valid_files.append(p)
+            elif p.is_dir():
+                dirs_stack.append(p)
+
         while dirs_stack:
             current = dirs_stack.pop()
             
@@ -83,6 +109,7 @@ class ProjectScanner:
                 
                 if entry.is_dir():
                     dirs_stack.append(entry)
+
                 elif entry.is_file():
                     # Extension Filter Check
                     if self.extensions and entry.suffix.lower() not in self.extensions:
@@ -91,9 +118,14 @@ class ProjectScanner:
                             continue
                             
                     valid_files.append(entry)
-                    
-        return sorted(valid_files)
 
-def scan_project(root_path: Path, extensions: set[str] = None, extra_ignores: list[str] = None) -> list[Path]:
-    scanner = ProjectScanner(root_path, extensions, extra_ignores)
+        return sorted(list(set(valid_files)))
+
+def scan_project(
+    root_path: Path, 
+    extensions: set[str] = None, 
+    extra_ignores: list[str] = None, 
+    include_paths: list[Path] = None
+) -> list[Path]:
+    scanner = ProjectScanner(root_path, extensions, extra_ignores, include_paths)
     return scanner.scan()

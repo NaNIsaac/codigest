@@ -35,12 +35,22 @@ structure = "toon"
 
 @app.callback(invoke_without_command=True)
 def handle(
+    # [변경 1] target 인자 추가 (기본값: 현재 위치)
+    target: Path = typer.Argument(
+        Path.cwd(), 
+        help="Target directory to initialize",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
 ):
     """
     Initialize the .codigest environment and capture the initial state.
     """
-    root_path = Path.cwd()
+    root_path = target  # Typer가 이미 resolve_path=True로 절대경로 변환해줌
+    
     config_dir = root_path / ".codigest"
     config_file = config_dir / "config.toml"
     gitignore_file = root_path / ".gitignore"
