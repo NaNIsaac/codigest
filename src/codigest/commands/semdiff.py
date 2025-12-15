@@ -61,38 +61,42 @@ def handle(
             # Read Content (Handle Missing Files for Deletion)
             try:
                 new_code = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
-            except: new_code = ""
+            except:
+                new_code = ""
                 
             old_code = anchor.read_anchor_file(rel_path)
             
             # Case: File Added (No old code) -> All symbols ADDED
             # Case: File Deleted (No new code) -> All symbols REMOVED
             # Case: Modified -> Semantic Compare
-            
+
             changes = semdiff.compare(old_code, new_code)
-            
+
             if changes:
                 change_lines = []
                 for ch in changes:
-                    if ch.change_type == "ADDED": icon = "➕ [ADDED]   "
-                    elif ch.change_type == "REMOVED": icon = "➖ [REMOVED] "
-                    elif ch.change_type == "MODIFIED": icon = "⚠️ [SIGNATURE]" # 중요: 시그니처 변경
-                    else: icon = "✏️ [LOGIC]   " # 내부 로직 변경
+                    if ch.change_type == "ADDED":
+                        icon = "➕ [ADDED]   "
+                    elif ch.change_type == "REMOVED":
+                        icon = "➖ [REMOVED] "
+                    elif ch.change_type == "MODIFIED":
+                        icon = "⚠️ [SIGNATURE]" # 중요: 시그니처 변경
+                    else:
+                        icon = "✏️ [LOGIC]   "
                         
                     detail = f" :: {ch.details}" if ch.details else ""
                     line = f"{icon} {ch.symbol.type} {ch.symbol.name}{ch.symbol.signature}{detail}"
                     change_lines.append(line)
-                
+
                 # File Deleted Tagging
                 file_status = ""
-                if not new_code: file_status = " (DELETED)"
-                elif not old_code: file_status = " (NEW)"
+                if not new_code:
+                    file_status = " (DELETED)"
+                elif not old_code:
+                    file_status = " (NEW)"
 
-                block = tags.xml(t"""
-                <file path="{rel_path.as_posix()}{file_status}">
-                {chr(10).join(change_lines)}
-                </file>
-                """)
+                raw_body = chr(10).join(change_lines)
+                block = tags.file(rel_path.as_posix(), raw_body, status=file_status)
                 reports.append(block)
 
         progress.update(task, completed=100)

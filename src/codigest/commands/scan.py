@@ -41,7 +41,7 @@ def _find_project_root(start_path: Path) -> Path:
 
 @app.callback(invoke_without_command=True)
 def handle(
-    # [변경] targets를 리스트로 받음 (여러 폴더 지정 가능)
+    # targets를 리스트로 받음 (여러 폴더 지정 가능)
     targets: list[Path] = typer.Argument(
         None, 
         help="Specific files or directories to scan (Scope)",
@@ -59,7 +59,7 @@ def handle(
     """
     # 1. 프로젝트 루트 결정 (현재 위치 기준 상위 탐색)
     root_path = _find_project_root(Path.cwd())
-    
+
     # 2. Scope 설정
     # 입력된 targets가 있으면 사용, 없으면 [root_path] 전체
     scan_scope = targets if targets else None
@@ -124,11 +124,9 @@ def handle(
             rel_path = file_path.relative_to(root_path).as_posix()
             try:
                 content = processor.read_file_content(file_path, add_line_numbers=line_numbers)
-                block = tags.xml(t"""
-                    <file path="{rel_path}">
-                    {content}
-                    </file>
-                """)
+                
+
+                block = tags.file(rel_path, content)
                 file_blocks.append(block)
             except Exception:
                 continue

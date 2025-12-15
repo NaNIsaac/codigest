@@ -19,15 +19,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    # [변경] uv 설치 (가장 빠르고 확실한 방법)
+    # uv 설치 (가장 빠르고 확실한 방법)
     - name: Install uv
       uses: astral-sh/setup-uv@v5
     
-    # [변경] Python 3.14 설정 (uv 이용)
+    # Python 3.14 설정 (uv 이용)
     - name: Set up Python
       run: uv python install 3.14
     
-    # [변경] 의존성 설치 및 빌드 (uv build 하나로 해결)
+    # 의존성 설치 및 빌드 (uv build 하나로 해결)
     - name: Build package
       run: uv build
     

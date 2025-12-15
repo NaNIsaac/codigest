@@ -49,11 +49,7 @@ def handle(
                     
                     if summary:
                         rel_path = file_path.relative_to(root_path).as_posix()
-                        block = tags.xml(t"""
-                        <file path="{rel_path}">
-                        {summary}
-                        </file>
-                        """)
+                        block = tags.file(rel_path, summary)
                         summary_blocks.append(block)
                 except Exception:
                     continue

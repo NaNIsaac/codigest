@@ -12,7 +12,7 @@ console = Console()
 
 @app.callback(invoke_without_command=True)
 def handle(
-    # [변경 1] target 인자 추가
+    # target 인자 추가
     target: Path = typer.Argument(
         Path.cwd(), 
         help="Target directory to check diff",
