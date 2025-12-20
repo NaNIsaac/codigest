@@ -132,7 +132,7 @@ def parse_code(code: str) -> Dict[str, SymbolInfo]:
     except SyntaxError:
         return {} 
 
-def compare(old_code: str, new_code: str) -> List[SemanticChange]:
+def compare(old_code: str, new_code: str) -> list[SemanticChange]:
     old_syms = parse_code(old_code)
     new_syms = parse_code(new_code)
     
