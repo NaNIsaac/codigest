@@ -32,6 +32,7 @@ Issues = "https://github.com/SJB777/codigest/issues"
 
 [project.scripts]
 codigest = "codigest.main:app"
+cdg = "codigest.main:app"
 
 [build-system]
 requires = ["hatchling"]

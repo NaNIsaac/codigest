@@ -28,7 +28,7 @@ def handle(
 
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        console.print("[yellow]⚠️  No scan history found. Run [bold]codigest scan[/bold] first.[/yellow]")
+        console.print("[yellow]No scan history found. Run [bold]codigest scan[/bold] first.[/yellow]")
         raise typer.Exit(1)
 
     console.print(f"[dim]Analyzing structural changes since ({last_update})...[/dim]")
@@ -118,7 +118,7 @@ def handle(
             instruction=message
         )
     except Exception as e:
-        console.print(f"[red]❌ Template Error:[/red] {e}")
+        console.print(f"[red]Template Error:[/red] {e}")
         raise typer.Exit(1)
 
     token_count = tokenizer.estimate_tokens(final_output)
@@ -126,10 +126,10 @@ def handle(
     
     if copy:
         pyperclip.copy(final_output)
-        console.print("[dim]📋 Copied to clipboard[/dim]")
+        console.print("[dim]Copied to clipboard[/dim]")
     
     if save:
         out_path = root_path / ".codigest" / "semdiff.xml"
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(final_output, encoding="utf-8")
-        console.print(f"[dim]💾 Saved to {out_path}[/dim]")
+        console.print(f"[dim]Saved to {out_path}[/dim]")

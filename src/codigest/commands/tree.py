@@ -77,7 +77,7 @@ def handle(
     [Visual] Print the project directory tree (Respects .gitignore).
     """
     if not target.exists():
-        console.print(f"[red]❌ Error: Path '{target}' does not exist.[/red]")
+        console.print(f"[red]Error: Path '{target}' does not exist.[/red]")
         raise typer.Exit(code=1)
 
     root_path = target.resolve()
@@ -97,7 +97,7 @@ def handle(
     try:
         files = scan_project(root_path, extensions)
     except Exception as e:
-        console.print(f"[red]❌ Scan failed:[/red] {e}")
+        console.print(f"[red]Scan failed:[/red] {e}")
         raise typer.Exit(code=1)
 
     if not files:

@@ -65,7 +65,7 @@ def handle(
                 instruction=message
             )
         except Exception as e:
-            console.print(f"[red]❌ Rendering Failed:[/red] {e}")
+            console.print(f"[red]Rendering Failed:[/red] {e}")
             raise typer.Exit(1)
             
         progress.update(task, completed=100)
@@ -75,10 +75,10 @@ def handle(
     
     if copy:
         pyperclip.copy(digest_content)
-        console.print("[dim]📋 Copied to clipboard[/dim]")
+        console.print("[dim]Copied to clipboard[/dim]")
     
     if save:
         out_path = root_path / ".codigest" / "digest.xml"
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(digest_content, encoding="utf-8")
-        console.print(f"[dim]💾 Saved to {out_path}[/dim]")
+        console.print(f"[dim]Saved to {out_path}[/dim]")

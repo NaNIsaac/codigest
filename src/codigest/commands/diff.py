@@ -35,7 +35,7 @@ def handle(
     # 1. Check Baseline Existence
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        console.print("[yellow]⚠️  No scan history found.[/yellow]")
+        console.print("[yellow]No scan history found.[/yellow]")
         console.print("   Run [bold cyan]codigest scan[/bold cyan] first to establish a baseline.")
         raise typer.Exit(1)
 
@@ -84,10 +84,10 @@ def handle(
     
     if copy:
         pyperclip.copy(formatted_diff)
-        console.print("[dim]📋 Copied to clipboard[/dim]")
+        console.print("[dim]Copied to clipboard[/dim]")
 
     if save:
         out_path = root_path / ".codigest" / "changes.diff"
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(formatted_diff, encoding="utf-8")
-        console.print(f"[dim]💾 Saved to {out_path}[/dim]")
+        console.print(f"[dim]Saved to {out_path}[/dim]")
