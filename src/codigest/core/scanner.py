@@ -123,9 +123,9 @@ class ProjectScanner:
 
 def scan_project(
     root_path: Path, 
-    extensions: set[str] = None, 
-    extra_ignores: list[str] = None, 
-    include_paths: list[Path] = None
+    extensions: set[str] | None = None, 
+    extra_ignores: list[str] | None = None, 
+    include_paths: list[Path] | None = None
 ) -> list[Path]:
     scanner = ProjectScanner(root_path, extensions, extra_ignores, include_paths)
     return scanner.scan()

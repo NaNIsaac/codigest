@@ -17,7 +17,7 @@ class ContextAnchor:
         """Checks if a valid anchor (git repo with commits) exists."""
         return self.git_dir.exists() and (self.anchor_dir / ".git" / "HEAD").exists()
 
-    def _run_git(self, args: list[str], cwd: Path = None, check=True) -> str:
+    def _run_git(self, args: list[str], cwd: Path | None = None, check=True) -> str:
         target_dir = cwd or self.anchor_dir
         cmd = ["git"] + args
         result = subprocess.run(
@@ -44,19 +44,46 @@ class ContextAnchor:
             else:
                 item.unlink()
 
+        source_rel_paths = set()
+
         for src in source_files:
             if ".git" in src.parts:
                 continue
             try:
                 rel = src.relative_to(self.root)
                 dest = self.anchor_dir / rel
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dest)
+
+                if not dest.parent.exists():
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+
+                should_copy = True
+                if dest.exists():
+                    src_stat = src.stat()
+                    dest_stat = dest.stat()
+
+                    if src_stat.st_size == dest_stat.st_size and dest_stat.st_mtime >= src_stat.st_mtime:
+                        should_copy = False
+                
+                if should_copy:
+                    shutil.copy2(src, dest)
             except Exception:
                 continue
 
+        for anchor_file in self.anchor_dir.rglob("*"):
+            if anchor_file.is_file():
+                if ".git" in anchor_file.parts:
+                    continue
+
+                try:
+                    rel = anchor_file.relative_to(self.anchor_dir)
+                    if rel not in source_rel_paths:
+                        anchor_file.unlink()
+
+                except Exception:
+                    continue
+
         self._run_git(["add", "."])
-        if self._run_git(["status", "--porcelain"]):
+        if self._run_git(["diff-index", "--quiet", "HEAD", "--"], check=False) != "":
             self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
             logger.info("Context anchor updated.")
 
@@ -108,7 +135,7 @@ class ContextAnchor:
                 if d.exists():
                     shutil.rmtree(d)
 
-    def _prune_ignored_files(self, baseline_dir: Path, valid_rel_paths: Set[Path]):
+    def _prune_ignored_files(self, baseline_dir: Path, valid_rel_paths: set[Path]):
         for file_path in baseline_dir.rglob("*"):
             if file_path.is_file() and ".git" not in file_path.parts:
                 try:

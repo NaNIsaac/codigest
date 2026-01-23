@@ -106,14 +106,14 @@ def handle(
         )
 
         # Pre-scan Diff Report
-        if anchor.has_history():
-            try:
-                diff_content = anchor.get_changes(files)
-                if diff_content.strip():
-                    pre_diff_path = artifact_dir / "previous_changes.diff"
-                    pre_diff_path.write_text(diff_content, encoding="utf-8")
-            except Exception:
-                pass
+        # if anchor.has_history():
+        #     try:
+        #         diff_content = anchor.get_changes(files)
+        #         if diff_content.strip():
+        #             pre_diff_path = artifact_dir / "previous_changes.diff"
+        #             pre_diff_path.write_text(diff_content, encoding="utf-8")
+        #     except Exception:
+        #         pass
 
         # Structure Generation
         tree_str = structure.generate_ascii_tree(files, root_path)
