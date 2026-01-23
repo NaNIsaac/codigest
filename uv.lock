@@ -16,7 +16,11 @@ wheels = [
 
 [[package]]
 name = "codigest"
+<<<<<<< HEAD
 version = "0.3.2"
+=======
+version = "0.3.5"
+>>>>>>> 03f5ec5087ff49559e917b3620b915c9ace496c2
 source = { editable = "." }
 dependencies = [
     { name = "loguru" },

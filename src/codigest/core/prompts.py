@@ -122,7 +122,7 @@ Use this to understand the project structure and relationships.
 
 # Registry of default implementations
 # Ensure ALL keys correspond to prompt_engine.render calls
-DEFAULT_RENDERERS: Dict[str, RenderFunc] = {
+DEFAULT_RENDERERS: dict[str, RenderFunc] = {
     "snapshot": _default_snapshot,
     "diff": _default_diff,
     "semdiff": _default_semdiff,
@@ -134,7 +134,7 @@ class PromptEngine:
         self.root_path = root_path
         self.overrides = self._load_overrides()
 
-    def _load_overrides(self) -> Dict[str, str]:
+    def _load_overrides(self) -> dict[str, str]:
         """Loads raw template strings from .codigest/prompts.toml"""
         prompt_file = self.root_path / ".codigest" / "prompts.toml"
         if not prompt_file.exists():

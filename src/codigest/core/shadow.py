@@ -1,5 +1,6 @@
 """
 Context Anchor Engine.
+Modified to hide internal git repository from VS Code by renaming .git -> .shadow_git
 """
 import shutil
 import subprocess
@@ -11,25 +12,40 @@ class ContextAnchor:
     def __init__(self, root_path: Path):
         self.root = root_path
         self.anchor_dir = root_path / ".codigest" / "anchor"
-        self.git_dir = self.anchor_dir / ".git"
+
+        self.git_dir = self.anchor_dir / ".shadow_git"
 
     def has_history(self) -> bool:
         """Checks if a valid anchor (git repo with commits) exists."""
-        return self.git_dir.exists() and (self.anchor_dir / ".git" / "HEAD").exists()
+        return self.git_dir.exists() and (self.git_dir / "HEAD").exists()
 
     def _run_git(self, args: list[str], cwd: Path | None = None, check=True) -> str:
+
+        base_cmd = [
+            "git", 
+            "--git-dir", str(self.git_dir), 
+            "--work-tree", str(self.anchor_dir)
+        ]
+
+        cmd = base_cmd + args
+
         target_dir = cwd or self.anchor_dir
-        cmd = ["git"] + args
+        
         result = subprocess.run(
             cmd, cwd=target_dir, capture_output=True, text=True, encoding='utf-8', errors='replace'
         )
+        
         if check and result.returncode != 0:
-            logger.debug(f"Shadow Git Warning: {result.stderr}")
+
+            logger.debug(f"Shadow Git Warning ({args[0]}): {result.stderr.strip()}")
+            
         return (result.stdout or "").strip()
 
     def update(self, source_files: list[Path]):
         if not self.git_dir.exists():
             self.anchor_dir.mkdir(parents=True, exist_ok=True)
+            self.git_dir.mkdir(parents=True, exist_ok=True)
+
             self._run_git(["init"])
             self._run_git(["config", "user.email", "codigest@ai"])
             self._run_git(["config", "user.name", "Context Manager"])
@@ -37,7 +53,7 @@ class ContextAnchor:
             self._run_git(["config", "gc.auto", "0"])
 
         for item in self.anchor_dir.iterdir():
-            if item.name == ".git":
+            if item.name == ".shadow_git": # [변경] 보호할 폴더 이름 변경
                 continue
             if item.is_dir():
                 shutil.rmtree(item)
@@ -114,7 +130,12 @@ class ContextAnchor:
                     continue
 
             subprocess.run(
-                ["git", "--git-dir", str(self.git_dir), "--work-tree", str(temp_baseline), "checkout", "HEAD", "--", "."],
+                [
+                    "git", 
+                    "--git-dir", str(self.git_dir),  # [변경] .shadow_git 경로 사용
+                    "--work-tree", str(temp_baseline), 
+                    "checkout", "HEAD", "--", "."
+                ],
                 capture_output=True, check=False
             )
 
@@ -154,44 +175,38 @@ class ContextAnchor:
             return "Never"
         try:
             return self._run_git(["log", "-1", "--format=%cr"])
-        except:
+        except (subprocess.SubprocessError, FileNotFoundError) as e:
+            logger.warning(f"Git history lookup failed: {e}")
             return "Unknown"
 
     def read_anchor_file(self, rel_path: Path) -> str:
-        """
-        Reads the content of a file from the Shadow Git HEAD (Baseline).
-        Used for comparing Old vs New AST.
-        """
         if not self.git_dir.exists():
             return ""
         
-        # Git expects forward slashes
         git_path = rel_path.as_posix()
-        
-        # git show HEAD:path/to/file
+
         result = subprocess.run(
-            ["git", "--git-dir", str(self.git_dir), "--work-tree", str(self.anchor_dir), "show", f"HEAD:{git_path}"],
+            [
+                "git", 
+                "--git-dir", str(self.git_dir), # [변경]
+                "--work-tree", str(self.anchor_dir),
+                "show", f"HEAD:{git_path}"
+            ],
             capture_output=True, text=True, encoding='utf-8', errors='replace'
         )
         
         if result.returncode != 0:
-            # File might be new (not in anchor), return empty string
             return ""
             
         return result.stdout
 
     def get_changed_files(self, current_files: list[Path]) -> list[Path]:
-        """Returns list of paths that have text diffs (Modified/Added/Deleted)."""
         raw_diff = self.get_changes(current_files)
         paths = set()
         for line in raw_diff.splitlines():
-            # diff --git a/src/main.py b/src/main.py
             if line.startswith("diff --git"):
                 parts = line.split()
-                # Parse paths (rough parsing, robust enough for standard names)
-                # usually parts[-1] is b/path, parts[-2] is a/path
                 if len(parts) >= 4:
-                    # Clean "a/" or "b/"
                     p = parts[-1]
                     if p.startswith("b/") or p.startswith("a/"): p = p[2:]
                     paths.add(self.root / p)

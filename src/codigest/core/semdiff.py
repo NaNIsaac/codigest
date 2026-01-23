@@ -24,7 +24,7 @@ class SemanticChange:
 
 class CodeParser(ast.NodeVisitor):
     def __init__(self):
-        self.symbols: Dict[str, SymbolInfo] = {}
+        self.symbols: dict[str, SymbolInfo] = {}
         self.current_class = None
 
     def _get_hash(self, node: ast.AST) -> str:
@@ -122,7 +122,7 @@ class CodeParser(ast.NodeVisitor):
                 content_hash=self._get_hash(node)
             )
 
-def parse_code(code: str) -> Dict[str, SymbolInfo]:
+def parse_code(code: str) -> dict[str, SymbolInfo]:
     if not code: return {}
     try:
         tree = ast.parse(code)
@@ -132,7 +132,7 @@ def parse_code(code: str) -> Dict[str, SymbolInfo]:
     except SyntaxError:
         return {} 
 
-def compare(old_code: str, new_code: str) -> List[SemanticChange]:
+def compare(old_code: str, new_code: str) -> list[SemanticChange]:
     old_syms = parse_code(old_code)
     new_syms = parse_code(new_code)
     

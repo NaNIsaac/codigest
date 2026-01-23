@@ -58,7 +58,7 @@ def main():
             raise e
         
         error_msg = str(e)
-        console.print(f"[bold red]❌ Error:[/bold red] {error_msg}")
+        console.print(f"[bold red]Error:[/bold red] {error_msg}")
         sys.exit(1)
 
 if __name__ == "__main__":
