@@ -8,6 +8,7 @@ from ..core import prompts, shadow, tags, common
 
 app = typer.Typer()
 console = Console()
+err_console = Console(stderr=True)
 
 @app.callback(invoke_without_command=True)
 def handle(
@@ -21,6 +22,7 @@ def handle(
     ),
     copy: bool = typer.Option(True, help="Auto-copy to clipboard"),
     save: bool = typer.Option(True, help="Save to .codigest/changes.diff"),
+    stdout: bool = typer.Option(False, "-s", "--stdout", help="Print output to terminal (stdout) instead of file"),
     message: str = typer.Option("", "--message", "-m", help="Add specific instruction context"),
     # [추가] resolve 옵션
     resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports"),
@@ -29,6 +31,8 @@ def handle(
     [Context Update] Shows changes since the last 'codigest scan'.
     Useful for updating LLM context without re-uploading everything.
     """
+    log_console = err_console if stdout else console
+
     # [1] Context Setup
     ctx = common.get_context(target)
     root_path = ctx.root_path
@@ -38,18 +42,18 @@ def handle(
     # Check Baseline
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        console.print("[yellow]⚠️  No scan history found.[/yellow]")
-        console.print("   Run [bold cyan]cdg scan[/bold cyan] first to establish a baseline.")
+        log_console.print("[yellow]⚠️  No scan history found.[/yellow]")
+        log_console.print("   Run [bold cyan]cdg scan[/bold cyan] first to establish a baseline.")
         raise typer.Exit(1)
 
-    console.print(f"[dim]Checking changes since last scan ({last_update})...[/dim]")
+    log_console.print(f"[dim]Checking changes since last scan ({last_update})...[/dim]")
 
     # [2] Calculate Diff via Context
     with Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]Analyzing changes...[/bold blue]"),
         transient=True,
-        console=console
+        console=log_console
     ) as progress:
         task = progress.add_task("diff", total=None)
 
@@ -62,7 +66,7 @@ def handle(
         progress.update(task, completed=100)
 
     if not diff_content.strip():
-        console.print("[green]No changes detected since last scan.[/green]")
+        log_console.print("[green]No changes detected since last scan.[/green]")
         return
 
     # [3] Render
@@ -81,14 +85,19 @@ def handle(
         formatted_diff = f"<diff>\n{safe_content}\n</diff>"
 
     # [4] Output
-    console.print(f"[bold green]Changes Detected![/bold green] ({len(formatted_diff)} chars)")
+    log_console.print(f"[bold green]Changes Detected![/bold green] ({len(formatted_diff)} chars)")
     
     if copy:
-        pyperclip.copy(formatted_diff)
-        console.print("[dim]Clipboard copied[/dim]")
+        try:
+            pyperclip.copy(formatted_diff)
+            log_console.print("[dim]Clipboard copied[/dim]")
+        except Exception:
+            log_console.print("[dim]⚠️ Clipboard unavailable (skipped copy)[/dim]")
 
-    if save:
+    if stdout:
+        print(formatted_diff)
+    elif save:
         out_path = root_path / ".codigest" / "changes.diff"
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(formatted_diff, encoding="utf-8")
-        console.print(f"[dim]Saved to {out_path}[/dim]")
+        log_console.print(f"[dim]Saved to {out_path}[/dim]")

@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from importlib.metadata import version, PackageNotFoundError
 
-from .commands import init, scan, tree, digest, diff, semdiff
+from .commands import init, scan, tree, digest, diff, semdiff, status, clean
 
 console = Console()
 
@@ -18,6 +18,8 @@ app = typer.Typer(
 )
 
 app.add_typer(init.app, name="init")
+app.add_typer(status.app, name="status")
+app.add_typer(clean.app, name="clean")
 app.add_typer(scan.app, name="scan")
 app.add_typer(tree.app, name="tree")
 app.add_typer(digest.app, name="digest")

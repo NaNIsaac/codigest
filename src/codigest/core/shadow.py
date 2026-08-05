@@ -10,17 +10,16 @@ from loguru import logger
 
 class ContextAnchor:
     def __init__(self, root_path: Path):
-        self.root = root_path
-        self.anchor_dir = root_path / ".codigest" / "anchor"
-
-        self.git_dir = self.anchor_dir / ".shadow_git"
+        self.root = root_path.resolve()
+        self.anchor_dir = (self.root / ".codigest" / "anchor").resolve()
+        self.git_dir = (self.anchor_dir / ".shadow_git").resolve()
 
     def has_history(self) -> bool:
         """Checks if a valid anchor (git repo with commits) exists."""
         return self.git_dir.exists() and (self.git_dir / "HEAD").exists()
 
     def _run_git(self, args: list[str], cwd: Path | None = None, check=True) -> str:
-
+        self.anchor_dir.mkdir(parents=True, exist_ok=True)
         base_cmd = [
             "git", 
             "--git-dir", str(self.git_dir), 
@@ -42,11 +41,16 @@ class ContextAnchor:
         return (result.stdout or "").strip()
 
     def update(self, source_files: list[Path]):
-        if not self.git_dir.exists():
-            self.anchor_dir.mkdir(parents=True, exist_ok=True)
-            self.git_dir.mkdir(parents=True, exist_ok=True)
-
-            self._run_git(["init"])
+        self.anchor_dir.mkdir(parents=True, exist_ok=True)
+        (self.anchor_dir / ".gitignore").write_text(".shadow_git\n", encoding="utf-8")
+        if not self.git_dir.exists() or not (self.git_dir / "HEAD").exists():
+            if self.git_dir.exists():
+                shutil.rmtree(self.git_dir)
+            subprocess.run(
+                ["git", "init", "--bare", str(self.git_dir)],
+                capture_output=True, check=False
+            )
+            self._run_git(["config", "core.bare", "false"])
             self._run_git(["config", "user.email", "codigest@ai"])
             self._run_git(["config", "user.name", "Context Manager"])
             self._run_git(["config", "core.autocrlf", "false"])
@@ -63,7 +67,7 @@ class ContextAnchor:
         source_rel_paths = set()
 
         for src in source_files:
-            if ".git" in src.parts:
+            if ".git" in src.parts or ".codigest" in src.parts:
                 continue
             try:
                 rel = src.relative_to(self.root)
@@ -80,6 +84,7 @@ class ContextAnchor:
                     if src_stat.st_size == dest_stat.st_size and dest_stat.st_mtime >= src_stat.st_mtime:
                         should_copy = False
                 
+                source_rel_paths.add(rel)
                 if should_copy:
                     shutil.copy2(src, dest)
             except Exception:
@@ -87,7 +92,7 @@ class ContextAnchor:
 
         for anchor_file in self.anchor_dir.rglob("*"):
             if anchor_file.is_file():
-                if ".git" in anchor_file.parts:
+                if ".shadow_git" in anchor_file.parts:
                     continue
 
                 try:
@@ -99,7 +104,10 @@ class ContextAnchor:
                     continue
 
         self._run_git(["add", "."])
-        if self._run_git(["diff-index", "--quiet", "HEAD", "--"], check=False) != "":
+        if not self._run_git(["rev-parse", "--verify", "HEAD"], check=False):
+            self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
+            logger.info("Initial context anchor created.")
+        elif self._run_git(["diff-index", "--quiet", "HEAD", "--"], check=False) != "":
             self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
             logger.info("Context anchor updated.")
 
@@ -118,7 +126,7 @@ class ContextAnchor:
         try:
             current_rel_paths = set()
             for src in current_files:
-                if ".git" in src.parts:
+                if ".git" in src.parts or ".codigest" in src.parts:
                     continue
                 try:
                     rel = src.relative_to(self.root)
@@ -149,7 +157,15 @@ class ContextAnchor:
             
             diff_text = (result.stdout or "")
             diff_text = diff_text.replace("temp_diff_baseline/", "").replace("temp_diff_current/", "")
-            return diff_text
+            
+            clean_lines = []
+            skip = False
+            for line in diff_text.splitlines():
+                if line.startswith("diff --git"):
+                    skip = any(x in line for x in [".shadow_git", ".codigest", ".git"])
+                if not skip:
+                    clean_lines.append(line)
+            return "\n".join(clean_lines)
 
         finally:
             for d in [temp_current, temp_baseline]:
@@ -158,7 +174,7 @@ class ContextAnchor:
 
     def _prune_ignored_files(self, baseline_dir: Path, valid_rel_paths: set[Path]):
         for file_path in baseline_dir.rglob("*"):
-            if file_path.is_file() and ".git" not in file_path.parts:
+            if file_path.is_file() and ".git" not in file_path.parts and ".codigest" not in file_path.parts and ".shadow_git" not in file_path.parts:
                 try:
                     rel_path = file_path.relative_to(baseline_dir)
                     if rel_path in valid_rel_paths:
@@ -209,5 +225,6 @@ class ContextAnchor:
                 if len(parts) >= 4:
                     p = parts[-1]
                     if p.startswith("b/") or p.startswith("a/"): p = p[2:]
-                    paths.add(self.root / p)
+                    if not any(part in (".codigest", ".git", ".shadow_git") for part in Path(p).parts):
+                        paths.add(self.root / p)
         return sorted(list(paths))

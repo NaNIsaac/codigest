@@ -1,3 +1,4 @@
+import sys
 import typer
 from pathlib import Path
 from rich.console import Console
@@ -5,10 +6,11 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 from rich.filesize import decimal
 
-from ..core import structure, tags, prompts, processor, shadow, tokenizer, common
+from ..core import structure, tags, prompts, processor, shadow, tokenizer, common, cache
 
 app = typer.Typer()
 console = Console()
+err_console = Console(stderr=True)
 
 @app.callback(invoke_without_command=True)
 def handle(
@@ -18,7 +20,8 @@ def handle(
         exists=True,
         resolve_path=True
     ),
-    output: str = typer.Option("snapshot.xml", help="Output filename inside .codigest/"),
+    output: str = typer.Option("snapshot.txt", "-o", "--output", help="Output filename inside .codigest/"),
+    stdout: bool = typer.Option(False, "-s", "--stdout", help="Print output to terminal (stdout) instead of file"),
     all: bool = typer.Option(False, "--all", "-a", help="Ignore config filters"),
     message: str = typer.Option("", "--message", "-m", help="Add specific instruction"),
     line_numbers: bool = typer.Option(False, "--lines", "-l", help="Add line numbers to code blocks"),
@@ -29,6 +32,8 @@ def handle(
     Scans the codebase. 
     If TARGETS provided, only scans those paths within the project.
     """
+    log_console = err_console if stdout else console
+
     # [1] Context Setup (Centralized)
     ctx = common.get_context(targets)
     root_path = ctx.root_path
@@ -36,11 +41,11 @@ def handle(
     # Init check
     artifact_dir = root_path / ".codigest"
     if not artifact_dir.exists():
-        console.print(f"[yellow][Warning] .codigest directory missing in {root_path.name}. Running init...[/yellow]")
+        log_console.print(f"[yellow][Warning] .codigest directory missing in {root_path.name}. Running init...[/yellow]")
         try:
             artifact_dir.mkdir(exist_ok=True)
         except PermissionError:
-            console.print(f"[red][Error] Cannot create .codigest at {root_path}[/red]")
+            log_console.print(f"[red][Error] Cannot create .codigest at {root_path}[/red]")
             raise typer.Exit(1)
 
     output_path = artifact_dir / output
@@ -52,7 +57,7 @@ def handle(
         SpinnerColumn(),
         TextColumn("[bold blue]Scanning...[/bold blue]"),
         transient=True,
-        console=console
+        console=log_console
     ) as progress:
         task = progress.add_task("scanning", total=None)
         
@@ -70,7 +75,7 @@ def handle(
     total_size = sum(f.stat().st_size for f in files)
     est_tokens = int(total_size / 4) 
 
-    console.print(Panel(f"""[bold]Scan Plan[/bold]
+    log_console.print(Panel(f"""[bold]Scan Plan[/bold]
   Target: [cyan]{root_path}[/cyan]
   Scope: {total_files} files
   Est. Size: {decimal(total_size)}
@@ -83,19 +88,19 @@ def handle(
     if yes:
         pass 
     elif is_large_context:
-        console.print(f"[yellow][Warning] Large context detected (> {TOKEN_THRESHOLD:,} tokens or > {FILE_COUNT_THRESHOLD} files).[/yellow]")
+        log_console.print(f"[yellow][Warning] Large context detected (> {TOKEN_THRESHOLD:,} tokens or > {FILE_COUNT_THRESHOLD} files).[/yellow]")
         if not typer.confirm("Proceed with digestion?"):
-            console.print("[red]Aborted.[/red]")
+            log_console.print("[red]Aborted.[/red]")
             raise typer.Exit()
     else:
-        console.print("[dim]Small context detected. Automatically proceeding...[/dim]")
+        log_console.print("[dim]Small context detected. Automatically proceeding...[/dim]")
 
     # [4] Execution
     with Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]Generating Snapshot...[/bold blue]"),
         transient=True,
-        console=console
+        console=log_console
     ) as progress:
         
         if anchor.has_history():
@@ -109,19 +114,33 @@ def handle(
 
         tree_str = structure.generate_ascii_tree(files, root_path)
 
+        content_cache = cache.ContentCache(root_path)
         file_blocks = []
+
         for file_path in files:
             try:
                 rel_path = file_path.relative_to(root_path).as_posix()
             except ValueError:
                 rel_path = f"[EXTERNAL]/{file_path.name}"
 
-            try:
-                content = processor.read_file_content(file_path, add_line_numbers=line_numbers)
-                block = tags.file(rel_path, content)
-                file_blocks.append(block)
-            except Exception:
-                continue
+            blob_hash = cache.get_file_blob_hash(file_path)
+            cached_block = None
+            if blob_hash:
+                cached_block = content_cache.get_file_block(rel_path, blob_hash, line_numbers)
+
+            if cached_block is not None:
+                file_blocks.append(cached_block)
+            else:
+                try:
+                    content = processor.read_file_content(file_path, add_line_numbers=line_numbers)
+                    block = tags.file(rel_path, content)
+                    file_blocks.append(block)
+                    if blob_hash:
+                        content_cache.set_file_block(rel_path, blob_hash, line_numbers, block)
+                except Exception:
+                    continue
+
+        content_cache.save()
 
         source_code_blob = "\n\n".join(file_blocks)
 
@@ -134,27 +153,30 @@ def handle(
                 instruction=message
             )
         except Exception as e:
-            console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
+            log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
             raise typer.Exit(1)
 
     try:
         anchor.update(files)
     except Exception as e:
-        console.print(f"[yellow][Warning] Failed to update context anchor: {e}[/yellow]")
+        log_console.print(f"[yellow][Warning] Failed to update context anchor: {e}[/yellow]")
 
-    try:
-        output_path.write_text(snapshot_content, encoding="utf-8")
-        final_token_count = tokenizer.estimate_tokens(snapshot_content)
+    if stdout:
+        print(snapshot_content)
+    else:
+        try:
+            output_path.write_text(snapshot_content, encoding="utf-8")
+            final_token_count = tokenizer.estimate_tokens(snapshot_content)
 
-        console.print("[bold green]Snapshot Saved![/bold green]")
-        console.print(f"  Path: [underline]{output_path}[/underline]")
-        console.print(f"  Final Tokens: [bold cyan]~{final_token_count:,}[/bold cyan]")
-        
-        if anchor.has_history():
-            pre_diff_path = artifact_dir / "previous_changes.diff"
-            if pre_diff_path.exists() and pre_diff_path.stat().st_size > 0:
-                console.print(f"  [dim]Changes before this scan saved to: {pre_diff_path.name}[/dim]")
+            log_console.print("[bold green]Snapshot Saved![/bold green]")
+            log_console.print(f"  Path: [underline]{output_path}[/underline]")
+            log_console.print(f"  Final Tokens: [bold cyan]~{final_token_count:,}[/bold cyan]")
+            
+            if anchor.has_history():
+                pre_diff_path = artifact_dir / "previous_changes.diff"
+                if pre_diff_path.exists() and pre_diff_path.stat().st_size > 0:
+                    log_console.print(f"  [dim]Changes before this scan saved to: {pre_diff_path.name}[/dim]")
 
-    except Exception as e:
-        console.print(f"[bold red][Error] Save Failed:[/bold red] {e}")
-        raise typer.Exit(1)
+        except Exception as e:
+            log_console.print(f"[bold red][Error] Save Failed:[/bold red] {e}")
+            raise typer.Exit(1)

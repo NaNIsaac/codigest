@@ -67,13 +67,12 @@ cdg init
 
 Scans the codebase and generates a structured XML snapshot. Includes a **Pre-flight Check** to prevent accidental token overflow.
 
-* **Output:** `.codigest/snapshot.xml`
+* **Output:** `.codigest/snapshot.txt` (or stdout with `-s`)
 * **Features:**
 * **Smart Confirmation:** Automatically skips confirmation for small contexts, but warns you for large ones (>30k tokens).
 * **Dependency Resolution (`-r`):** Automatically finds and includes local files imported by your target files.
 * **Scope Control:** You can specify folders or files to scan.
-
-
+* **Terminal Output (`-s` / `--stdout`):** Output directly to stdout instead of saving to file.
 
 ```bash
 # Basic scan (Interactive confirmation if large)
@@ -84,30 +83,39 @@ cdg scan src/main.py -r
 
 # Force execution without confirmation (Good for CI/CD)
 cdg scan -y --message "Automated snapshot"
+
+# Output directly to stdout
+cdg scan -s
 ```
 
 ### 3. Incremental Changes (`diff`)
 
 Tracks text-based changes between the last `scan` and the current working tree.
 
-* **Output:** `.codigest/changes.diff`
+* **Output:** `.codigest/changes.diff` (or stdout with `-s`)
 * **Use Case:** "I modified 3 files. Here is exactly what changed since the last snapshot."
 * **Note:** Checks against the internal Shadow Git, enabling tracking without committing to the real Git.
 
 ```bash
 cdg diff
+
+# Output directly to stdout
+cdg diff -s
 ```
 
 ### 4. Semantic Analysis (`semdiff`)
 
 Analyzes **structural changes** (AST-based) rather than line-by-line text differences.
 
-* **Output:** `.codigest/semdiff.xml`
+* **Output:** `.codigest/semdiff.txt` (or stdout with `-s`)
 * **Use Case:** "I refactored the API. Show me added/removed functions or signature changes."
 * **Benefit:** Reduces token usage by ignoring formatting/comment changes.
 
 ```bash
 cdg semdiff
+
+# Output directly to stdout
+cdg semdiff -s
 ```
 
 ### 5. Project Tree (`tree`)
@@ -125,11 +133,38 @@ cdg tree
 
 Generates a high-level outline of the project structure (Classes, Functions, Methods only).
 
-* **Output:** `.codigest/digest.xml`
+* **Output:** `.codigest/digest.txt` (or stdout with `-s`)
 * **Use Case:** "Don't read the implementation details. Just understand the class hierarchy."
 
 ```bash
 cdg digest
+
+# Output directly to stdout
+cdg digest -s
+```
+
+### 7. Environment Status (`status`)
+
+Displays the health of `.codigest`, anchor snapshot baseline, pending working tree changes, and generated artifacts.
+
+* **Use Case:** "Check what files have changed since my last snapshot and inspect the state of generated context artifacts."
+
+```bash
+cdg status
+```
+
+### 8. Environment Cleanup (`clean`)
+
+Removes the `.codigest/` environment and resets all context anchors and artifacts.
+
+* **Use Case:** "Clean up context files and resets Codigest tracking."
+
+```bash
+# Interactive confirmation
+cdg clean
+
+# Force clean without prompt
+cdg clean -y
 ```
 
 ---

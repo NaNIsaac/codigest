@@ -8,12 +8,14 @@ from ..core import prompts, shadow, semdiff, tags, tokenizer, common
 
 app = typer.Typer()
 console = Console()
+err_console = Console(stderr=True)
 
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(Path.cwd(), help="Target directory"),
     copy: bool = typer.Option(True, help="Auto-copy to clipboard"),
-    save: bool = typer.Option(True, help="Save to .codigest/semdiff.xml"),
+    save: bool = typer.Option(True, help="Save to .codigest/semdiff.txt"),
+    stdout: bool = typer.Option(False, "-s", "--stdout", help="Print output to terminal (stdout) instead of file"),
     message: str = typer.Option("", "--message", "-m", help="Add specific instruction"),
     # [추가] resolve 옵션
     resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports"),
@@ -22,6 +24,8 @@ def handle(
     [Advanced] Generates a Semantic Diff (AST-based) report.
     Shows ADDED/REMOVED/MODIFIED functions & classes instead of raw text lines.
     """
+    log_console = err_console if stdout else console
+
     # [1] Context Setup
     ctx = common.get_context(target)
     root_path = ctx.root_path
@@ -30,10 +34,10 @@ def handle(
 
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        console.print("[yellow]⚠️  No scan history found. Run [bold]cdg scan[/bold] first.[/yellow]")
+        log_console.print("[yellow]⚠️  No scan history found. Run [bold]cdg scan[/bold] first.[/yellow]")
         raise typer.Exit(1)
 
-    console.print(f"[dim]Analyzing structural changes since ({last_update})...[/dim]")
+    log_console.print(f"[dim]Analyzing structural changes since ({last_update})...[/dim]")
 
     reports = []
 
@@ -41,7 +45,7 @@ def handle(
         SpinnerColumn(),
         TextColumn("[bold blue]Parsing AST...[/bold blue]"),
         transient=True,
-        console=console
+        console=log_console
     ) as progress:
         task = progress.add_task("semdiff", total=None)
 
@@ -108,7 +112,7 @@ def handle(
         progress.update(task, completed=100)
 
     if not reports:
-        console.print("[green]No structural (AST) changes detected.[/green]")
+        log_console.print("[green]No structural (AST) changes detected.[/green]")
         return
 
     # [4] Render
@@ -124,18 +128,23 @@ def handle(
             instruction=message
         )
     except Exception as e:
-        console.print(f"[red]Template Error:[/red] {e}")
+        log_console.print(f"[red]Template Error:[/red] {e}")
         raise typer.Exit(1)
 
     token_count = tokenizer.estimate_tokens(final_output)
-    console.print(f"[bold green]SemDiff Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
+    log_console.print(f"[bold green]SemDiff Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
     
     if copy:
-        pyperclip.copy(final_output)
-        console.print("[dim]Clipboard copied[/dim]")
+        try:
+            pyperclip.copy(final_output)
+            log_console.print("[dim]Clipboard copied[/dim]")
+        except Exception:
+            log_console.print("[dim]⚠️ Clipboard unavailable (skipped copy)[/dim]")
     
-    if save:
-        out_path = root_path / ".codigest" / "semdiff.xml"
+    if stdout:
+        print(final_output)
+    elif save:
+        out_path = root_path / ".codigest" / "semdiff.txt"
         out_path.parent.mkdir(exist_ok=True)
         out_path.write_text(final_output, encoding="utf-8")
-        console.print(f"[dim]Saved to {out_path}[/dim]")
+        log_console.print(f"[dim]Saved to {out_path}[/dim]")
