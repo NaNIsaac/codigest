@@ -55,17 +55,15 @@ def handle(
                 except ValueError:
                     rel_path = f"[EXTERNAL]/{file_path.name}"
 
-                blob_hash = cache.get_file_blob_hash(file_path)
-                summary = None
-                if blob_hash:
-                    summary = content_cache.get_summary(rel_path, blob_hash)
+                summary = content_cache.get_summary(rel_path, blob_hash=None, file_path=file_path)
 
                 if summary is None:
                     try:
+                        blob_hash = cache.get_file_blob_hash(file_path)
                         content = file_path.read_text(encoding="utf-8")
                         summary = semdiff.summarize(content)
                         if summary and blob_hash:
-                            content_cache.set_summary(rel_path, blob_hash, summary)
+                            content_cache.set_summary(rel_path, blob_hash, summary, file_path=file_path)
                     except Exception:
                         continue
 

@@ -40,6 +40,40 @@ class ContextAnchor:
             
         return (result.stdout or "").strip()
 
+    def has_changes(self, current_files: list[Path]) -> bool:
+        """Fast check to determine if any file was modified/added/deleted since last anchor baseline."""
+        if not self.git_dir.exists() or not (self.git_dir / "HEAD").exists() or not self.anchor_dir.exists():
+            return True
+
+        current_rel_paths = set()
+        for src in current_files:
+            if ".git" in src.parts or ".codigest" in src.parts:
+                continue
+            try:
+                rel = src.relative_to(self.root)
+                current_rel_paths.add(rel)
+                dest = self.anchor_dir / rel
+                if not dest.exists():
+                    return True
+                src_stat = src.stat()
+                dest_stat = dest.stat()
+                # Use size + 1ms mtime tolerance for filesystem precision differences
+                if src_stat.st_size != dest_stat.st_size or (src_stat.st_mtime_ns - dest_stat.st_mtime_ns) > 1_000_000:
+                    return True
+            except Exception:
+                return True
+
+        for anchor_file in self.anchor_dir.rglob("*"):
+            if anchor_file.is_file() and ".shadow_git" not in anchor_file.parts and anchor_file.name != ".gitignore":
+                try:
+                    rel = anchor_file.relative_to(self.anchor_dir)
+                    if rel not in current_rel_paths:
+                        return True
+                except Exception:
+                    continue
+
+        return False
+
     def update(self, source_files: list[Path]):
         self.anchor_dir.mkdir(parents=True, exist_ok=True)
         (self.anchor_dir / ".gitignore").write_text(".shadow_git\n", encoding="utf-8")
@@ -56,13 +90,9 @@ class ContextAnchor:
             self._run_git(["config", "core.autocrlf", "false"])
             self._run_git(["config", "gc.auto", "0"])
 
-        for item in self.anchor_dir.iterdir():
-            if item.name == ".shadow_git": # [변경] 보호할 폴더 이름 변경
-                continue
-            if item.is_dir():
-                shutil.rmtree(item)
-            else:
-                item.unlink()
+        # Quick check: if nothing changed since last anchor, skip work
+        if self.git_dir.exists() and (self.git_dir / "HEAD").exists() and not self.has_changes(source_files):
+            return
 
         source_rel_paths = set()
 
@@ -81,7 +111,7 @@ class ContextAnchor:
                     src_stat = src.stat()
                     dest_stat = dest.stat()
 
-                    if src_stat.st_size == dest_stat.st_size and dest_stat.st_mtime >= src_stat.st_mtime:
+                    if src_stat.st_size == dest_stat.st_size and dest_stat.st_mtime_ns >= src_stat.st_mtime_ns:
                         should_copy = False
                 
                 source_rel_paths.add(rel)
@@ -113,6 +143,9 @@ class ContextAnchor:
 
     def get_changes(self, current_files: list[Path]) -> str:
         if not self.git_dir.exists():
+            return ""
+
+        if not self.has_changes(current_files):
             return ""
 
         temp_current = self.root / ".codigest" / "temp_diff_current"

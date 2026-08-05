@@ -123,20 +123,27 @@ def handle(
             except ValueError:
                 rel_path = f"[EXTERNAL]/{file_path.name}"
 
-            blob_hash = cache.get_file_blob_hash(file_path)
-            cached_block = None
-            if blob_hash:
-                cached_block = content_cache.get_file_block(rel_path, blob_hash, line_numbers)
+            cached_block = content_cache.get_file_block(
+                rel_path=rel_path, 
+                line_numbers=line_numbers, 
+                file_path=file_path
+            )
 
             if cached_block is not None:
                 file_blocks.append(cached_block)
             else:
                 try:
+                    blob_hash = cache.get_file_blob_hash(file_path)
                     content = processor.read_file_content(file_path, add_line_numbers=line_numbers)
                     block = tags.file(rel_path, content)
                     file_blocks.append(block)
-                    if blob_hash:
-                        content_cache.set_file_block(rel_path, blob_hash, line_numbers, block)
+                    content_cache.set_file_block(
+                        rel_path=rel_path, 
+                        blob_hash=blob_hash, 
+                        line_numbers=line_numbers, 
+                        block=block, 
+                        file_path=file_path
+                    )
                 except Exception:
                     continue
 
