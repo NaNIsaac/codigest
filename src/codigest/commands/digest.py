@@ -1,29 +1,27 @@
 import typer
-import pyperclip
 from pathlib import Path
-from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
 from ..core import structure, prompts, semdiff, tags, tokenizer, common, cache
+from ..core.output import OutputHandler
 
 app = typer.Typer()
-console = Console()
-err_console = Console(stderr=True)
 
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(Path.cwd(), help="Target directory"),
-    copy: bool = typer.Option(True, help="Auto-copy to clipboard"),
+    copy: CopyOption = True,
     save: bool = typer.Option(True, help="Save to .codigest/digest.txt"),
-    stdout: bool = typer.Option(False, "-s", "--stdout", help="Print output to terminal (stdout) instead of file"),
-    message: str = typer.Option("", "--message", "-m", help="Add specific instruction"),
-    # [추가]
-    resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports"),
+    stdout: StdoutOption = False,
+    message: MessageOption = "",
+    resolve: ResolveOption = False,
 ):
     """
     [Architectural View] Summarizes the codebase structure (Classes/Functions only).
     """
-    log_console = err_console if stdout else console
+    handler = OutputHandler(stdout=stdout, copy=copy)
+    log_console = handler.log_console
 
     # [1] Context Setup
     ctx = common.get_context(target)
@@ -92,17 +90,11 @@ def handle(
     token_count = tokenizer.estimate_tokens(digest_content)
     log_console.print(f"[bold green]Digest Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
     
-    if copy:
-        try:
-            pyperclip.copy(digest_content)
-            log_console.print("[dim]📋 Copied to clipboard[/dim]")
-        except Exception:
-            log_console.print("[dim]⚠️ Clipboard unavailable (skipped copy)[/dim]")
-    
-    if stdout:
-        print(digest_content)
-    elif save:
-        out_path = root_path / ".codigest" / "digest.txt"
-        out_path.parent.mkdir(exist_ok=True)
-        out_path.write_text(digest_content, encoding="utf-8")
-        log_console.print(f"[dim]💾 Saved to {out_path}[/dim]")
+    def _save():
+        if save:
+            out_path = root_path / ".codigest" / "digest.txt"
+            out_path.parent.mkdir(exist_ok=True)
+            out_path.write_text(digest_content, encoding="utf-8")
+            log_console.print(f"[dim]💾 Saved to {out_path}[/dim]")
+
+    handler.handle_output(digest_content, save_action=_save, item_name="digest")

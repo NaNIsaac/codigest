@@ -1,14 +1,14 @@
 import typer
 from pathlib import Path
-from rich.console import Console
 from rich.tree import Tree
 from rich.text import Text
 from rich.filesize import decimal
 
-from ..core import common
+from ..options import CopyOption, StdoutOption, ResolveOption, AllOption
+from ..core import common, structure
+from ..core.output import OutputHandler
 
 app = typer.Typer()
-console = Console()
 
 def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
     # (기존의 이모티콘 없는 버전 로직 유지)
@@ -16,7 +16,6 @@ def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
     dir_nodes = {root_path: tree}
 
     for path in files:
-        # (중략: 기존 트리 생성 로직)
         # External path 처리 (루트 밖의 파일)
         try:
             relative = path.relative_to(root_path)
@@ -54,12 +53,17 @@ def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(Path.cwd(), help="Target directory"),
-    all: bool = typer.Option(False, "--all", "-a", help="Ignore config filters"),
-    resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports"),
+    copy: CopyOption = False,
+    stdout: StdoutOption = False,
+    all: AllOption = False,
+    resolve: ResolveOption = False,
 ):
     """
     [Visual] Print the project directory tree.
     """
+    handler = OutputHandler(stdout=stdout, copy=copy)
+    log_console = handler.log_console
+
     # 1. Context 생성 (루트 찾기용)
     ctx = common.get_context(target)
     root_path = ctx.root_path
@@ -69,14 +73,19 @@ def handle(
         # [수정] targets=[target]을 명시적으로 전달해야 해당 폴더만 스캔함
         files = ctx.get_target_files(targets=[target], ignore_config=all, resolve_deps=resolve)
     except Exception as e:
-        console.print(f"[red][Error] Scan failed:[/red] {e}")
+        log_console.print(f"[red][Error] Scan failed:[/red] {e}")
         raise typer.Exit(code=1)
 
     if not files:
-        console.print("[yellow][Warning] No matching files found.[/yellow]")
+        log_console.print("[yellow][Warning] No matching files found.[/yellow]")
         return
 
     # 3. Visualize
-    tree_viz = _build_rich_tree(root_path, files)
-    console.print(tree_viz)
-    console.print(f"\n[dim]Found {len(files)} files.[/dim]")
+    ascii_tree = structure.generate_ascii_tree(files, root_path)
+    
+    def _print_tree_viz():
+        tree_viz = _build_rich_tree(root_path, files)
+        log_console.print(tree_viz)
+        log_console.print(f"\n[dim]Found {len(files)} files.[/dim]")
+
+    handler.handle_output(ascii_tree, save_action=_print_tree_viz, item_name="tree")

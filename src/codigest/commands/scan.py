@@ -1,16 +1,15 @@
 import sys
 import typer
 from pathlib import Path
-from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 from rich.filesize import decimal
 
+from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, AllOption
 from ..core import structure, tags, prompts, processor, shadow, tokenizer, common, cache
+from ..core.output import OutputHandler
 
 app = typer.Typer()
-console = Console()
-err_console = Console(stderr=True)
 
 @app.callback(invoke_without_command=True)
 def handle(
@@ -21,18 +20,20 @@ def handle(
         resolve_path=True
     ),
     output: str = typer.Option("snapshot.txt", "-o", "--output", help="Output filename inside .codigest/"),
-    stdout: bool = typer.Option(False, "-s", "--stdout", help="Print output to terminal (stdout) instead of file"),
-    all: bool = typer.Option(False, "--all", "-a", help="Ignore config filters"),
-    message: str = typer.Option("", "--message", "-m", help="Add specific instruction"),
+    copy: CopyOption = True,
+    stdout: StdoutOption = False,
+    all: AllOption = False,
+    message: MessageOption = "",
     line_numbers: bool = typer.Option(False, "--lines", "-l", help="Add line numbers to code blocks"),
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation prompt"),
-    resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports for local files"),
+    resolve: ResolveOption = False,
 ):
     """
     Scans the codebase. 
     If TARGETS provided, only scans those paths within the project.
     """
-    log_console = err_console if stdout else console
+    handler = OutputHandler(stdout=stdout, copy=copy)
+    log_console = handler.log_console
 
     # [1] Context Setup (Centralized)
     ctx = common.get_context(targets)
@@ -168,9 +169,7 @@ def handle(
     except Exception as e:
         log_console.print(f"[yellow][Warning] Failed to update context anchor: {e}[/yellow]")
 
-    if stdout:
-        print(snapshot_content)
-    else:
+    def _save():
         try:
             output_path.write_text(snapshot_content, encoding="utf-8")
             final_token_count = tokenizer.estimate_tokens(snapshot_content)
@@ -187,3 +186,5 @@ def handle(
         except Exception as e:
             log_console.print(f"[bold red][Error] Save Failed:[/bold red] {e}")
             raise typer.Exit(1)
+
+    handler.handle_output(snapshot_content, save_action=_save)

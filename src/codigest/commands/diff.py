@@ -1,14 +1,12 @@
 import typer
-import pyperclip
 from pathlib import Path
-from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
 from ..core import prompts, shadow, tags, common
+from ..core.output import OutputHandler
 
 app = typer.Typer()
-console = Console()
-err_console = Console(stderr=True)
 
 @app.callback(invoke_without_command=True)
 def handle(
@@ -20,18 +18,18 @@ def handle(
         dir_okay=True,
         resolve_path=True
     ),
-    copy: bool = typer.Option(True, help="Auto-copy to clipboard"),
+    copy: CopyOption = True,
     save: bool = typer.Option(True, help="Save to .codigest/changes.diff"),
-    stdout: bool = typer.Option(False, "-s", "--stdout", help="Print output to terminal (stdout) instead of file"),
-    message: str = typer.Option("", "--message", "-m", help="Add specific instruction context"),
-    # [추가] resolve 옵션
-    resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports"),
+    stdout: StdoutOption = False,
+    message: MessageOption = "",
+    resolve: ResolveOption = False,
 ):
     """
     [Context Update] Shows changes since the last 'codigest scan'.
     Useful for updating LLM context without re-uploading everything.
     """
-    log_console = err_console if stdout else console
+    handler = OutputHandler(stdout=stdout, copy=copy)
+    log_console = handler.log_console
 
     # [1] Context Setup
     ctx = common.get_context(target)
@@ -87,17 +85,11 @@ def handle(
     # [4] Output
     log_console.print(f"[bold green]Changes Detected![/bold green] ({len(formatted_diff)} chars)")
     
-    if copy:
-        try:
-            pyperclip.copy(formatted_diff)
-            log_console.print("[dim]Clipboard copied[/dim]")
-        except Exception:
-            log_console.print("[dim]⚠️ Clipboard unavailable (skipped copy)[/dim]")
+    def _save():
+        if save:
+            out_path = root_path / ".codigest" / "changes.diff"
+            out_path.parent.mkdir(exist_ok=True)
+            out_path.write_text(formatted_diff, encoding="utf-8")
+            log_console.print(f"[dim]Saved to {out_path}[/dim]")
 
-    if stdout:
-        print(formatted_diff)
-    elif save:
-        out_path = root_path / ".codigest" / "changes.diff"
-        out_path.parent.mkdir(exist_ok=True)
-        out_path.write_text(formatted_diff, encoding="utf-8")
-        log_console.print(f"[dim]Saved to {out_path}[/dim]")
+    handler.handle_output(formatted_diff, save_action=_save, item_name="diff")
