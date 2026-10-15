@@ -74,7 +74,7 @@ if (-not (Get-Module PSReadLine) -and $Host.Name -eq 'ConsoleHost') {
 }
 if (-not (Get-Module PSReadLine)) { return }
 
-# ponytail: denylist heuristic for programs that need a real TTY (editors, pagers,
+# Denylist heuristic for programs that need a real TTY (editors, pagers,
 # REPLs, ssh). Extend with $env:CODIGEST_CAP_SKIP (a regex) when one slips through.
 $global:__cdgSkip = '^\s*(vim?|nvim|nano|emacs|less|more|ssh|htop|btop|top|fzf|lazygit|claude|codex|wsl|exit)(\.exe)?\b' +
     '|^\s*(cdg|codigest)(\.exe)?\s+(term|mcp)\b' +

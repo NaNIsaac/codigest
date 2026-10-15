@@ -183,7 +183,7 @@ def _trim(path: Path) -> None:
     """Rewrites the log keeping only the most recent MAX_ENTRIES lines."""
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
-    # ponytail: no file lock. Concurrent hook ingests can drop an entry appended
+    # No file lock: Concurrent hook ingests can drop an entry appended
     # between read and replace; the slack makes rewrites (and that window) rare.
     if len(lines) <= MAX_ENTRIES + _TRIM_SLACK:
         return
