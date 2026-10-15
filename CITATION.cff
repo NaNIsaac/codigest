@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Codigest: codebase and terminal context manager for LLM-assisted development"
+abstract: >-
+  Command-line tool that extracts project snapshots, change-tracked diffs,
+  structural (semantic) diffs and captured terminal output as LLM-ready XML,
+  and serves them to AI agents over MCP.
+authors:
+  - family-names: Yong
+    given-names: Isaac
+    email: isaacyong@naver.com
+    affiliation: Sogang University
+repository-code: "https://github.com/NaNIsaac/codigest"
+url: "https://pypi.org/project/codigest/"
+license: MIT
+version: 0.4.0
+date-released: "2026-10-15"
+keywords:
+  - LLM
+  - developer tools
+  - code context
+  - MCP
+  - CLI
