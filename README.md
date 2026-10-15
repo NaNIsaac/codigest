@@ -1,10 +1,66 @@
 # Codigest
 
-[![PyPI](https://img.shields.io/pypi/v/codigest)](https://pypi.org/project/codigest/)
-[![Downloads](https://static.pepy.tech/badge/codigest)](https://pepy.tech/project/codigest)
-[![Tests](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml/badge.svg)](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/codigest)](https://pypi.org/project/codigest/) [![Tests](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml/badge.svg)](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 <!-- mcp-name: io.github.NaNIsaac/codigest -->
+
+**Hand an LLM your failing command, your recent changes or your whole codebase as one block of XML.**
+
+A test fails. Run it through `cdg cap`, then `cdg term -f` puts the failed command, its output and exit code
+on your clipboard, ready to paste into a chat (`-s` also prints it):
+
+```console
+$ cdg cap -- python -m unittest -q
+======================================================================
+FAIL: test_ten_percent (test_prices.DiscountTest.test_ten_percent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "~/project/test_prices.py", line 7, in test_ten_percent
+    self.assertEqual(apply_discount(200, 10), 180)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: -1800 != 180
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)
+$ cdg term -f -s
+📋 Copied 1 terminal entry to clipboard
+<terminal_history>
+<command index="1" command="python -m unittest -q" exit_code="1" cwd="~/project" duration="586ms" at="2026-10-16T05:39:44+09:00">
+<output>
+======================================================================
+FAIL: test_ten_percent (test_prices.DiscountTest.test_ten_percent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "~/project/test_prices.py", line 7, in test_ten_percent
+    self.assertEqual(apply_discount(200, 10), 180)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: -1800 != 180
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)
+</output>
+</command>
+</terminal_history>
+```
+
+An agent connected over MCP (`cdg mcp`) gets the same block from the `terminal_history` tool
+(`failed: true`), with no copying.
+
+Try it on your own project. `tree` only reads:
+
+```console
+$ uvx codigest tree
+project
+├── .gitignore (26 bytes)
+├── prices.py (102 bytes)
+└── test_prices.py (227 bytes)
+
+Found 3 files.
+```
 
 Codigest is a CLI and MCP server that turns your codebase, your recent changes and your terminal output into XML context for LLMs.
 
