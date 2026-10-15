@@ -35,6 +35,36 @@ jobs:
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
 
+  publish-mcp:
+    name: Publish to the MCP registry
+    needs: build-n-publish
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # GitHub OIDC login for io.github.NaNIsaac/*
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set server.json version from the tag
+      run: |
+        VERSION="${GITHUB_REF_NAME#v}"
+        jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp
+        mv server.tmp server.json
+        # The registry verifies the package on PyPI; wait until the release is visible.
+        for i in $(seq 30); do
+          curl -sf "https://pypi.org/pypi/codigest/$VERSION/json" > /dev/null && exit 0
+          sleep 10
+        done
+        echo "codigest $VERSION not visible on PyPI" && exit 1
+
+    - name: Install mcp-publisher
+      run: curl -sL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+
+    - name: Publish
+      run: |
+        ./mcp-publisher login github-oidc
+        ./mcp-publisher publish
+
   deploy-docs:
     name: Build and deploy Sphinx docs to GitHub Pages
     runs-on: ubuntu-latest
