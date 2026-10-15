@@ -7,12 +7,12 @@
     "url": "https://github.com/NaNIsaac/codigest",
     "source": "github"
   },
-  "version": "0.4.3",
+  "version": "0.5.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "codigest",
-      "version": "0.4.3",
+      "version": "0.5.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

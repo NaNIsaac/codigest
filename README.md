@@ -57,6 +57,8 @@ Install Codigest globally. `uv` will automatically manage the required Python 3.
 uv tool install codigest
 ```
 
+Codigest needs Python 3.15. If `uv` reports a syntax error on `lazy import`, it picked an early 3.15 alpha: run `uv self update` (or upgrade uv) and install again.
+
 ### Step 3: Update Path (Important!)
 
 To run `codigest` (or `cdg`) from any terminal, ensure your tools directory is in your PATH.
