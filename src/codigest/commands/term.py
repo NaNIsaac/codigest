@@ -40,6 +40,11 @@ FailedOption = Annotated[
     typer.Option("-f", "--failed", help="Only commands that exited non-zero"),
 ]
 
+HereOption = Annotated[
+    bool,
+    typer.Option("--here", help="Only commands run in the current directory or below"),
+]
+
 HistoryOnlyOption = Annotated[
     bool,
     typer.Option(
@@ -68,6 +73,7 @@ def handle(
     count: CountOption = 1,
     index: IndexOption = None,
     failed: FailedOption = False,
+    here: HereOption = False,
     history_only: HistoryOnlyOption = False,
     copy: CopyOption = True,
     stdout: StdoutOption = False,
@@ -80,6 +86,7 @@ def handle(
         cdg term -n 3       # the last 3 commands
         cdg term -i 3       # only the command from 3 runs ago
         cdg term -f         # the last failed command
+        cdg term --here -n 3  # the last 3 commands run in this project
     """
     if ctx.invoked_subcommand:
         return
@@ -107,10 +114,11 @@ def handle(
             _diagnose(log)
             raise typer.Exit(code=1)
 
-    if failed:
-        entries = [e for e in entries if e.exit_code not in (None, 0)]
+    if failed or here:
+        entries = termstore.select(entries, failed=failed, under=Path.cwd() if here else None)
         if not entries:
-            log.print("[yellow]No failed commands captured.[/yellow]")
+            what = " and ".join(w for w, on in (("failed", failed), ("in this directory", here)) if on)
+            log.print(f"[yellow]No captured commands match ({what}).[/yellow]")
             raise typer.Exit(code=1)
 
     if index:

@@ -15,6 +15,7 @@ exactly what a human would paste, and stdout stays clean for the protocol.
 import json
 import subprocess
 import sys
+from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
@@ -40,6 +41,11 @@ TOOLS: list[JSON] = [
             "properties": {
                 "count": {"type": "integer", "minimum": 1, "default": 1, "description": "How many recent commands"},
                 "failed": {"type": "boolean", "default": False, "description": "Only commands that exited non-zero"},
+                "here": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Only commands run in the server's working directory (the project) or below",
+                },
             },
         },
     },
@@ -81,12 +87,12 @@ TOOLS: list[JSON] = [
 
 def _terminal_history(args: JSON) -> str:
     count = int(args.get("count", 1))
-    entries = termstore.load_entries()
-    if args.get("failed"):
-        entries = [e for e in entries if e.exit_code not in (None, 0)]
-    if not entries:
+    if not (entries := termstore.load_entries()):
+        # Nothing captured at all: native shell history still names the commands.
         entries, _ = shellhist.read_recent(count)
-    return termstore.render(entries[-count:])
+        return termstore.render(entries)
+    under = Path.cwd() if args.get("here", True) else None
+    return termstore.render(termstore.select(entries, failed=bool(args.get("failed")), under=under)[-count:])
 
 
 def _cli(command: str, args: JSON) -> str:

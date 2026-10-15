@@ -32,6 +32,20 @@ def test_mcp_lists_tools_and_ignores_notifications():
     assert mcp.handle_message({"jsonrpc": "2.0", "id": 2, "method": "nope"})["error"]["code"] == -32601
 
 
+
+def test_select_filters_failed_and_directory(tmp_path):
+    project, other = tmp_path / "proj", tmp_path / "proj-other"
+    entries = [
+        Entry(command="a", exit_code=1, cwd=str(project / "sub")),
+        Entry(command="b", exit_code=0, cwd=str(project)),
+        Entry(command="c", exit_code=2, cwd=str(other)),  # shares the prefix, not the directory
+        Entry(command="d", exit_code=None, cwd=""),
+    ]
+    assert [e.command for e in termstore.select(entries, under=project)] == ["a", "b"]
+    assert [e.command for e in termstore.select(entries, failed=True)] == ["a", "c"]
+    assert [e.command for e in termstore.select(entries, failed=True, under=project)] == ["a"]
+
+
 if __name__ == "__main__":
     test_crlf_output_survives_normalization()
     test_progress_redraw_keeps_last_frame()

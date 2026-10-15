@@ -131,6 +131,20 @@ def _truncate(text: str) -> tuple[str, bool]:
 # Read / write
 # --------------------------------------------------------------------------
 
+def _inside(path: str, root: Path) -> bool:
+    path, base = (os.path.normcase(os.path.abspath(p)) for p in (path, root))
+    return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
+
+
+def select(entries: list[Entry], *, failed: bool = False, under: Path | None = None) -> list[Entry]:
+    """Keeps entries that exited non-zero (`failed`) and/or ran inside `under` or below it."""
+    if failed:
+        entries = [e for e in entries if e.exit_code not in (None, 0)]
+    if under is not None:
+        entries = [e for e in entries if e.cwd and _inside(e.cwd, under)]
+    return entries
+
+
 def load_entries() -> list[Entry]:
     """Loads all stored entries, oldest first. Corrupt lines are skipped."""
     path = get_history_path()

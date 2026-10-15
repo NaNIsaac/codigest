@@ -1,49 +1,34 @@
-name: Publish Python distributions to PyPI and GitHub Pages
+name: Publish
 
 on:
   push:
     tags:
-      - 'v*'  # v0.3.0 태그 푸시 시 배포 실행
+      - 'v*'
 
 jobs:
-  build-n-publish:
-    name: Build and publish Python distributions to PyPI
+  pypi:
+    name: Build and publish to PyPI
     runs-on: ubuntu-latest
-    # v* 태그일 때만 실행
-    if: startsWith(github.ref, 'refs/tags/v')
     environment: release
     permissions:
-      id-token: write  # Trusted Publishing을 위한 필수 권한
+      id-token: write  # PyPI Trusted Publishing
       contents: read
-    
     steps:
-    - uses: actions/checkout@v4
-    
-    # uv 설치 (가장 빠르고 확실한 방법)
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-    
-    # Python 3.14 설정 (uv 이용)
-    - name: Set up Python
-      run: uv python install 3.15
-    
-    # 의존성 설치 및 빌드 (uv build 하나로 해결)
-    - name: Build package
-      run: uv build
-    
-    # PyPI 배포 (기존 형식 유지)
-    - name: Publish package distributions to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+    - uses: actions/checkout@v7
+    - uses: astral-sh/setup-uv@v10
+    - run: uv python install 3.15
+    - run: uv build
+    - uses: pypa/gh-action-pypi-publish@release/v1
 
-  publish-mcp:
+  mcp:
     name: Publish to the MCP registry
-    needs: build-n-publish
+    needs: pypi
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # GitHub OIDC login for io.github.NaNIsaac/*
       contents: read
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Set server.json version from the tag
       run: |
@@ -64,40 +49,3 @@ jobs:
       run: |
         ./mcp-publisher login github-oidc
         ./mcp-publisher publish
-
-  deploy-docs:
-    name: Build and deploy Sphinx docs to GitHub Pages
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python
-        run: uv python install 3.15
-
-      - name: Install Python and Sphinx dependencies
-        run: |
-          uv pip install --system --upgrade pip
-          if [ -f docs/requirements.txt ]; then uv pip install --system -r docs/requirements.txt; fi
-
-      - name: Build HTML docs with Sphinx
-        run: |
-          if [ -d "docs" ]; then
-            sphinx-build -b html docs/source docs/html
-            touch docs/html/.nojekyll
-          else
-            echo "No docs folder found, skipping build."
-            mkdir -p docs/html
-            touch docs/html/.nojekyll
-          fi
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/html
