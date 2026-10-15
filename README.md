@@ -202,7 +202,8 @@ cdg term clear        # delete all captures
 - Disable for a session: `$env:CODIGEST_NOCAP = 1` (bash/zsh: `export CODIGEST_NOCAP=1`).
 - Remove the hooks: `cdg term uninstall`.
 - Captured programs write to a pipe, not a TTY, so some lose colors or progress bars.
-- In bash (4+) and zsh, multi-line commands (loops typed over several lines, heredocs), background jobs (`cmd &`) and lines using `!` history expansion are not captured; they run normally.
+- In bash (4+) and zsh, multi-line commands (loops typed over several lines, heredocs), background jobs (`cmd &`) and lines using `!` history expansion are not captured; they run normally. In bash, neither are lines that start with a subshell `( ... )`.
+- In bash the hook uses the DEBUG trap and keeps one set before the first prompt (starship, bash-preexec); a DEBUG trap set later replaces it.
 
 ### `mcp`: for AI agents
 
