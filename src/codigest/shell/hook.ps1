@@ -21,8 +21,9 @@ function global:__cdg {
     # Dot-sourced: these locals live in the caller's scope, hence the prefix and cleanup.
     $__cdgLine = $global:__cdgLine
     $__cdgErr = $global:Error.Count
+    # Left as is so the line can read it; a native command stores a new boxed int,
+    # so a reference change means one ran, even with the same exit code.
     $__cdgPrevExit = $global:LASTEXITCODE
-    $global:LASTEXITCODE = $null
     $__cdgUnbuf = $env:PYTHONUNBUFFERED
     $env:PYTHONUNBUFFERED = '1'  # piped Python would otherwise block-buffer live output
     $__cdgStart = Get-Date
@@ -32,9 +33,8 @@ function global:__cdg {
     }
     finally {
         $env:PYTHONUNBUFFERED = $__cdgUnbuf
-        $__cdgExit = if ($null -ne $global:LASTEXITCODE) { $global:LASTEXITCODE }
+        $__cdgExit = if (-not [object]::ReferenceEquals($global:LASTEXITCODE, $__cdgPrevExit)) { $global:LASTEXITCODE }
                      elseif ($global:Error.Count -gt $__cdgErr) { 1 } else { 0 }
-        if ($null -eq $global:LASTEXITCODE) { $global:LASTEXITCODE = $__cdgPrevExit }
         try {
             $__cdgJson = @{
                 command     = $__cdgLine
