@@ -1,5 +1,11 @@
 # Codigest
 
+[![PyPI](https://img.shields.io/pypi/v/codigest)](https://pypi.org/project/codigest/)
+[![Downloads](https://static.pepy.tech/badge/codigest)](https://pepy.tech/project/codigest)
+[![Tests](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml/badge.svg)](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml)
+
+<!-- mcp-name: io.github.NaNIsaac/codigest -->
+
 **Codigest** is a standalone CLI tool designed to extract, structure, and track the context of your codebase for Large Language Models (LLMs).
 
 Unlike simple copy-paste tools, Codigest employs a **Context Anchor** system (Shadow Git) to track changes locally without polluting your main version control history. It also features **Semantic Analysis** to detect structural changes in your code.
@@ -9,7 +15,8 @@ Unlike simple copy-paste tools, Codigest employs a **Context Anchor** system (Sh
 ## Quickstart
 
 ```bash
-uv tool install codigest
+uvx codigest scan          # try it without installing
+uv tool install codigest  # or install the `cdg` command
 
 cdg scan                  # whole project as LLM-ready XML (copied to clipboard)
 cdg init && cdg diff      # set an anchor, later get only what changed
