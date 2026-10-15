@@ -212,6 +212,7 @@ cdg term            # last command
 cdg term -n 3       # last 3 commands
 cdg term -i 2       # only the command from 2 runs ago
 cdg term -f         # last failed command
+cdg term --here -n 3  # last 3 commands run in this project
 
 cdg term path       # where captures are stored (override with CODIGEST_HOME)
 cdg term clear      # delete all captures
@@ -223,7 +224,7 @@ cdg term clear      # delete all captures
 
 | Tool | Returns |
 | --- | --- |
-| `terminal_history` | Recent commands with output and exit code (`count`, `failed`) |
+| `terminal_history` | Recent commands with output and exit code (`count`, `failed`, `here`: only this project, default on) |
 | `scan` | Project snapshot (`targets`, `resolve`, `message`) |
 | `diff` / `semdiff` | Text / structural changes since the anchor |
 | `digest` | Signatures and docstrings only |
