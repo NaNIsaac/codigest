@@ -1,12 +1,14 @@
-import typer
 from pathlib import Path
-from rich.tree import Tree
-from rich.text import Text
-from rich.filesize import decimal
+
+import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, AllOption
-from ..core import common, structure
-from ..core.output import OutputHandler
+
+lazy from rich.tree import Tree
+lazy from rich.text import Text
+lazy from rich.filesize import decimal
+lazy from ..core import common, structure
+lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
 
@@ -28,23 +30,24 @@ def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
                 if current_path not in dir_nodes:
                     dir_nodes[current_path] = current_node.add(f"[bold cyan]{part}[/bold cyan]")
                 current_node = dir_nodes[current_path]
-            
+
             filename = parts[-1]
         except ValueError:
             # 루트 밖의 파일은 별도 노드로 표시하지 않고 루트에 [EXTERNAL] 접두어로 추가
             filename = f"[EXTERNAL] {path.name}"
-            current_node = tree 
+            current_node = tree
 
         stat = path.stat()
         size_str = decimal(stat.st_size)
-        
-        style = "white"
-        if filename.endswith(".py"): style = "green"
-        elif filename.endswith((".js", ".ts")): style = "yellow"
-        elif filename.endswith((".json", ".toml")): style = "blue"
-        elif filename.endswith(".md"): style = "cyan"
 
-        label = Text(f"{filename}", style=style)
+        match path.suffix:
+            case ".py": style = "green"
+            case ".js" | ".ts": style = "yellow"
+            case ".json" | ".toml": style = "blue"
+            case ".md": style = "cyan"
+            case _: style = "white"
+
+        label = Text(filename, style=style)
         label.append(f" ({size_str})", style="dim")
         current_node.add(label)
 
@@ -57,7 +60,7 @@ def handle(
     stdout: StdoutOption = False,
     all: AllOption = False,
     resolve: ResolveOption = False,
-):
+) -> None:
     """
     [Visual] Print the project directory tree.
     """
@@ -74,7 +77,7 @@ def handle(
         files = ctx.get_target_files(targets=[target], ignore_config=all, resolve_deps=resolve)
     except Exception as e:
         log_console.print(f"[red][Error] Scan failed:[/red] {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
     if not files:
         log_console.print("[yellow][Warning] No matching files found.[/yellow]")
@@ -82,7 +85,7 @@ def handle(
 
     # 3. Visualize
     ascii_tree = structure.generate_ascii_tree(files, root_path)
-    
+
     def _print_tree_viz():
         tree_viz = _build_rich_tree(root_path, files)
         log_console.print(tree_viz)

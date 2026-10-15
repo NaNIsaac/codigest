@@ -1,10 +1,12 @@
-import typer
 from pathlib import Path
-from rich.progress import Progress, SpinnerColumn, TextColumn
+
+import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
-from ..core import structure, prompts, semdiff, tags, tokenizer, common, cache
-from ..core.output import OutputHandler
+
+lazy from rich.progress import Progress, SpinnerColumn, TextColumn
+lazy from ..core import structure, prompts, semdiff, tags, tokenizer, common, cache
+lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
 
@@ -16,7 +18,7 @@ def handle(
     stdout: StdoutOption = False,
     message: MessageOption = "",
     resolve: ResolveOption = False,
-):
+) -> None:
     """
     [Architectural View] Summarizes the codebase structure (Classes/Functions only).
     """
@@ -26,7 +28,7 @@ def handle(
     # [1] Context Setup
     ctx = common.get_context(target)
     root_path = ctx.root_path
-    
+
     prompt_engine = prompts.get_engine(root_path)
 
     with Progress(
@@ -35,12 +37,12 @@ def handle(
         transient=True,
         console=log_console
     ) as progress:
-        
+
         task = progress.add_task("digest", total=None)
-        
+
         # [2] File Discovery via Context
         files = ctx.get_target_files(ignore_config=False, resolve_deps=resolve)
-        
+
         tree_str = structure.generate_ascii_tree(files, root_path)
 
         content_cache = cache.ContentCache(root_path)
@@ -72,7 +74,7 @@ def handle(
         content_cache.save()
 
         summary_blob = "\n".join(summary_blocks)
-        
+
         try:
             digest_content = prompt_engine.render(
                 "digest",
@@ -83,13 +85,13 @@ def handle(
             )
         except Exception as e:
             log_console.print(f"[red]❌ Rendering Failed:[/red] {e}")
-            raise typer.Exit(1)
-            
+            raise typer.Exit(1) from e
+
         progress.update(task, completed=100)
 
     token_count = tokenizer.estimate_tokens(digest_content)
     log_console.print(f"[bold green]Digest Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
-    
+
     def _save():
         if save:
             out_path = root_path / ".codigest" / "digest.txt"

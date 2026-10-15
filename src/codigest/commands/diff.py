@@ -1,17 +1,19 @@
-import typer
 from pathlib import Path
-from rich.progress import Progress, SpinnerColumn, TextColumn
+
+import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
-from ..core import prompts, shadow, tags, common
-from ..core.output import OutputHandler
+
+lazy from rich.progress import Progress, SpinnerColumn, TextColumn
+lazy from ..core import prompts, shadow, tags, common
+lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
 
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(
-        Path.cwd(), 
+        Path.cwd(),
         help="Target directory to check diff",
         exists=True,
         file_okay=False,
@@ -23,7 +25,7 @@ def handle(
     stdout: StdoutOption = False,
     message: MessageOption = "",
     resolve: ResolveOption = False,
-):
+) -> None:
     """
     [Context Update] Shows changes since the last 'codigest scan'.
     Useful for updating LLM context without re-uploading everything.
@@ -34,7 +36,7 @@ def handle(
     # [1] Context Setup
     ctx = common.get_context(target)
     root_path = ctx.root_path
-    
+
     anchor = shadow.ContextAnchor(root_path)
 
     # Check Baseline
@@ -84,7 +86,7 @@ def handle(
 
     # [4] Output
     log_console.print(f"[bold green]Changes Detected![/bold green] ({len(formatted_diff)} chars)")
-    
+
     def _save():
         if save:
             out_path = root_path / ".codigest" / "changes.diff"

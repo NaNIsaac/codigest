@@ -2,11 +2,10 @@
 Core Template Engine & XML Factory.
 Centralizes XML escaping and block generation logic.
 """
-import html
+lazy import html
 import textwrap
-from typing import Any
 
-def escape_xml_value(value: Any) -> str:
+def escape_xml_value(value: object) -> str:
     """[XML] Escapes characters for XML safety."""
     raw_value = str(value)
     safe_value = html.escape(raw_value, quote=False)

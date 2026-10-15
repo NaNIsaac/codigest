@@ -1,10 +1,12 @@
-import typer
 from pathlib import Path
-from rich.progress import Progress, SpinnerColumn, TextColumn
+
+import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
-from ..core import prompts, shadow, semdiff, tags, tokenizer, common
-from ..core.output import OutputHandler
+
+lazy from rich.progress import Progress, SpinnerColumn, TextColumn
+lazy from ..core import prompts, shadow, semdiff, tags, tokenizer, common
+lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
 
@@ -16,7 +18,7 @@ def handle(
     stdout: StdoutOption = False,
     message: MessageOption = "",
     resolve: ResolveOption = False,
-):
+) -> None:
     """
     [Advanced] Generates a Semantic Diff (AST-based) report.
     Shows ADDED/REMOVED/MODIFIED functions & classes instead of raw text lines.
@@ -27,7 +29,7 @@ def handle(
     # [1] Context Setup
     ctx = common.get_context(target)
     root_path = ctx.root_path
-    
+
     anchor = shadow.ContextAnchor(root_path)
 
     last_update = anchor.get_last_update_time()
@@ -53,10 +55,7 @@ def handle(
         # Only check files that have text changes first (Optimization)
         changed_files_paths = anchor.get_changed_files(list(current_files))
 
-        target_files = []
-        for p in changed_files_paths:
-            if p.suffix in (".py", ".pyi"):
-                target_files.append(p)
+        target_files = [p for p in changed_files_paths if p.suffix in (".py", ".pyi")]
 
         # [3] Compare Each File
         for file_path in target_files:
@@ -68,41 +67,37 @@ def handle(
                 # External files tracked via resolve logic
                 rel_path = None # Anchor might not support reading external files yet
                 rel_path_str = f"[EXTERNAL]/{file_path.name}"
-            
+
             # Read New Content
             try:
                 new_code = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
-            except:
+            except Exception:
                 new_code = ""
-            
+
             # Read Old Content (From Anchor)
             # Note: Anchor only stores files inside root. External files will likely return empty old_code.
-            if rel_path:
-                old_code = anchor.read_anchor_file(rel_path)
-            else:
-                old_code = "" 
+            old_code = anchor.read_anchor_file(rel_path) if rel_path else ""
 
             changes = semdiff.compare(old_code, new_code)
 
             if changes:
                 change_lines = []
                 for ch in changes:
-                    if ch.change_type == "ADDED": icon = "➕ [ADDED]   "
-                    elif ch.change_type == "REMOVED": icon = "➖ [REMOVED] "
-                    elif ch.change_type == "MODIFIED": icon = "⚠️ [SIGNATURE]"
-                    else: icon = "✏️ [LOGIC]   "
-                    
+                    match ch.change_type:
+                        case "ADDED": icon = "➕ [ADDED]   "
+                        case "REMOVED": icon = "➖ [REMOVED] "
+                        case "MODIFIED": icon = "⚠️ [SIGNATURE]"
+                        case _: icon = "✏️ [LOGIC]   "
+
                     detail = f" :: {ch.details}" if ch.details else ""
                     line = f"{icon} {ch.symbol.type} {ch.symbol.name}{ch.symbol.signature}{detail}"
                     change_lines.append(line)
 
                 # File Status Tag
-                file_status = ""
-                if not new_code: file_status = " (DELETED)"
-                elif not old_code: file_status = " (NEW)"
+                file_status = " (DELETED)" if not new_code else " (NEW)" if not old_code else ""
 
-                raw_body = chr(10).join(change_lines)
-                
+                raw_body = "\n".join(change_lines)
+
                 # Use unified tags factory
                 block = tags.file(rel_path_str, raw_body, status=file_status)
                 reports.append(block)
@@ -127,11 +122,11 @@ def handle(
         )
     except Exception as e:
         log_console.print(f"[red]Template Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
     token_count = tokenizer.estimate_tokens(final_output)
     log_console.print(f"[bold green]SemDiff Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
-    
+
     def _save():
         if save:
             out_path = root_path / ".codigest" / "semdiff.txt"

@@ -1,11 +1,12 @@
-import typer
 from pathlib import Path
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.filesize import decimal
 
-from ..core import common, shadow, tokenizer
+import typer
+from rich.console import Console
+
+lazy from rich.panel import Panel
+lazy from rich.table import Table
+lazy from rich.filesize import decimal
+lazy from ..core import common, shadow, tokenizer
 
 app = typer.Typer()
 console = Console()
@@ -21,16 +22,16 @@ def handle(
         resolve_path=True
     ),
     resolve: bool = typer.Option(False, "-r", "--resolve", help="Recursively resolve imports when checking context files"),
-):
+) -> None:
     """
     [Environment Status] Displays information about the .codigest setup, anchor baseline, changes, and artifacts.
     """
     ctx = common.get_context(target)
     root_path = ctx.root_path
     codigest_dir = root_path / ".codigest"
-    
-    is_initialized = codigest_dir.exists() and codigest_dir.is_dir()
-    
+
+    is_initialized = codigest_dir.is_dir()
+
     # Header Panel
     init_status_str = "[bold green]Initialized[/bold green]" if is_initialized else "[bold yellow]Not Initialized[/bold yellow]"
     header_content = (
@@ -72,32 +73,29 @@ def handle(
             diff_tokens = tokenizer.estimate_tokens(diff_content)
             console.print(f"  • [bold]Changed Files:[/bold] [yellow]{len(changed_files)} files[/yellow]")
             console.print(f"  • [bold]Est. Diff Size:[/bold] [cyan]~{diff_tokens:,} tokens[/cyan] ({len(diff_content):,} chars)")
-            
+
             console.print("  • [bold]Modified / New Files:[/bold]")
             max_show = 10
-            for idx, p in enumerate(changed_files):
-                if idx >= max_show:
-                    remaining = len(changed_files) - max_show
-                    console.print(f"    [dim]... and {remaining} more file(s)[/dim]")
-                    break
+            for p in changed_files[:max_show]:
                 try:
                     rel_p = p.relative_to(root_path).as_posix()
                 except ValueError:
                     rel_p = str(p)
-                
+
                 # Check if new file or modified
                 try:
-                    rel_path_obj = p.relative_to(root_path)
-                    anchor_file_content = anchor.read_anchor_file(rel_path_obj)
+                    anchor_file_content = anchor.read_anchor_file(p.relative_to(root_path))
                 except Exception:
                     anchor_file_content = ""
 
                 status_label = "[green][NEW]     [/green]" if not anchor_file_content else "[yellow][MODIFIED][/yellow]"
                 console.print(f"    {status_label} {rel_p}")
+            if (remaining := len(changed_files) - max_show) > 0:
+                console.print(f"    [dim]... and {remaining} more file(s)[/dim]")
 
     # 3. Artifacts Summary Table
     console.print("\n[bold blue]📦 Context Artifacts[/bold blue] [dim](.codigest/)[/dim]")
-    
+
     artifacts = [
         ("snapshot.txt", "Full Context Snapshot", "cdg scan"),
         ("changes.diff", "Incremental Diff", "cdg diff"),
@@ -114,7 +112,7 @@ def handle(
 
     for filename, desc, cmd_hint in artifacts:
         art_path = codigest_dir / filename
-        if art_path.exists() and art_path.is_file():
+        if art_path.is_file():
             stat = art_path.stat()
             size_str = decimal(stat.st_size)
             try:

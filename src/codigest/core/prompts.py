@@ -2,24 +2,27 @@
 Prompt Management Module.
 Templates are aligned flush-left to prevent indentation issues when injecting large code blocks.
 """
-import tomllib
+lazy import tomllib
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Dict
 from . import tags
 
 # RenderFunction takes keyword arguments and returns a processed string
-RenderFunc = Callable[..., str]
+type RenderFunc = Callable[..., str]
 
-# 1. Snapshot Template (codigest scan)
-def _default_snapshot(project_name: str, tree_structure: str, source_code: str, instruction: str = "") -> str:
-    instruction_block = ""
-    if instruction:
-        safe_instruction = tags.escape_xml_value(instruction)
-        instruction_block = tags.dedent(f"""
+def _instruction_block(instruction: str) -> str:
+    if not instruction:
+        return ""
+    safe_instruction = tags.escape_xml_value(instruction)
+    return tags.dedent(f"""
 <user_instruction>
 {safe_instruction}
 </user_instruction>
 """)
+
+# 1. Snapshot Template (codigest scan)
+def _default_snapshot(project_name: str, tree_structure: str, source_code: str, instruction: str = "") -> str:
+    instruction_block = _instruction_block(instruction)
 
     # Note: source_code is assumed to be already formatted via tags.file()
     return tags.dedent(f"""
@@ -43,14 +46,7 @@ Please digest this structure and code to build your internal mental model.
 
 # 2. Diff Template (codigest diff)
 def _default_diff(project_name: str, context_message: str, diff_content: str, instruction: str = "") -> str:
-    instruction_block = ""
-    if instruction:
-        safe_instruction = tags.escape_xml_value(instruction)
-        instruction_block = tags.dedent(f"""
-<user_instruction>
-{safe_instruction}
-</user_instruction>
-""")
+    instruction_block = _instruction_block(instruction)
 
     # Escape raw diff content to prevent XML injection
     safe_diff = tags.escape_xml_value(diff_content)
@@ -70,14 +66,7 @@ Focus on these modifications to update your context.
 
 # 3. SemDiff Template (codigest semdiff)
 def _default_semdiff(project_name: str, context_message: str, semdiff_content: str, instruction: str = "") -> str:
-    instruction_block = ""
-    if instruction:
-        safe_instruction = tags.escape_xml_value(instruction)
-        instruction_block = tags.dedent(f"""
-<user_instruction>
-{safe_instruction}
-</user_instruction>
-""")
+    instruction_block = _instruction_block(instruction)
 
     return tags.dedent(f"""
 [SYSTEM: CODIGEST - SEMANTIC ANALYSIS]
@@ -94,14 +83,7 @@ This report focuses on High-Level Architecture changes (Classes, Functions, Sign
 
 # 4. Digest Template (codigest digest)
 def _default_digest(project_name: str, tree_structure: str, digest_content: str, instruction: str = "") -> str:
-    instruction_block = ""
-    if instruction:
-        safe_instruction = tags.escape_xml_value(instruction)
-        instruction_block = tags.dedent(f"""
-<user_instruction>
-{safe_instruction}
-</user_instruction>
-""")
+    instruction_block = _instruction_block(instruction)
 
     return tags.dedent(f"""
 [SYSTEM: CODIGEST - ARCHITECTURE DIGEST]
@@ -153,8 +135,7 @@ class PromptEngine:
         Priority: TOML Override > Default t-string Function
         """
         # 1. Check for TOML Override (String-based)
-        if key in self.overrides:
-            raw_template = self.overrides[key]
+        if (raw_template := self.overrides.get(key)) is not None:
             # Safety: Automatically escape values when using user-defined templates
             safe_kwargs = {
                 k: tags.escape_xml_value(v) for k, v in kwargs.items()
@@ -165,9 +146,9 @@ class PromptEngine:
                 return f"Error rendering template '{key}': Missing argument {e}"
 
         # 2. Use Default (Code-based t-string)
-        if key in DEFAULT_RENDERERS:
+        if renderer := DEFAULT_RENDERERS.get(key):
             # Default functions handle their own escaping logic internally where needed
-            return DEFAULT_RENDERERS[key](**kwargs)
+            return renderer(**kwargs)
 
         return f"Error: Prompt template '{key}' not found."
 

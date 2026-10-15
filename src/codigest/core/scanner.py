@@ -3,7 +3,6 @@ Core File System Scanner.
 """
 import pathspec
 from pathlib import Path
-from typing import Optional
 from loguru import logger
 
 # Default "Safe" ignores
@@ -19,9 +18,9 @@ class ProjectScanner:
     def __init__(
             self,
             root_path: Path,
-            extensions: Optional[set[str]] = None,
-            extra_ignores: Optional[list[str]] = None,
-            include_paths: Optional[list[Path]] = None
+            extensions: set[str] | None = None,
+            extra_ignores: list[str] | None = None,
+            include_paths: list[Path] | None = None
             ):
         self.root_path = root_path
         self.extensions = extensions
@@ -31,21 +30,17 @@ class ProjectScanner:
 
     def _load_gitignore(self) -> pathspec.PathSpec:
         """Loads .gitignore and combines with ALWAYS_IGNORE and extra_ignores."""
-        patterns = list(ALWAYS_IGNORE)
-        
         # Add config-based ignores
-        if self.extra_ignores:
-            patterns.extend(self.extra_ignores)
+        patterns = [*ALWAYS_IGNORE, *self.extra_ignores]
 
         gitignore_path = self.root_path / ".gitignore"
         if gitignore_path.exists():
             try:
                 with open(gitignore_path, "r", encoding="utf-8") as f:
-                    user_patterns = [
-                        line.strip() for line in f 
-                        if line.strip() and not line.startswith("#")
-                    ]
-                    patterns.extend(user_patterns)
+                    patterns.extend([
+                        stripped for line in f
+                        if (stripped := line.strip()) and not line.startswith("#")
+                    ])
             except Exception as e:
                 logger.warning(f"Failed to read .gitignore: {e}")
                 
@@ -67,25 +62,18 @@ class ProjectScanner:
         """파일이 지정된 include_paths 범위 안에 있는지 확인"""
         if not self.include_paths:
             return True
-            
-        for path in self.include_paths:
-            try:
-                entry.relative_to(path)
-                return True
-            except ValueError:
-                continue
-        return False
+        return any(entry.is_relative_to(path) for path in self.include_paths)
 
     def scan(self) -> list[Path]:
         """
         Walks the directory tree and returns valid files.
         (Modernized from old core.py's stack-based approach)
         """
-        valid_files = []
-        start_dirs = self.include_paths if self.include_paths else [self.root_path]
+        valid_files: list[Path] = []
+        start_dirs = self.include_paths or [self.root_path]
         # Use rglob for simplicity, but we must manually filter dirs to respect gitignore
         # For better performance on large repos, we use a manual walk similar to the old code
-        dirs_stack = []
+        dirs_stack: list[Path] = []
         for p in start_dirs:
             if p.is_file():
                 if not self.is_ignored(p):
@@ -119,7 +107,7 @@ class ProjectScanner:
                             
                     valid_files.append(entry)
 
-        return sorted(list(set(valid_files)))
+        return sorted(set(valid_files))
 
 def scan_project(
     root_path: Path, 

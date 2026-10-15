@@ -3,9 +3,11 @@ Common Logic & Project Context Manager.
 Centralizes project discovery, config loading, scanning, and dependency resolution.
 Facade pattern to simplify command implementations.
 """
-import tomllib
+lazy import os
+lazy import shutil
+lazy import stat
+lazy import tomllib
 from pathlib import Path
-from typing import Tuple, List, Optional, Set, Union
 from rich.console import Console
 
 # Core modules
@@ -13,16 +15,18 @@ from . import scanner, resolver
 
 console = Console()
 
+type Targets = list[Path] | Path
+
 class ProjectContext:
-    # [수정] targets 타입을 Union[list[Path], Path]로 확장
-    def __init__(self, targets: Optional[Union[list[Path], Path]] = None):
+    # [수정] targets 타입을 list[Path] | Path로 확장
+    def __init__(self, targets: Targets | None = None):
         
         # [추가] 단일 Path가 들어오면 리스트로 감싸기 (Safety)
         if isinstance(targets, Path):
             targets = [targets]
 
         # 1. 탐색 시작점 결정
-        if targets and len(targets) > 0:
+        if targets:
             self.start_path = targets[0].resolve()
         else:
             self.start_path = Path.cwd().resolve()
@@ -38,7 +42,7 @@ class ProjectContext:
         current = start_path if start_path.is_dir() else start_path.parent
         
         # Traverse up
-        for parent in [current] + list(current.parents):
+        for parent in [current, *current.parents]:
             if (parent / ".codigest").exists():
                 return parent
             if (parent / ".git").exists() or (parent / ".shadow_git").exists():
@@ -46,18 +50,17 @@ class ProjectContext:
         
         return start_path if start_path.is_dir() else start_path.parent
 
-    def _load_config_filters(self) -> Tuple[Optional[set[str]], list[str]]:
+    def _load_config_filters(self) -> tuple[set[str] | None, list[str]]:
         config_path = self.root_path / ".codigest" / "config.toml"
-        extensions = None
-        exclude_patterns = []
+        extensions: set[str] | None = None
+        exclude_patterns: list[str] = []
         
         if config_path.exists():
             try:
                 with open(config_path, "rb") as f:
                     data = tomllib.load(f)
                     filters = data.get("filter", {})
-                    ext_list = filters.get("extensions", [])
-                    if ext_list:
+                    if ext_list := filters.get("extensions", []):
                         extensions = set(ext_list)
                     exclude_patterns = filters.get("exclude_patterns", [])
             except Exception:
@@ -66,7 +69,7 @@ class ProjectContext:
 
     def get_target_files(
         self, 
-        targets: Optional[Union[list[Path], Path]] = None, 
+        targets: Targets | None = None,
         ignore_config: bool = False,
         resolve_deps: bool = False
     ) -> list[Path]:
@@ -75,18 +78,14 @@ class ProjectContext:
         """
         # [핵심 수정] 입력된 경로를 무조건 '절대 경로'로 변환 (Resolve)
         # 이걸 안 하면 'src' 같은 상대 경로 입력 시 root_path(절대 경로)와 비교 실패함
-        resolved_targets = []
-        if targets:
-            # 단일 Path면 리스트로 변환
-            if isinstance(targets, Path):
-                targets = [targets]
-            
-            # 리스트 내부의 모든 경로를 resolve()
-            for t in targets:
-                resolved_targets.append(t.resolve())
-        
+        # 단일 Path면 리스트로 변환
+        if isinstance(targets, Path):
+            targets = [targets]
+        # 리스트 내부의 모든 경로를 resolve()
+        resolved_targets = [t.resolve() for t in targets or []]
+
         # 이후 로직에서는 변환된 resolved_targets를 사용
-        scan_scope = resolved_targets if resolved_targets else None
+        scan_scope = resolved_targets or None
         
         # 1. Determine Filters
         exts, ignores = (None, [])
@@ -94,10 +93,9 @@ class ProjectContext:
             exts, ignores = self.config_extensions, self.config_ignores
 
         # 2. Scope Warning UI (이제 정상 작동함)
-        if scan_scope:
-            for p in scan_scope:
-                if not p.is_relative_to(self.root_path):
-                    console.print(f"[yellow][Warning] {p.name} is outside detected root {self.root_path}[/yellow]")
+        for p in scan_scope or []:
+            if not p.is_relative_to(self.root_path):
+                console.print(f"[yellow][Warning] {p.name} is outside detected root {self.root_path}[/yellow]")
 
         # 3. Scan
         files = scanner.scan_project(
@@ -114,5 +112,14 @@ class ProjectContext:
         return files
 
 # Helper for quick access
-def get_context(targets: Optional[Union[list[Path], Path]] = None) -> ProjectContext:
+def get_context(targets: Targets | None = None) -> ProjectContext:
     return ProjectContext(targets)
+
+
+def remove_tree(path: Path) -> None:
+    """`shutil.rmtree` that also deletes read-only files (git objects on Windows)."""
+    def make_writable_and_retry(func, target, _exc):
+        os.chmod(target, stat.S_IWRITE)
+        func(target)
+
+    shutil.rmtree(path, onexc=make_writable_and_retry)

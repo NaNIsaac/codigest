@@ -4,24 +4,24 @@ Centralized CLI Options & Common Annotated Types.
 from typing import Annotated
 import typer
 
-# Common CLI Option Types using typing.Annotated
+# Plain aliases, not PEP 695 `type X = ...`: Typer can't unwrap TypeAliasType.
 CopyOption = Annotated[
-    bool, 
-    typer.Option("-c", "--copy/--no-copy", help="Auto-copy output to clipboard")
+    bool,
+    typer.Option("--copy/--no-copy", "-c", help="Auto-copy output to clipboard")
 ]
 
 StdoutOption = Annotated[
-    bool, 
+    bool,
     typer.Option("-s", "--stdout", help="Print output to terminal (stdout) instead of file")
 ]
 
 ResolveOption = Annotated[
-    bool, 
+    bool,
     typer.Option("-r", "--resolve", help="Recursively resolve imports")
 ]
 
 MessageOption = Annotated[
-    str, 
+    str,
     typer.Option("-m", "--message", help="Add specific instruction context")
 ]
 

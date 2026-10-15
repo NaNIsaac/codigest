@@ -3,8 +3,9 @@ Dependency Resolver Module.
 Analyzes Python AST to resolve local imports recursively.
 Optimized: Stdlib check -> Cache -> Local File Check.
 """
-import ast
+lazy import ast
 import sys
+from collections import deque
 from pathlib import Path
 
 class DependencyResolver:
@@ -16,25 +17,17 @@ class DependencyResolver:
 
         self.stdlib_names = self._get_stdlib_names()
 
-    def _get_stdlib_names(self) -> set[str]:
+    def _get_stdlib_names(self) -> frozenset[str]:
         """Get set of standard library module names."""
-        if sys.version_info >= (3, 10):
-            return sys.stdlib_module_names
-        else:
-            # Fallback for older python
-            return set(sys.builtin_module_names) | {
-                "os", "sys", "json", "pathlib", "typing", "subprocess", 
-                "math", "random", "time", "datetime", "abc", "collections",
-                "re", "shutil", "argparse", "logging", "unittest"
-            }
+        return sys.stdlib_module_names
 
     def resolve(self, initial_files: list[Path]) -> list[Path]:
-        queue = [f.resolve() for f in initial_files if f.suffix == ".py"]
+        queue = deque(f.resolve() for f in initial_files if f.suffix == ".py")
         self.visited = set(queue)
         results = set(initial_files)
 
         while queue:
-            current_file = queue.pop(0)
+            current_file = queue.popleft()
             try:
                 dependencies = self._get_imports(current_file)
             except Exception:
@@ -46,10 +39,10 @@ class DependencyResolver:
                     queue.append(dep_path)
                     results.add(dep_path)
         
-        return sorted(list(results))
+        return sorted(results)
 
     def _get_imports(self, file_path: Path) -> set[Path]:
-        local_deps = set()
+        local_deps: set[Path] = set()
         try:
             content = file_path.read_text(encoding="utf-8")
             tree = ast.parse(content)
@@ -57,29 +50,26 @@ class DependencyResolver:
             return local_deps
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    # Case: import my_module
-                    path = self._check_cache_and_resolve(alias.name, 0, file_path)
-                    if path:
-                        local_deps.add(path)
-            
-            elif isinstance(node, ast.ImportFrom):
-                module_name = node.module if node.module else ""
-                level = node.level
+            match node:
+                case ast.Import(names=names):
+                    for alias in names:
+                        # Case: import my_module
+                        if path := self._check_cache_and_resolve(alias.name, 0, file_path):
+                            local_deps.add(path)
 
-                # Case: from . import module
-                if module_name:
-                    path = self._check_cache_and_resolve(module_name, level, file_path)
-                    if path:
-                        local_deps.add(path)
+                case ast.ImportFrom(module=module, names=names, level=level):
+                    module_name = module or ""
 
-                # Case: from my_pkg import my_module
-                for alias in node.names:
-                    full_target = f"{module_name}.{alias.name}" if module_name else alias.name
-                    path = self._check_cache_and_resolve(full_target, level, file_path)
-                    if path:
-                        local_deps.add(path)
+                    # Case: from . import module
+                    if module_name:
+                        if path := self._check_cache_and_resolve(module_name, level, file_path):
+                            local_deps.add(path)
+
+                    # Case: from my_pkg import my_module
+                    for alias in names:
+                        full_target = f"{module_name}.{alias.name}" if module_name else alias.name
+                        if path := self._check_cache_and_resolve(full_target, level, file_path):
+                            local_deps.add(path)
 
         return local_deps
 
@@ -87,10 +77,8 @@ class DependencyResolver:
         """Wrapper to handle caching logic."""
         
         # 1. 표준 라이브러리면 즉시 탈락 (I/O 없음)
-        if level == 0:
-            root_pkg = module_name.split(".")[0]
-            if root_pkg in self.stdlib_names:
-                return None
+        if level == 0 and module_name.split(".")[0] in self.stdlib_names:
+            return None
 
         # 2. 상대 경로(level > 0)는 문맥(current_file)에 따라 달라지므로 캐싱 불가 -> 직접 해결
         if level > 0:
@@ -115,34 +103,27 @@ class DependencyResolver:
             return None
 
         parts = module_name.split(".")
-        candidates = []
 
         if level > 0:
             # Relative Import
             base_dir = current_file.parent
             for _ in range(level - 1):
                 base_dir = base_dir.parent
-            candidates.append(base_dir.joinpath(*parts))
+            candidates = [base_dir.joinpath(*parts)]
         else:
             # Absolute Import Priorities
-            # 1. Sibling (같은 폴더)
-            candidates.append(current_file.parent.joinpath(*parts))
-            # 2. Project Root
-            candidates.append(self.root_path.joinpath(*parts))
-            # 3. Project Root/src
-            candidates.append(self.root_path.joinpath("src", *parts))
+            candidates = [
+                current_file.parent.joinpath(*parts),       # 1. Sibling (같은 폴더)
+                self.root_path.joinpath(*parts),            # 2. Project Root
+                self.root_path.joinpath("src", *parts),     # 3. Project Root/src
+            ]
 
         # Check existence
         for base in candidates:
-            # Check for .py file
-            p_py = base.with_suffix(".py")
-            if p_py.is_file():
-                return p_py.resolve()
-            
-            # Check for package (__init__.py)
-            p_init = base / "__init__.py"
-            if p_init.is_file():
-                return p_init.resolve()
+            # Check for .py file, then package (__init__.py)
+            for p in (base.with_suffix(".py"), base / "__init__.py"):
+                if p.is_file():
+                    return p.resolve()
 
         return None
 

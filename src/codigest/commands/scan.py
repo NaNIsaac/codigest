@@ -1,20 +1,21 @@
-import sys
-import typer
 from pathlib import Path
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
-from rich.filesize import decimal
+
+import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, AllOption
-from ..core import structure, tags, prompts, processor, shadow, tokenizer, common, cache
-from ..core.output import OutputHandler
+
+lazy from rich.progress import Progress, SpinnerColumn, TextColumn
+lazy from rich.panel import Panel
+lazy from rich.filesize import decimal
+lazy from ..core import structure, tags, prompts, processor, shadow, tokenizer, common, cache
+lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
 
 @app.callback(invoke_without_command=True)
 def handle(
     targets: list[Path] = typer.Argument(
-        None, 
+        None,
         help="Specific files or directories to scan (Scope)",
         exists=True,
         resolve_path=True
@@ -27,9 +28,9 @@ def handle(
     line_numbers: bool = typer.Option(False, "--lines", "-l", help="Add line numbers to code blocks"),
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation prompt"),
     resolve: ResolveOption = False,
-):
+) -> None:
     """
-    Scans the codebase. 
+    Scans the codebase.
     If TARGETS provided, only scans those paths within the project.
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
@@ -45,9 +46,9 @@ def handle(
         log_console.print(f"[yellow][Warning] .codigest directory missing in {root_path.name}. Running init...[/yellow]")
         try:
             artifact_dir.mkdir(exist_ok=True)
-        except PermissionError:
+        except PermissionError as e:
             log_console.print(f"[red][Error] Cannot create .codigest at {root_path}[/red]")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     output_path = artifact_dir / output
     prompt_engine = prompts.get_engine(root_path)
@@ -61,20 +62,20 @@ def handle(
         console=log_console
     ) as progress:
         task = progress.add_task("scanning", total=None)
-        
+
         # ★ All logic delegated to common.py
         files = ctx.get_target_files(
-            targets=targets, 
-            ignore_config=all, 
+            targets=targets,
+            ignore_config=all,
             resolve_deps=resolve
         )
-        
+
         progress.update(task, completed=100)
 
     # [3] Pre-flight Check
     total_files = len(files)
     total_size = sum(f.stat().st_size for f in files)
-    est_tokens = int(total_size / 4) 
+    est_tokens = int(total_size / 4)
 
     log_console.print(Panel(f"""[bold]Scan Plan[/bold]
   Target: [cyan]{root_path}[/cyan]
@@ -82,12 +83,12 @@ def handle(
   Est. Size: {decimal(total_size)}
   Est. Tokens: ~{est_tokens:,}""", expand=False))
 
-    TOKEN_THRESHOLD = 30000   
+    TOKEN_THRESHOLD = 30000
     FILE_COUNT_THRESHOLD = 100
     is_large_context = est_tokens > TOKEN_THRESHOLD or total_files > FILE_COUNT_THRESHOLD
 
     if yes:
-        pass 
+        pass
     elif is_large_context:
         log_console.print(f"[yellow][Warning] Large context detected (> {TOKEN_THRESHOLD:,} tokens or > {FILE_COUNT_THRESHOLD} files).[/yellow]")
         if not typer.confirm("Proceed with digestion?"):
@@ -103,7 +104,7 @@ def handle(
         transient=True,
         console=log_console
     ) as progress:
-        
+
         if anchor.has_history():
             try:
                 diff_content = anchor.get_changes(files)
@@ -125,8 +126,8 @@ def handle(
                 rel_path = f"[EXTERNAL]/{file_path.name}"
 
             cached_block = content_cache.get_file_block(
-                rel_path=rel_path, 
-                line_numbers=line_numbers, 
+                rel_path=rel_path,
+                line_numbers=line_numbers,
                 file_path=file_path
             )
 
@@ -139,10 +140,10 @@ def handle(
                     block = tags.file(rel_path, content)
                     file_blocks.append(block)
                     content_cache.set_file_block(
-                        rel_path=rel_path, 
-                        blob_hash=blob_hash, 
-                        line_numbers=line_numbers, 
-                        block=block, 
+                        rel_path=rel_path,
+                        blob_hash=blob_hash,
+                        line_numbers=line_numbers,
+                        block=block,
                         file_path=file_path
                     )
                 except Exception:
@@ -162,7 +163,7 @@ def handle(
             )
         except Exception as e:
             log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     try:
         anchor.update(files)
@@ -177,7 +178,7 @@ def handle(
             log_console.print("[bold green]Snapshot Saved![/bold green]")
             log_console.print(f"  Path: [underline]{output_path}[/underline]")
             log_console.print(f"  Final Tokens: [bold cyan]~{final_token_count:,}[/bold cyan]")
-            
+
             if anchor.has_history():
                 pre_diff_path = artifact_dir / "previous_changes.diff"
                 if pre_diff_path.exists() and pre_diff_path.stat().st_size > 0:
@@ -185,6 +186,6 @@ def handle(
 
         except Exception as e:
             log_console.print(f"[bold red][Error] Save Failed:[/bold red] {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
     handler.handle_output(snapshot_content, save_action=_save)

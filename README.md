@@ -167,6 +167,38 @@ cdg clean
 cdg clean -y
 ```
 
+### 9. Terminal Capture & Recall (`cap`, `term`)
+
+Runs a command transparently (output still streams live) and records its command line, combined stdout/stderr, exit code and cwd in a machine-global store. `term` then recalls recent entries as a `<terminal_history>` block for your LLM. Works in any directory, no `cdg init` needed.
+
+* **Use Case:** "This test failed. Here's exactly what I ran and what it printed."
+* **Safety:** Known secret shapes (API keys, tokens, `password=...`) are redacted before anything touches disk. Output of credential commands (`env`, `printenv`, `gh auth token`, ...) is never stored.
+* **Fallback:** Commands not run through `cap` are read from the native shell history (PowerShell, bash, zsh, fish), without output.
+
+**Automatic capture (PowerShell):** `cdg term install` hooks your PowerShell profile so *every* command is captured without the `cap` prefix. Commands run in your current session (`cd`, variables and functions behave normally). Editors, pagers, REPLs and `ssh` are skipped automatically.
+
+* Skip one command: start the line with a space.
+* Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`
+* Disable for a session: `$env:CODIGEST_NOCAP = 1`. Remove: `cdg term uninstall`.
+* Trade-off: captured programs write to a pipe, not a TTY, so some lose colors or progress bars.
+
+```bash
+cdg term install    # PowerShell: capture everything automatically
+
+# Run and capture (prefix with -- so flags reach the command)
+cdg cap -- pytest -q
+cdg cap "npm run build | tail -20"
+
+# Recall
+cdg term            # last command
+cdg term -n 3       # last 3 commands
+cdg term -i 2       # only the command from 2 runs ago
+cdg term -f         # last failed command
+
+cdg term path       # where captures are stored (override with CODIGEST_HOME)
+cdg term clear      # delete all captures
+```
+
 ---
 
 ## Configuration

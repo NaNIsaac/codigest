@@ -2,7 +2,7 @@
 Git Operations.
 Retains the 'Untracked File' detection logic from the prototype.
 """
-import subprocess
+lazy import subprocess
 from pathlib import Path
 from loguru import logger
 

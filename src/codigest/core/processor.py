@@ -20,8 +20,8 @@ def read_file_content(path: Path, add_line_numbers: bool = True) -> str:
         width = len(str(len(lines)))
         
         return "\n".join(
-            f"{i+1:>{width}}: {line}" 
-            for i, line in enumerate(lines)
+            f"{i:>{width}}: {line}"
+            for i, line in enumerate(lines, start=1)
         )
         
     except UnicodeDecodeError:

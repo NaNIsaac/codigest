@@ -2,8 +2,9 @@
 Context Anchor Engine.
 Modified to hide internal git repository from VS Code by renaming .git -> .shadow_git
 """
-import shutil
-import subprocess
+lazy import shutil
+lazy from .common import remove_tree
+lazy import subprocess
 import time
 from pathlib import Path
 from loguru import logger
@@ -18,15 +19,14 @@ class ContextAnchor:
         """Checks if a valid anchor (git repo with commits) exists."""
         return self.git_dir.exists() and (self.git_dir / "HEAD").exists()
 
-    def _run_git(self, args: list[str], cwd: Path | None = None, check=True) -> str:
+    def _run_git(self, args: list[str], cwd: Path | None = None, check: bool = True) -> str:
         self.anchor_dir.mkdir(parents=True, exist_ok=True)
-        base_cmd = [
-            "git", 
-            "--git-dir", str(self.git_dir), 
-            "--work-tree", str(self.anchor_dir)
+        cmd = [
+            "git",
+            "--git-dir", str(self.git_dir),
+            "--work-tree", str(self.anchor_dir),
+            *args,
         ]
-
-        cmd = base_cmd + args
 
         target_dir = cwd or self.anchor_dir
         
@@ -42,7 +42,7 @@ class ContextAnchor:
 
     def has_changes(self, current_files: list[Path]) -> bool:
         """Fast check to determine if any file was modified/added/deleted since last anchor baseline."""
-        if not self.git_dir.exists() or not (self.git_dir / "HEAD").exists() or not self.anchor_dir.exists():
+        if not self.has_history() or not self.anchor_dir.exists():
             return True
 
         current_rel_paths = set()
@@ -74,12 +74,12 @@ class ContextAnchor:
 
         return False
 
-    def update(self, source_files: list[Path]):
+    def update(self, source_files: list[Path]) -> None:
         self.anchor_dir.mkdir(parents=True, exist_ok=True)
         (self.anchor_dir / ".gitignore").write_text(".shadow_git\n", encoding="utf-8")
-        if not self.git_dir.exists() or not (self.git_dir / "HEAD").exists():
+        if not self.has_history():
             if self.git_dir.exists():
-                shutil.rmtree(self.git_dir)
+                remove_tree(self.git_dir)
             subprocess.run(
                 ["git", "init", "--bare", str(self.git_dir)],
                 capture_output=True, check=False
@@ -91,7 +91,7 @@ class ContextAnchor:
             self._run_git(["config", "gc.auto", "0"])
 
         # Quick check: if nothing changed since last anchor, skip work
-        if self.git_dir.exists() and (self.git_dir / "HEAD").exists() and not self.has_changes(source_files):
+        if self.has_history() and not self.has_changes(source_files):
             return
 
         source_rel_paths = set()
@@ -153,7 +153,7 @@ class ContextAnchor:
         
         for d in [temp_current, temp_baseline]:
             if d.exists():
-                shutil.rmtree(d)
+                remove_tree(d)
             d.mkdir(parents=True)
 
         try:
@@ -203,9 +203,9 @@ class ContextAnchor:
         finally:
             for d in [temp_current, temp_baseline]:
                 if d.exists():
-                    shutil.rmtree(d)
+                    remove_tree(d)
 
-    def _prune_ignored_files(self, baseline_dir: Path, valid_rel_paths: set[Path]):
+    def _prune_ignored_files(self, baseline_dir: Path, valid_rel_paths: set[Path]) -> None:
         for file_path in baseline_dir.rglob("*"):
             if file_path.is_file() and ".git" not in file_path.parts and ".codigest" not in file_path.parts and ".shadow_git" not in file_path.parts:
                 try:
@@ -251,13 +251,14 @@ class ContextAnchor:
 
     def get_changed_files(self, current_files: list[Path]) -> list[Path]:
         raw_diff = self.get_changes(current_files)
-        paths = set()
+        paths: set[Path] = set()
         for line in raw_diff.splitlines():
             if line.startswith("diff --git"):
                 parts = line.split()
                 if len(parts) >= 4:
                     p = parts[-1]
-                    if p.startswith("b/") or p.startswith("a/"): p = p[2:]
+                    if p.startswith(("b/", "a/")):
+                        p = p[2:]
                     if not any(part in (".codigest", ".git", ".shadow_git") for part in Path(p).parts):
                         paths.add(self.root / p)
-        return sorted(list(paths))
+        return sorted(paths)

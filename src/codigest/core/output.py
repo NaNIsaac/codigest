@@ -2,15 +2,15 @@
 Unified Output Handler for CLI commands.
 Manages stderr log console, clipboard copying, and file vs stdout output.
 """
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
-import pyperclip
+lazy import pyperclip
 from rich.console import Console
 
 console = Console()
 err_console = Console(stderr=True)
 
-@dataclass
+@dataclass(slots=True)
 class OutputHandler:
     stdout: bool = False
     copy: bool = True
@@ -23,7 +23,7 @@ class OutputHandler:
         """
         return err_console if self.stdout else console
 
-    def copy_to_clipboard(self, content: str, item_name: str = "output"):
+    def copy_to_clipboard(self, content: str, item_name: str = "output") -> None:
         """Copies content to clipboard safely."""
         if not self.copy:
             return
@@ -36,9 +36,9 @@ class OutputHandler:
     def handle_output(
         self, 
         content: str, 
-        save_action: Optional[Callable[[], None]] = None,
+        save_action: Callable[[], None] | None = None,
         item_name: str = "output"
-    ):
+    ) -> None:
         """
         Executes clipboard copy, stdout print, or file save action cleanly.
         """
