@@ -193,15 +193,16 @@ Runs a command transparently (output still streams live) and records its command
 * **Safety:** Known secret shapes (API keys, tokens, `password=...`) are redacted before anything touches disk. Output of credential commands (`env`, `printenv`, `gh auth token`, ...) is never stored.
 * **Fallback:** Commands not run through `cap` are read from the native shell history (PowerShell, bash, zsh, fish), without output.
 
-**Automatic capture (PowerShell):** `cdg term install` hooks your PowerShell profile so *every* command is captured without the `cap` prefix. Commands run in your current session (`cd`, variables and functions behave normally). Editors, pagers, REPLs and `ssh` are skipped automatically.
+**Automatic capture (PowerShell, bash, zsh):** `cdg term install` hooks your shells so *every* command is captured without the `cap` prefix. It writes to your PowerShell profile, `~/.bashrc` and `~/.zshrc`, for whichever of these shells is installed; pick one with `--shell powershell|bash|zsh|all`. On Windows, Git Bash counts as bash. Commands run in your current session (`cd`, variables and functions behave normally) and your history shows them as typed. Editors, pagers, REPLs and `ssh` are skipped automatically.
 
 * Skip one command: start the line with a space.
-* Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`
-* Disable for a session: `$env:CODIGEST_NOCAP = 1`. Remove: `cdg term uninstall`.
+* Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'` (bash/zsh: `export CODIGEST_CAP_SKIP='^(myrepl|mytui)( |$)'`, an extended regex)
+* Disable for a session: `$env:CODIGEST_NOCAP = 1` (bash/zsh: `export CODIGEST_NOCAP=1`). Remove: `cdg term uninstall`.
 * Trade-off: captured programs write to a pipe, not a TTY, so some lose colors or progress bars.
+* bash (4+) and zsh do not capture multi-line commands (loops typed over several lines, heredocs), background jobs (`cmd &`) or lines using `!` history expansion; those run normally.
 
 ```bash
-cdg term install    # PowerShell: capture everything automatically
+cdg term install    # capture everything automatically (PowerShell, bash, zsh)
 
 # Run and capture (prefix with -- so flags reach the command)
 cdg cap -- pytest -q

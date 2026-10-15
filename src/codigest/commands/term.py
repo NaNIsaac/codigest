@@ -4,6 +4,7 @@
 import os
 import sys
 import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -157,16 +158,44 @@ def path() -> None:
 
 
 @app.command("ingest", hidden=True)
-def ingest() -> None:
-    """Store one JSON entry from stdin (called by the shell hook)."""
+def ingest(
+    file: Annotated[Path | None, typer.Option(help="Command, NUL, output; deleted afterwards")] = None,
+    exit_code: Annotated[int | None, typer.Option()] = None,
+    cwd: Annotated[str, typer.Option()] = "",
+    shell: Annotated[str, typer.Option()] = "",
+    start: Annotated[str, typer.Option(help="Epoch seconds")] = "",
+    end: Annotated[str, typer.Option(help="Epoch seconds")] = "",
+) -> None:
+    """
+    Store one entry (called by the shell hook): JSON on stdin (PowerShell),
+    or options plus a capture file (bash / zsh).
+    """
+    # The command travels in the file, not argv: click expands $VARS in argv on Windows.
     try:
-        data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+        if file is None:
+            data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+        else:
+            command, _, output = file.read_bytes().partition(b"\0")
+            # Locales with a decimal comma format $EPOCHREALTIME as 12,5.
+            t0, t1 = (float(t.replace(",", ".")) for t in (start or "0", end or start or "0"))
+            data = {
+                "command": command.decode("utf-8", "replace"),
+                "output": output.decode("utf-8", "replace"),
+                "exit_code": exit_code,
+                "cwd": str(Path(cwd)) if cwd else "",  # Git Bash passes D:/x
+                "shell": shell,
+                "started_at": datetime.fromtimestamp(t0).astimezone().isoformat(timespec="seconds"),
+                "duration_ms": max(0, round((t1 - t0) * 1000)),
+            }
         termstore.append_entry(termstore.Entry.from_dict(data))
     except Exception:
         # The hook discards our stderr; leave a trail `cdg term` can surface.
         with _ingest_log().open("a", encoding="utf-8") as f:
             f.write(f"--- {termstore.now_iso()}\n{traceback.format_exc()}")
         raise typer.Exit(code=1)
+    finally:
+        if file:
+            file.unlink(missing_ok=True)
 
 
 def _ingest_log() -> Path:
@@ -181,18 +210,36 @@ def _diagnose(log) -> None:
             "[dim]Capture hook is not active in this shell. Run `cdg term install` "
             "and open a new window, or enable it now with:[/dim]"
         )
-        log.print(f"[dim]  . '{HOOK_PATH}'[/dim]", highlight=False)
+        log.print(f"[dim]  PowerShell: . '{HOOK_PATH}'[/dim]", highlight=False)
+        log.print(f"[dim]  bash / zsh: . '{_posix(SH_HOOK_PATH)}'[/dim]", highlight=False)
     if (errors := termstore.get_term_dir() / "ingest-errors.log").exists():
         log.print(f"[red]Capture errors were logged:[/red] {errors}", highlight=False)
 
 
 # --------------------------------------------------------------------------
-# PowerShell hook install
+# Hook install (PowerShell profiles, ~/.bashrc, ~/.zshrc)
 # --------------------------------------------------------------------------
 
 HOOK_PATH = Path(__file__).resolve().parent.parent / "shell" / "hook.ps1"
+SH_HOOK_PATH = HOOK_PATH.with_name("hook.sh")
 _BEGIN = "# >>> codigest terminal capture >>>"
 _END = "# <<< codigest terminal capture <<<"
+_SHELLS = ("auto", "powershell", "bash", "zsh", "all")
+
+ShellOption = Annotated[
+    str,
+    typer.Option(
+        "--shell",
+        help="powershell, bash, zsh or all (default: every one installed)",
+    ),
+]
+
+
+def _posix(path: Path) -> str:
+    """C:/x/y -> /c/x/y, the form Git Bash understands."""
+    if path.drive.endswith(":"):
+        return f"/{path.drive[0].lower()}{path.as_posix()[2:]}"
+    return path.as_posix()
 
 
 def _powershell_profiles() -> list[Path]:
@@ -212,6 +259,21 @@ def _powershell_profiles() -> list[Path]:
     return profiles
 
 
+def _targets(shell: str) -> list[Path]:
+    """Startup files for the requested shells; `auto` picks the installed ones."""
+    if shell not in _SHELLS:
+        raise typer.BadParameter(f"choose one of: {', '.join(_SHELLS)}", param_hint="--shell")
+    wants = lambda name: shell in (name, "all") or (shell == "auto" and shutil.which(name))
+    targets = []
+    if shell in ("powershell", "all", "auto"):
+        targets += _powershell_profiles()
+    if wants("bash"):
+        targets.append(Path.home() / ".bashrc")
+    if wants("zsh"):
+        targets.append(Path(os.environ.get("ZDOTDIR") or Path.home()) / ".zshrc")
+    return targets
+
+
 def _strip_block(text: str) -> str:
     start = text.find(_BEGIN)
     end = text.find(_END)
@@ -221,45 +283,55 @@ def _strip_block(text: str) -> str:
     return rest + "\n" if rest else ""
 
 
-def _rewrite_profiles(add: bool) -> None:
+def _rewrite_profiles(add: bool, shell: str) -> None:
     console = Console()
-    if not (profiles := _powershell_profiles()):
-        console.print("[red][Error][/red] No PowerShell found (pwsh / powershell).")
+    # Removing from a file that has no block is a no-op, so uninstall checks every shell.
+    if not (targets := _targets(shell if add or shell != "auto" else "all")):
+        console.print("[red][Error][/red] No supported shell found (PowerShell, bash, zsh).")
         raise typer.Exit(code=1)
 
-    block = f"{_BEGIN}\nif (Test-Path '{HOOK_PATH}') {{ . '{HOOK_PATH}' }}\n{_END}\n"
-    for profile in profiles:
+    sh = _posix(SH_HOOK_PATH)
+    for target in targets:
+        is_ps = target.suffix == ".ps1"
         text = ""
-        if profile.exists():
+        if target.exists():
             try:
-                text = profile.read_bytes().decode("utf-8-sig")
+                text = target.read_bytes().decode("utf-8-sig")
             except UnicodeDecodeError:
                 # Rewriting a non-UTF-8 profile would corrupt it.
-                console.print(f"[yellow]Skipped[/yellow] {profile} (not UTF-8; edit it by hand)")
+                console.print(f"[yellow]Skipped[/yellow] {target} (not UTF-8; edit it by hand)")
                 continue
         new = _strip_block(text)
         if add:
-            new = (new.rstrip("\n") + "\n\n" if new.strip() else "") + block
+            line = (
+                f"if (Test-Path '{HOOK_PATH}') {{ . '{HOOK_PATH}' }}"
+                if is_ps
+                else f"if [ -f '{sh}' ]; then . '{sh}'; fi"
+            )
+            new = (new.rstrip("\n") + "\n\n" if new.strip() else "") + f"{_BEGIN}\n{line}\n{_END}\n"
         elif new == text:
             continue
-        profile.parent.mkdir(parents=True, exist_ok=True)
-        # BOM so Windows PowerShell 5.1 reads non-ASCII paths correctly.
-        profile.write_bytes(new.encode("utf-8-sig"))
-        console.print(f"[green]{'Installed' if add else 'Removed'}[/green] {profile}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # BOM so Windows PowerShell 5.1 reads non-ASCII paths correctly; a BOM would break bash.
+        target.write_bytes(new.encode("utf-8-sig" if is_ps else "utf-8"))
+        console.print(f"[green]{'Installed' if add else 'Removed'}[/green] {target}")
 
     if add:
-        console.print("Active in new PowerShell windows. Enable in this window now with:")
-        console.print(f"  . '{HOOK_PATH}'", highlight=False)
-        console.print("[dim]Skip one command: start it with a space. Disable: $env:CODIGEST_NOCAP = 1[/dim]")
+        console.print("Active in new shell windows. Enable in this one now with:")
+        if any(t.suffix == ".ps1" for t in targets):
+            console.print(f"  PowerShell:  . '{HOOK_PATH}'", highlight=False)
+        if any(t.suffix != ".ps1" for t in targets):
+            console.print(f"  bash / zsh:  . '{sh}'", highlight=False)
+        console.print("[dim]Skip one command: start it with a space. Disable: set CODIGEST_NOCAP=1[/dim]")
 
 
 @app.command("install")
-def install() -> None:
-    """Hook PowerShell so every command's output is captured automatically."""
-    _rewrite_profiles(add=True)
+def install(shell: ShellOption = "auto") -> None:
+    """Hook your shells so every command's output is captured automatically."""
+    _rewrite_profiles(add=True, shell=shell)
 
 
 @app.command("uninstall")
-def uninstall() -> None:
-    """Remove the PowerShell capture hook from your profile."""
-    _rewrite_profiles(add=False)
+def uninstall(shell: ShellOption = "auto") -> None:
+    """Remove the capture hook from your shell startup files."""
+    _rewrite_profiles(add=False, shell=shell)
