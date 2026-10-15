@@ -1,10 +1,11 @@
 # Codigest terminal capture hook for PowerShell. Installed by `cdg term install`.
 #
-# On Enter, the accepted line is rewritten to `. __cdg { <line> }`. Dot-sourcing
-# runs it in the caller's scope, so `cd`, variable assignments and function
-# definitions behave exactly as typed. Output is teed into a buffer and handed
-# to `cdg term ingest` in a background process (redaction happens there,
-# before anything touches disk).
+# The line you type is run as `. __cdg { <line> }`. The wrapping happens in
+# PSConsoleHostReadLine, after PSReadLine has returned the line, so the screen and
+# the history keep the line as typed. Dot-sourcing runs it in the caller's scope,
+# so `cd`, variable assignments and function definitions behave exactly as typed.
+# Output is teed into a buffer and handed to `cdg term ingest` in a background
+# process (redaction happens there, before anything touches disk).
 #
 # Opt out for one command: start the line with a space.
 # Opt out entirely: $env:CODIGEST_NOCAP = 1
@@ -81,39 +82,31 @@ $global:__cdgSkip = '^\s*(vim?|nvim|nano|emacs|less|more|ssh|htop|btop|top|fzf|l
     '|^\s*(python3?|py|ipython|node|pwsh|powershell|bash|cmd)(\.exe)?\s*$' +
     '|^\s*git\s+(commit(?!.*\s-\w*[mF])|rebase\s+-i|add\s+-[pi]|mergetool)'
 
-Set-PSReadLineKeyHandler -Key Enter -BriefDescription CodigestAcceptLine -ScriptBlock {
-    $line = $null; $cursor = $null
-    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+# Replaces PSReadLine's own PSConsoleHostReadLine, which the host calls for every prompt.
+# PSReadLine draws and stores the line as typed; only the string returned to the engine
+# is wrapped, so nothing changes on screen.
+function global:PSConsoleHostReadLine {
+    # First statement: any script run resets $?, and PSReadLine shows it in the prompt.
+    $__cdgOk = $?
+    Microsoft.PowerShell.Core\Set-StrictMode -Off
+    $line = try { [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $__cdgOk) }
+            catch [Management.Automation.MethodException] {  # PSReadLine < 2.2 has no status argument
+                [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext) }
     $wrap = $line.Trim() -and $line -notmatch '^\s' -and $line -notmatch $global:__cdgSkip -and
             -not ($env:CODIGEST_CAP_SKIP -and $line -match $env:CODIGEST_CAP_SKIP) -and -not $env:CODIGEST_NOCAP
     if ($wrap) {
         $tokens = $null; $errs = $null
-        [void][Management.Automation.Language.Parser]::ParseInput($line, [ref]$tokens, [ref]$errs)
-        # Incomplete input (open brace etc.) goes through untouched to the continuation prompt.
-        if (-not $errs) {
-            # Single-line form first; the newline form survives a trailing `# comment`.
-            foreach ($w in ". __cdg { $line }", ". __cdg { $line`n}") {
-                [void][Management.Automation.Language.Parser]::ParseInput($w, [ref]$tokens, [ref]$errs)
-                if (-not $errs) {
-                    $global:__cdgLine = $line
-                    [Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory($line)
-                    [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $w)
-                    break
-                }
+        # Single-line form first; the newline form survives a trailing `# comment`.
+        # Input that does not parse is returned as typed so the engine reports the error.
+        foreach ($w in ". __cdg { $line }", ". __cdg { $line`n}") {
+            [void][Management.Automation.Language.Parser]::ParseInput($w, [ref]$tokens, [ref]$errs)
+            if (-not $errs) {
+                $global:__cdgLine = $line
+                return $w
             }
         }
     }
-    [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
-}
-
-# Keep the wrapper out of history; the original line was added above.
-$global:__cdgPrevHistHandler = (Get-PSReadLineOption).AddToHistoryHandler
-Set-PSReadLineOption -AddToHistoryHandler {
-    param($l)
-    if ($l -like '. __cdg {*') { return $false }
-    # The default handler is a .NET Func delegate, not a scriptblock: .Invoke() covers both.
-    if ($global:__cdgPrevHistHandler) { return $global:__cdgPrevHistHandler.Invoke($l) }
-    return $true
+    $line
 }
 
 # Lets `cdg term` tell whether this shell is hooked.
