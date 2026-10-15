@@ -19,14 +19,14 @@ app = typer.Typer(
     no_args_is_help=True
 )
 
-app.add_typer(init.app, name="init")
-app.add_typer(status.app, name="status")
-app.add_typer(clean.app, name="clean")
-app.add_typer(scan.app, name="scan")
-app.add_typer(tree.app, name="tree")
-app.add_typer(digest.app, name="digest")
-app.add_typer(diff.app, name="diff")
-app.add_typer(semdiff.app, name="semdiff")
+app.command(name="init")(init.handle)
+app.command(name="status")(status.handle)
+app.command(name="clean")(clean.handle)
+app.command(name="scan")(scan.handle)
+app.command(name="tree")(tree.handle)
+app.command(name="digest")(digest.handle)
+app.command(name="diff")(diff.handle)
+app.command(name="semdiff")(semdiff.handle)
 app.add_typer(term.app, name="term")
 
 # `cap` is a plain command, not a group: its first argument is the wrapped

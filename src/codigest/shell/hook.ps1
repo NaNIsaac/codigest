@@ -76,7 +76,8 @@ if (-not (Get-Module PSReadLine)) { return }
 
 # ponytail: denylist heuristic for programs that need a real TTY (editors, pagers,
 # REPLs, ssh). Extend with $env:CODIGEST_CAP_SKIP (a regex) when one slips through.
-$global:__cdgSkip = '^\s*(vim?|nvim|nano|emacs|less|more|ssh|htop|btop|top|fzf|lazygit|claude|codex|wsl|cdg|codigest|exit)(\.exe)?\b' +
+$global:__cdgSkip = '^\s*(vim?|nvim|nano|emacs|less|more|ssh|htop|btop|top|fzf|lazygit|claude|codex|wsl|exit)(\.exe)?\b' +
+    '|^\s*(cdg|codigest)(\.exe)?\s+(term|mcp)\b' +
     '|^\s*(python3?|py|ipython|node|pwsh|powershell|bash|cmd)(\.exe)?\s*$' +
     '|^\s*git\s+(commit(?!.*\s-\w*[mF])|rebase\s+-i|add\s+-[pi]|mergetool)'
 
@@ -114,3 +115,6 @@ Set-PSReadLineOption -AddToHistoryHandler {
     if ($global:__cdgPrevHistHandler) { return $global:__cdgPrevHistHandler.Invoke($l) }
     return $true
 }
+
+# Lets `cdg term` tell whether this shell is hooked.
+$env:CODIGEST_HOOK = '1'

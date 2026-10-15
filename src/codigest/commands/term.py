@@ -1,7 +1,9 @@
 """
 `cdg term` -- recall recent terminal commands (and their output) as LLM context.
 """
+import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Annotated
 
@@ -99,13 +101,10 @@ def handle(
                 f"[yellow][Warning][/yellow] No Codigest captures found; "
                 f"falling back to {shell} history [dim](commands only, no output)[/dim]"
             )
-            log.print(
-                "[dim]Capture output with `cdg term install` (PowerShell) "
-                "or `cdg cap -- <command>`.[/dim]"
-            )
+            _diagnose(log)
         else:
             log.print("[yellow]No terminal history available.[/yellow]")
-            log.print("[dim]Try: cdg term install, or cdg cap -- <command>[/dim]")
+            _diagnose(log)
             raise typer.Exit(code=1)
 
     if failed:
@@ -138,6 +137,7 @@ def clear() -> None:
     """Delete all stored terminal captures."""
     console = Console()
     removed = termstore.clear()
+    (termstore.get_term_dir() / "ingest-errors.log").unlink(missing_ok=True)
     console.print(f"[green]Cleared[/green] {removed} captured entries.")
 
 
@@ -151,8 +151,31 @@ def path() -> None:
 @app.command("ingest", hidden=True)
 def ingest() -> None:
     """Store one JSON entry from stdin (called by the shell hook)."""
-    data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
-    termstore.append_entry(termstore.Entry.from_dict(data))
+    try:
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+        termstore.append_entry(termstore.Entry.from_dict(data))
+    except Exception:
+        # The hook discards our stderr; leave a trail `cdg term` can surface.
+        with _ingest_log().open("a", encoding="utf-8") as f:
+            f.write(f"--- {termstore.now_iso()}\n{traceback.format_exc()}")
+        raise typer.Exit(code=1)
+
+
+def _ingest_log() -> Path:
+    termstore.get_term_dir().mkdir(parents=True, exist_ok=True)
+    return termstore.get_term_dir() / "ingest-errors.log"
+
+
+def _diagnose(log) -> None:
+    """Explains why nothing was captured instead of failing silently."""
+    if not os.environ.get("CODIGEST_HOOK"):
+        log.print(
+            "[dim]Capture hook is not active in this shell. Run `cdg term install` "
+            "and open a new window, or enable it now with:[/dim]"
+        )
+        log.print(f"[dim]  . '{HOOK_PATH}'[/dim]", highlight=False)
+    if (errors := termstore.get_term_dir() / "ingest-errors.log").exists():
+        log.print(f"[red]Capture errors were logged:[/red] {errors}", highlight=False)
 
 
 # --------------------------------------------------------------------------

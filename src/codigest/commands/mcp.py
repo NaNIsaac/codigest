@@ -97,7 +97,6 @@ def _cli(command: str, args: JSON) -> str:
         argv.append("-r")
     if message := args.get("message"):
         argv += ["-m", message]
-    # Options before positionals: Typer group callbacks require that order.
     match command:
         case "scan":
             argv += [str(t) for t in args.get("targets") or []] or ([args["path"]] if "path" in args else [])
