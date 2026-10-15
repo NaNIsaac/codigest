@@ -6,12 +6,24 @@ Unlike simple copy-paste tools, Codigest employs a **Context Anchor** system (Sh
 
 > **Note:** You can use the short alias **`cdg`** instead of `codigest` for faster typing.
 
+## Quickstart
+
+```bash
+uv tool install codigest
+
+cdg scan                  # whole project as LLM-ready XML (copied to clipboard)
+cdg init && cdg diff      # set an anchor, later get only what changed
+cdg cap -- pytest -q      # run a command and keep its output
+cdg term -f               # hand the last failed command + output to your LLM
+claude mcp add codigest -- cdg mcp   # let AI agents call all of the above
+```
+
 ## Core Philosophy
 
 * **Read-Only & Safe**: Codigest never modifies your source code. It only reads, analyzes, and formats context.
 * **Context-Aware**: Instead of dumping raw text, it structures code into XML snapshots designed for LLM comprehension.
 * **Session-Based Tracking**: It maintains an internal anchor to track "work-in-progress" changes independently of your Git commits.
-* **Environment Isolated**: Runs in its own isolated Python 3.14 environment via `uv`, ensuring it never conflicts with your project's dependencies.
+* **Environment Isolated**: Runs in its own isolated Python 3.15 environment via `uv`, ensuring it never conflicts with your project's dependencies.
 
 ## Installation
 
@@ -27,13 +39,12 @@ If you don't have `uv` installed, use **Winget** (Windows) or curl (macOS/Linux)
 winget install --id astral-sh.uv
 
 # macOS/Linux
-curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
-
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Step 2: Install `codigest`
 
-Install Codigest globally. `uv` will automatically manage the required Python 3.14 environment for you.
+Install Codigest globally. `uv` will automatically manage the required Python 3.15 environment for you.
 
 ```bash
 uv tool install codigest
@@ -199,6 +210,25 @@ cdg term path       # where captures are stored (override with CODIGEST_HOME)
 cdg term clear      # delete all captures
 ```
 
+### 10. For AI Agents (`mcp`)
+
+`cdg mcp` serves Codigest as an [MCP](https://modelcontextprotocol.io) server over stdio, so coding agents can pull context themselves instead of asking you to paste it.
+
+| Tool | Returns |
+| --- | --- |
+| `terminal_history` | Recent commands with output and exit code (`count`, `failed`) |
+| `scan` | Project snapshot (`targets`, `resolve`, `message`) |
+| `diff` / `semdiff` | Text / structural changes since the anchor |
+| `digest` | Signatures and docstrings only |
+| `tree` | Directory tree |
+
+```bash
+# Claude Code
+claude mcp add --scope user codigest -- cdg mcp
+```
+
+Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command `cdg` and args `["mcp"]`.
+
 ---
 
 ## Configuration
@@ -238,4 +268,4 @@ Codigest maintains a hidden, lightweight Git repository inside `.codigest/anchor
 
 ## License
 
-MIT License
+MIT. See [LICENSE](LICENSE).

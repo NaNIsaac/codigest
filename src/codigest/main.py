@@ -8,7 +8,7 @@ from rich.console import Console
 
 lazy from importlib.metadata import PackageNotFoundError, version
 
-from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term
+from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp
 
 console = Console()
 
@@ -32,6 +32,7 @@ app.add_typer(term.app, name="term")
 # `cap` is a plain command, not a group: its first argument is the wrapped
 # program, which a Typer group would try to resolve as a subcommand.
 app.command(name="cap", context_settings=cap.CONTEXT_SETTINGS)(cap.handle)
+app.command(name="mcp")(mcp.handle)
 
 def version_callback(value: bool) -> None:
     """

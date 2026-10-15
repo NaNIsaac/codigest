@@ -23,9 +23,19 @@ def test_profile_block_strip_keeps_user_content():
     assert term._strip_block(block) == ""
 
 
+
+def test_mcp_lists_tools_and_ignores_notifications():
+    from codigest.commands import mcp
+    listed = mcp.handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    assert "terminal_history" in [t["name"] for t in listed["result"]["tools"]]
+    assert mcp.handle_message({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
+    assert mcp.handle_message({"jsonrpc": "2.0", "id": 2, "method": "nope"})["error"]["code"] == -32601
+
+
 if __name__ == "__main__":
     test_crlf_output_survives_normalization()
     test_progress_redraw_keeps_last_frame()
     test_render_escapes_quotes_in_command_attribute()
     test_profile_block_strip_keeps_user_content()
+    test_mcp_lists_tools_and_ignores_notifications()
     print("ok")
