@@ -137,7 +137,7 @@ def handle(
     if failure:
         head.append(termstore.render([failure]))
     if diff.strip():
-        head.append(f'<changes source="{html.escape(diff_source)}">\n{tags.escape_xml_value(diff)}\n</changes>')
+        head.append(f'<changes source="{html.escape(diff_source)}">\n{tags.escape_xml_value(diff.rstrip())}\n</changes>')
     used = tokenizer.estimate_tokens("\n".join(head))
 
     blocks: list[str] = []
