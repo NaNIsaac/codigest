@@ -158,7 +158,7 @@ claude mcp add --scope user codigest -- cdg mcp      # Claude Code
 3. 바꾼 파일: Git의 커밋 안 된 파일과 추적 안 된 파일. `cdg mark`로 기준점을 잡았다면 그
    이후의 변경([아래](#어느-시점-이후-바뀐-것-보기) 참고).
 4. 바뀐 파일을 import하는 테스트(`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js` 등).
-5. 위 파일들이 import하는 프로젝트 파일: Python import와 JS/TS 상대 경로 import
+5. 1·3·4단계 파일이 import하는 프로젝트 파일: Python import와 JS/TS 상대 경로 import
    (`./x`, `x.ts`를 가리키는 `./x.js`, `dir/index.ts`를 가리키는 `./dir`).
 
 실패한 명령과 diff는 항상 들어가고, `.env`, `*.pem`, `*.key`, SSH 키는 절대 들어가지 않습니다.

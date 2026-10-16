@@ -10,6 +10,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from ..options import CopyOption, StdoutOption
 
@@ -65,7 +66,7 @@ def _summarize(handler: OutputHandler, entries: list[termstore.Entry]) -> None:
             case 0: status = " [green]✓[/green]"
             case code: status = f" [red](exit {code})[/red]"
         marker = "" if entry.captured else " [yellow](no output)[/yellow]"
-        log.print(f"[dim]{index}.[/dim] [cyan]{entry.command}[/cyan]{status}{marker}")
+        log.print(f"[dim]{index}.[/dim] [cyan]{escape(entry.command)}[/cyan]{status}{marker}")
 
 
 @app.callback(invoke_without_command=True)

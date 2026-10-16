@@ -162,7 +162,7 @@ fills its token budget (default 30,000):
 3. Files you changed: uncommitted and untracked files in Git, or changes since `cdg mark` if you
    set a baseline (see [below](#see-what-changed-since-a-point)).
 4. Tests that import a changed file (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js`, ...).
-5. Project files imported by the files above: Python imports, and relative imports in
+5. Project files imported by the files from steps 1, 3 and 4: Python imports, and relative imports in
    JS/TS (`./x`, `./x.js` for `x.ts`, `./dir` for `dir/index.ts`).
 
 The failed command and the diff are always included. `.env`, `*.pem`, `*.key` and SSH keys never

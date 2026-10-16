@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import typer
+from rich.markup import escape
 
 from ..options import CopyOption, MessageOption, StdoutOption
 
@@ -204,7 +205,7 @@ def handle(
         if hit := sorted(imports(test) & edited):
             wanted.setdefault(test, f"tests {hit[0].relative_to(root).as_posix()}")
 
-    for path in list(wanted):
+    for path in [p for p, why in wanted.items() if not why.endswith("failing output")]:
         for dep in sorted(imports(path)):
             wanted.setdefault(dep, f"imported by {path.relative_to(root).as_posix()}")
 
@@ -254,13 +255,13 @@ def handle(
     log.print(f"[bold]Packed ~{used:,} / {budget:,} tokens[/bold]{over}")
     if failure:
         when = _ago(failure.started_at)
-        log.print(f"  [red]failed [/red]  [cyan]{failure.command}[/cyan] [dim](exit {failure.exit_code}{', ' + when if when else ''})[/dim]")
+        log.print(f"  [red]failed [/red]  [cyan]{escape(failure.command)}[/cyan] [dim](exit {failure.exit_code}{', ' + when if when else ''})[/dim]")
     if diff.strip():
         log.print(f"  [yellow]changes[/yellow]  [dim]{diff_source}[/dim]")
     width = max((len(rel) for rel, _ in included + omitted), default=0)
     for rel, why in included:
-        log.print(f"  [green]+[/green] {rel:<{width}}  [dim]{why}[/dim]")
+        log.print(f"  [green]+[/green] {escape(rel):<{width}}  [dim]{escape(why)}[/dim]")
     for rel, why in omitted:
-        log.print(f"  [dim]- {rel:<{width}}  {why}[/dim]")
+        log.print(f"  [dim]- {escape(rel):<{width}}  {escape(why)}[/dim]")
 
     handler.handle_output(pack, item_name="pack")
