@@ -154,9 +154,11 @@ When a file you expected is missing, or one you didn't expect is there, this is 
 fills its token budget (default 30,000):
 
 1. Files you name: `cdg pack src/prices.py`.
-2. Files named in the output of the last failed command run in this project:
-   `File "x.py", line 7` (Python), `x.py:7` (pytest, gcc, rustc, eslint), `x.ts(7,3)` (tsc).
-   Once the same command passes again, that failure is no longer used.
+2. Files named in the output of the last failed command run in this project in the past hour:
+   `File "x.py", line 7` (Python), `x.py:7` (pytest, ruff, gcc, rustc, eslint), `x.ts(7,3)` (tsc).
+   Once the same command passes again, that failure is no longer used. A file that is only named
+   in the output, not changed by you, comes as an excerpt: ten lines around each place the output
+   points at, marked with a `lines="40-60"` attribute. Short files come whole.
 3. Files you changed: uncommitted and untracked files in Git, or changes since `cdg mark` if you
    set a baseline (see [below](#see-what-changed-since-a-point)).
 4. Tests that import a changed file (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js`, ...).

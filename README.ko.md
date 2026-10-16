@@ -150,9 +150,11 @@ claude mcp add --scope user codigest -- cdg mcp      # Claude Code
 예산(기본 30,000)을 채웁니다.
 
 1. 직접 지정한 파일: `cdg pack src/prices.py`
-2. 이 프로젝트에서 마지막으로 실패한 명령의 출력에 나온 파일:
-   `File "x.py", line 7`(Python), `x.py:7`(pytest, gcc, rustc, eslint), `x.ts(7,3)`(tsc).
-   같은 명령이 다시 통과하면 그 실패는 더 이상 쓰지 않습니다.
+2. 이 프로젝트에서 최근 한 시간 안에 마지막으로 실패한 명령의 출력에 나온 파일:
+   `File "x.py", line 7`(Python), `x.py:7`(pytest, ruff, gcc, rustc, eslint), `x.ts(7,3)`(tsc).
+   같은 명령이 다시 통과하면 그 실패는 더 이상 쓰지 않습니다. 내가 바꾸지 않고 출력에만 나온
+   파일은 발췌로 들어갑니다. 출력이 가리킨 곳마다 앞뒤 열 줄이며 `lines="40-60"` 속성이
+   붙습니다. 짧은 파일은 통째로 들어갑니다.
 3. 바꾼 파일: Git의 커밋 안 된 파일과 추적 안 된 파일. `cdg mark`로 기준점을 잡았다면 그
    이후의 변경([아래](#어느-시점-이후-바뀐-것-보기) 참고).
 4. 바뀐 파일을 import하는 테스트(`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js` 등).

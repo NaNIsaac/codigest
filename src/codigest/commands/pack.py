@@ -6,7 +6,7 @@ in that order until the token budget runs out; whatever is left out is listed,
 so the reader knows what it is not seeing.
 """
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import typer
@@ -18,6 +18,10 @@ lazy from ..core import common, git_ops, processor, resolver, shadow, tags, term
 lazy from ..core.output import OutputHandler
 
 DEFAULT_BUDGET = 30_000
+# A file that is only named in the failing output gets this many lines around each reference.
+EXCERPT_CONTEXT = 10
+EXCERPT_MIN_LINES = 60
+FAILURE_MAX_AGE = timedelta(hours=1)
 
 # `File "x.py", line 7` (Python) or `x.py:7` / `x.ts(7,3)` (pytest, tsc, gcc, rustc, eslint, ...)
 _LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path>[\w./\\~-]+\.\w+)[:(](?P<line>\d+)')
@@ -32,9 +36,15 @@ _SECRET_FILE_RE = re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx)$|^id_(rsa|dsa|
 
 
 def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry | None:
-    """Latest failed command run under `root`, unless the same command has passed since."""
+    """
+    Latest failed command run under `root` within the last hour, unless the same command has
+    passed since. Older failures are rarely what someone running `pack` is looking at.
+    """
+    cutoff = datetime.now().astimezone() - FAILURE_MAX_AGE
     passed: set[str] = set()
     for entry in reversed(termstore.select(entries, under=root)):
+        if _started(entry) < cutoff:
+            return None
         if entry.exit_code == 0:
             passed.add(entry.command)
         elif entry.exit_code is not None and entry.command not in passed:
@@ -42,16 +52,49 @@ def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry 
     return None
 
 
-def referenced_files(output: str, bases: list[Path], known: set[Path]) -> dict[Path, int]:
-    """Project files named in command output, with the first line number given for each."""
-    found: dict[Path, int] = {}
+def _started(entry: termstore.Entry) -> datetime:
+    try:
+        return datetime.fromisoformat(entry.started_at)
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def referenced_files(output: str, bases: list[Path], known: set[Path]) -> dict[Path, list[int]]:
+    """Project files named in command output, with the line numbers given for each, in order."""
+    found: dict[Path, list[int]] = {}
     for m in _LOCATION_RE.finditer(output):
         raw = Path(m["py"] or m["path"]).expanduser()
         for base in bases:
             if (path := (base / raw).resolve()) in known:
-                found.setdefault(path, int(m["py_line"] or m["line"]))
+                if (line := int(m["py_line"] or m["line"])) not in (lines := found.setdefault(path, [])):
+                    lines.append(line)
                 break
     return found
+
+
+def excerpt(path: Path, lines: list[int]) -> tuple[str, str] | None:
+    """
+    The lines around each reference, numbered, with `...` between gaps, plus the ranges shown
+    ("3-23,40-60"). None when the file is short or the excerpt would be most of it anyway.
+    """
+    try:
+        rows = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    spans: list[list[int]] = []
+    for line in sorted(lines):
+        lo, hi = max(1, line - EXCERPT_CONTEXT), min(len(rows), line + EXCERPT_CONTEXT)
+        if spans and lo <= spans[-1][1] + 1:
+            spans[-1][1] = max(spans[-1][1], hi)
+        else:
+            spans.append([lo, hi])
+    if len(rows) <= EXCERPT_MIN_LINES or sum(hi - lo + 1 for lo, hi in spans) > len(rows) * 0.7:
+        return None
+    width = len(str(len(rows)))
+    text = "\n...\n".join(
+        "\n".join(f"{i:>{width}}: {rows[i - 1]}" for i in range(lo, hi + 1)) for lo, hi in spans
+    )
+    return text, ",".join(f"{lo}-{hi}" for lo, hi in spans)
 
 
 def js_imports(path: Path) -> set[Path]:
@@ -135,16 +178,19 @@ def handle(
     for path in ctx.get_target_files(targets=targets) if targets else []:
         wanted.setdefault(path, "requested")
 
+    refs: dict[Path, list[int]] = {}
     failure = pick_failure(termstore.load_entries(), root)
     if failure:
         bases = [Path(failure.cwd), root] if failure.cwd else [root]
-        for path, line in referenced_files(failure.output, bases, known).items():
-            wanted.setdefault(path, f"line {line} in failing output")
+        refs = referenced_files(failure.output, bases, known)
+        for path, lines in refs.items():
+            shown = ", ".join(map(str, lines[:3])) + (", ..." if len(lines) > 3 else "")
+            wanted.setdefault(path, f"line{'s' * (len(lines) > 1)} {shown} in failing output")
 
     diff, diff_source, changed = _changes(root, sorted(known))
+    changed = [p.resolve() for p in changed if p.resolve() in known]
     for path in changed:
-        if path.resolve() in known:
-            wanted.setdefault(path.resolve(), "changed")
+        wanted.setdefault(path, "changed")
 
     deps = resolver.DependencyResolver(root)
 
@@ -184,15 +230,19 @@ def handle(
         if _SECRET_FILE_RE.search(path.name):
             omitted.append((rel, "may contain secrets"))
             continue
-        content = tags.escape_xml_value(processor.read_file_content(path, add_line_numbers=True))
-        block = f'<file path="{html.escape(rel)}" reason="{html.escape(reason)}">\n{content}\n</file>'
+        # Files you changed or asked for come whole; files the output only points at come as excerpts.
+        part = excerpt(path, refs[path]) if path in refs and reason.endswith("failing output") and path not in changed else None
+        content, shown = part or (processor.read_file_content(path, add_line_numbers=True), "")
+        lines_attr = f' lines="{shown}"' if shown else ""
+        block = f'<file path="{html.escape(rel)}" reason="{html.escape(reason)}"{lines_attr}>\n{tags.escape_xml_value(content)}\n</file>'
         cost = tokenizer.estimate_tokens(block)
         if used + cost > budget:
             omitted.append((rel, f"over budget (~{cost:,} tokens)"))
             continue
         used += cost
         blocks.append(block)
-        included.append((rel, reason))
+        brief = f"{len(refs[path])} places in failing output" if reason.startswith("lines ") else reason
+        included.append((rel, f"{brief} (excerpt)" if shown else brief))
 
     if omitted:
         listing = "\n".join(f"{rel}: {why}" for rel, why in omitted)
