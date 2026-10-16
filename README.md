@@ -4,34 +4,45 @@
 
 <!-- mcp-name: io.github.NaNIsaac/codigest -->
 
-**Hand an LLM your failing command, the code it points at and your changes, in one paste.**
+**Collects what an AI model needs to help with your code, from your terminal and your project.**
 
 [한국어](README.ko.md)
 
+Codigest is a command-line tool. When you ask ChatGPT, Claude or a coding agent about a failing
+test or code you are working on, it gathers the material the model needs to answer.
+
+A model only knows what you show it. To help, it needs the error, the code involved, and what you
+changed. Collecting that by hand is slow, and it is easy to leave out the one file that matters,
+or to paste far more than the question needs.
+
+Codigest remembers the commands you run and their output, finds the files an error points at and
+the changes Git knows about, and puts them together as one block of text. You paste it into a
+chat, or let an agent fetch it directly.
+
+## What it does
+
+- **Remembers terminal output.** Commands are stored with their output and exit code. Values that
+  look like tokens or passwords are masked before anything is written.
+- **Picks the relevant code.** It finds the files and lines an error names and the files you
+  changed, then follows the tests and imports connected to them.
+- **Says why.** Each file carries the reason it was included, and files left out for size are
+  still listed by name.
+- **Fits a budget.** Large files come as excerpts around the lines that matter.
+- **Works with agents.** Claude Code, Cursor and other MCP clients can request the same output.
+
+Codigest does not call any AI model; it only prepares what you send to one. Everything runs on
+your machine, and your source files and Git history are only read.
+
 <p align="center">
   <img src="docs/demo/demo.gif" alt="cdg cap runs a failing pytest, then cdg pack bundles the failure, the test file it names and the changed file" width="760">
+  <br>
+  <sub>A test fails; one command collects what the model needs.</sub>
 </p>
-
-## The idea
-
-A test fails and you ask an LLM for help. You copy the error, then the test, then the file you
-changed, and the model still asks for one more file.
-
-Codigest does the copying. You need two commands:
-
-```text
-cdg cap -- pytest     runs your command and remembers its output
-cdg pack              finds the files that output mentions, adds what you changed,
-                      and copies all of it to your clipboard
-```
-
-Then you paste. That is the whole tool for most days; everything below either sets it up,
-explains it, or is optional.
 
 ## Install
 
-Codigest is a command-line tool. Install it with [uv](https://docs.astral.sh/uv/), which also
-fetches the Python version it needs (3.15) without touching your projects:
+Install it with [uv](https://docs.astral.sh/uv/), which also fetches the Python version Codigest
+needs (3.15) and keeps it apart from your projects:
 
 ```bash
 winget install --id astral-sh.uv                  # Windows (skip if you have uv)
@@ -44,9 +55,9 @@ uv tool update-shell                              # then restart your terminal
 The command is `codigest`, or `cdg` for short.
 If the install fails with a syntax error on `lazy import`, run `uv self update` and try again.
 
-## Your first pack
+## Getting started
 
-Go to a project with a failing test. No setup is needed.
+Try it in any project with a failing test. No setup is needed.
 
 **1. Run the test through `cdg cap`.** Put `--` before your command. The output looks exactly as
 it would without `cdg cap`; Codigest just keeps a copy.
@@ -129,7 +140,7 @@ what it is not seeing.
 
 </details>
 
-## Two optional upgrades
+## Making it smoother
 
 Once the basic loop works, each of these removes one manual step.
 
