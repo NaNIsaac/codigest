@@ -53,3 +53,13 @@ if __name__ == "__main__":
     test_profile_block_strip_keeps_user_content()
     test_mcp_lists_tools_and_ignores_notifications()
     print("ok")
+
+
+def test_mcp_refuses_paths_outside_the_project(tmp_path, monkeypatch):
+    from codigest.commands import mcp
+    (tmp_path / "proj").mkdir()
+    monkeypatch.chdir(tmp_path / "proj")
+    for path in ("..", str(tmp_path), "../proj/../x"):
+        result = mcp._call_tool("tree", {"path": path})
+        assert result["isError"] and "outside the project" in result["content"][0]["text"]
+    assert mcp._in_project(".") == str((tmp_path / "proj").resolve())

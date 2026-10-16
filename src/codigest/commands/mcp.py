@@ -111,6 +111,15 @@ def _terminal_history(args: JSON) -> str:
     return termstore.render(termstore.select(entries, failed=bool(args.get("failed")), under=under)[-count:])
 
 
+def _in_project(raw: str) -> str:
+    """Absolute form of an agent-supplied path; refuses anything outside the server's project."""
+    root = Path.cwd().resolve()
+    # resolve() follows symlinks and junctions, so a link pointing outside is caught too.
+    if not (path := (root / str(raw)).resolve()).is_relative_to(root):
+        raise ValueError(f"{raw} is outside the project ({root})")
+    return str(path)
+
+
 def _cli(command: str, args: JSON) -> str:
     argv = [sys.executable, "-m", "codigest", command, "-s", "--no-copy"]
     if command == "scan":
@@ -123,9 +132,9 @@ def _cli(command: str, args: JSON) -> str:
         argv += ["-b", str(int(budget))]
     match command:
         case "scan" | "pack":
-            argv += [str(t) for t in args.get("targets") or []] or ([args["path"]] if "path" in args else [])
+            argv += [_in_project(t) for t in args.get("targets") or []] or ([_in_project(args["path"])] if "path" in args else [])
         case _ if "path" in args:
-            argv.append(args["path"])
+            argv.append(_in_project(args["path"]))
 
     result = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
