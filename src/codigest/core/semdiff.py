@@ -166,12 +166,6 @@ def summarize(code: str) -> str:
 
     lines = []
     for _, sym in sorted(symbols.items()):
-        match sym.type:
-            case "class": icon = "📦"
-            case "method": icon = "  ƒ"
-            case "async_function": icon = "⚡"
-            case "variable": icon = "🔹"
-            case _: icon = "ƒ"
-
-        lines.append(f"{icon} {sym.type} {sym.name}{sym.signature}")
+        indent = "  " if sym.type == "method" else ""
+        lines.append(f"{indent}{sym.type} {sym.name}{sym.signature}")
     return "\n".join(lines)

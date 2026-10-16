@@ -41,7 +41,7 @@ def handle(
     # Check Baseline
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        log_console.print("[yellow]⚠️  No baseline found.[/yellow]")
+        log_console.print("[yellow]No baseline found.[/yellow]")
         log_console.print("   Run [bold cyan]cdg mark[/bold cyan] first to set a baseline.")
         raise typer.Exit(1)
 
@@ -56,7 +56,7 @@ def handle(
     ) as progress:
         task = progress.add_task("diff", total=None)
 
-        # ★ Use common context to get files (handles config & resolve)
+        
         current_files = ctx.get_target_files(resolve_deps=resolve)
 
         # Compare Working Tree vs Anchor

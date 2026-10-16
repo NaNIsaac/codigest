@@ -61,7 +61,7 @@ def handle(
     ) as progress:
         task = progress.add_task("scanning", total=None)
 
-        # ★ All logic delegated to common.py
+        
         files = ctx.get_target_files(
             targets=targets,
             ignore_config=all,

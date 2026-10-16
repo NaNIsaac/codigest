@@ -39,7 +39,7 @@ def handle(
 
     try:
         common.remove_tree(codigest_dir)
-        console.print(f"[bold green]✔ Successfully removed .codigest environment from {root_path}[/bold green]")
+        console.print(f"[green]Removed[/green] {root_path / '.codigest'}")
     except Exception as e:
         console.print(f"[bold red]Error removing .codigest:[/bold red] {e}")
         raise typer.Exit(1) from e

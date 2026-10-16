@@ -3,8 +3,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-lazy from rich.panel import Panel
-lazy from ..core import scanner, shadow
+lazy from ..core import common, shadow
 
 app = typer.Typer()
 console = Console()
@@ -56,35 +55,25 @@ def handle(
     config_file = config_dir / "config.toml"
     gitignore_file = root_path / ".gitignore"
 
-    console.print(Panel(f"[bold blue]Initializing Codigest[/bold blue]\n📂 Location: {root_path}", expand=False))
+    console.print(f"Setting up Codigest in {root_path}", highlight=False)
 
-    # 1. Config Setup (기존 로직)
-    if not config_dir.exists():
-        config_dir.mkdir()
-        console.print("  [green]✔[/green] Created [bold].codigest/[/bold] directory")
-
+    config_dir.mkdir(exist_ok=True)
     if not config_file.exists() or force:
         config_file.write_text(DEFAULT_CONFIG, encoding="utf-8")
-        console.print("  [green]✔[/green] Created [bold]config.toml[/bold]")
+        console.print("  [green]Created[/green] .codigest/config.toml")
     else:
-        console.print("  [yellow]![/yellow] Config exists. Use --force to overwrite.")
+        console.print("  [yellow]Kept[/yellow] .codigest/config.toml (--force overwrites it)")
 
     _update_gitignore(gitignore_file)
 
-    # 2. [NEW] Initial Anchoring (Shadow Git)
-    #    "프로그램 시작 시에도 Anchor 하나 잡고 시작"
-    console.print("\n[dim]Creating initial context anchor...[/dim]")
     try:
-        # Default scan settings for initialization
-        files = scanner.scan_project(root_path)
-        anchor = shadow.ContextAnchor(root_path)
-        anchor.update(files)
-        console.print("  [green]✔[/green] Baseline snapshot captured.")
+        # Same file set as `cdg mark`, so the config filters apply to the baseline too.
+        shadow.ContextAnchor(root_path).update(common.get_context(root_path).get_target_files())
+        console.print("  [green]Set[/green] the baseline")
     except Exception as e:
-        console.print(f"  [red]⚠️ Failed to create initial anchor: {e}[/red]")
+        console.print(f"  [red]Could not set the baseline:[/red] {e}")
 
-    console.print("\n[bold green]✨ Ready to digest![/bold green]")
-    console.print("Try running: [cyan]codigest diff[/cyan] to see changes from now on.")
+    console.print("\nEdit .codigest/config.toml to choose which files are included.")
 
 def _update_gitignore(path: Path) -> None:
     entry = ".codigest/"
@@ -95,4 +84,4 @@ def _update_gitignore(path: Path) -> None:
     if entry not in path.read_text(encoding="utf-8"):
         with path.open("a", encoding="utf-8") as f:
             f.write(f"\n{entry}\n")
-        console.print("  [green]✔[/green] Added [bold].codigest/[/bold] to .gitignore")
+        console.print("  [green]Added[/green] .codigest/ to .gitignore")

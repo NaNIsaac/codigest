@@ -73,6 +73,6 @@ def handle(ctx: typer.Context, command: CommandArgument = None) -> None:
     try:
         termstore.append_entry(entry)
     except OSError as e:
-        err_console.print(f"[dim]⚠️ Capture not stored: {e}[/dim]")
+        err_console.print(f"[dim]Capture not stored: {e}[/dim]")
 
     raise typer.Exit(code=exit_code)

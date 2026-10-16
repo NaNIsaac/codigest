@@ -84,7 +84,7 @@ def handle(
                 instruction=message
             )
         except Exception as e:
-            log_console.print(f"[red]❌ Rendering Failed:[/red] {e}")
+            log_console.print(f"[red]Rendering failed:[/red] {e}")
             raise typer.Exit(1) from e
 
         progress.update(task, completed=100)
@@ -97,6 +97,6 @@ def handle(
             out_path = root_path / ".codigest" / "digest.txt"
             out_path.parent.mkdir(exist_ok=True)
             out_path.write_text(digest_content, encoding="utf-8")
-            log_console.print(f"[dim]💾 Saved to {out_path}[/dim]")
+            log_console.print(f"[dim]Saved to {out_path}[/dim]")
 
     handler.handle_output(digest_content, save_action=_save, item_name="digest")

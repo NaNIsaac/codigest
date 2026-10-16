@@ -75,7 +75,7 @@ Packed ~370 / 30,000 tokens
   changes  uncommitted changes (git)
   + test_prices.py  line 5 in failing output
   + prices.py       changed
-📋 Copied pack to clipboard
+Copied pack to clipboard
 ```
 
 Read it as: the failing command, your uncommitted Git changes, `test_prices.py` because the error

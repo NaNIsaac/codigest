@@ -51,7 +51,7 @@ def version_callback(value: bool) -> None:
         except PackageNotFoundError:
             pkg_version = "dev"
 
-        console.print(f"🦁 [bold cyan]Codigest[/bold cyan] version [bold green]{pkg_version}[/bold green]")
+        console.print(f"codigest {pkg_version}")
         raise typer.Exit()
 
 @app.callback()

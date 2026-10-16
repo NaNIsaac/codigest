@@ -33,7 +33,7 @@ def handle(
 
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        log_console.print("[yellow]⚠️  No baseline found. Run [bold]cdg mark[/bold] first.[/yellow]")
+        log_console.print("[yellow]No baseline found. Run [bold]cdg mark[/bold] first.[/yellow]")
         raise typer.Exit(1)
 
     log_console.print(f"[dim]Analyzing structural changes since ({last_update})...[/dim]")
@@ -83,10 +83,10 @@ def handle(
                 change_lines = []
                 for ch in changes:
                     match ch.change_type:
-                        case "ADDED": icon = "➕ [ADDED]   "
-                        case "REMOVED": icon = "➖ [REMOVED] "
-                        case "MODIFIED": icon = "⚠️ [SIGNATURE]"
-                        case _: icon = "✏️ [LOGIC]   "
+                        case "ADDED": icon = "[ADDED]    "
+                        case "REMOVED": icon = "[REMOVED]  "
+                        case "MODIFIED": icon = "[SIGNATURE]"
+                        case _: icon = "[LOGIC]    "
 
                     detail = f" :: {ch.details}" if ch.details else ""
                     line = f"{icon} {ch.symbol.type} {ch.symbol.name}{ch.symbol.signature}{detail}"

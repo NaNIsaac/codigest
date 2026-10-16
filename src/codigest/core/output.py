@@ -29,9 +29,9 @@ class OutputHandler:
             return
         try:
             pyperclip.copy(content)
-            self.log_console.print(f"[dim]📋 Copied {item_name} to clipboard[/dim]")
+            self.log_console.print(f"[dim]Copied {item_name} to clipboard[/dim]")
         except Exception:
-            self.log_console.print("[dim]⚠️ Clipboard unavailable (skipped copy)[/dim]")
+            self.log_console.print("[yellow]Clipboard unavailable; use -s to print instead[/yellow]")
 
     def handle_output(
         self, 

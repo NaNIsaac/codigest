@@ -72,7 +72,7 @@ Packed ~370 / 30,000 tokens
   changes  uncommitted changes (git)
   + test_prices.py  line 5 in failing output
   + prices.py       changed
-📋 Copied pack to clipboard
+Copied pack to clipboard
 ```
 
 위에서부터 실패한 명령, Git에서 아직 커밋하지 않은 변경, 오류가 5번째 줄을 가리킨
