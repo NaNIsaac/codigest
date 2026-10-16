@@ -137,9 +137,16 @@ class ContextAnchor:
         if not self._run_git(["rev-parse", "--verify", "HEAD"], check=False):
             self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
             logger.info("Initial context anchor created.")
-        elif self._run_git(["diff-index", "--quiet", "HEAD", "--"], check=False) != "":
-            self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
-            logger.info("Context anchor updated.")
+        else:
+            # --quiet reports changes only through the exit code, never on stdout.
+            dirty = subprocess.run(
+                ["git", "--git-dir", str(self.git_dir), "--work-tree", str(self.anchor_dir),
+                 "diff-index", "--quiet", "--cached", "HEAD", "--"],
+                cwd=self.anchor_dir, capture_output=True,
+            ).returncode != 0
+            if dirty:
+                self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
+                logger.info("Context anchor updated.")
 
     def get_changes(self, current_files: list[Path]) -> str:
         if not self.git_dir.exists():
