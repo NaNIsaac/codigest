@@ -1,6 +1,6 @@
 [project]
 name = "codigest"
-version = "0.7.0"
+version = "0.8.0"
 description = "Human-Centered Codebase Context Manager for LLMs"
 authors = [{ name = "Isaac Yong", email = "isaacyong@naver.com" }]
 readme = "README.md"
