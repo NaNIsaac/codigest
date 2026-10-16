@@ -25,3 +25,28 @@ def test_changed_paths_skips_deleted_files(tmp_path):
     (tmp_path / "kept.py").write_text("")
     diff = "diff --git a/kept.py b/kept.py\ndiff --git a/gone.py b/gone.py\n"
     assert pack.changed_paths(diff, tmp_path) == [(tmp_path / "kept.py").resolve()]
+
+
+def test_pack_adds_the_test_that_imports_a_changed_module(tmp_path, monkeypatch):
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    from codigest.main import app
+
+    (tmp_path / "shop").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "shop" / "prices.py").write_text("RATE = 1\n")
+    (tmp_path / "tests" / "test_prices.py").write_text("from shop.prices import RATE\n")
+    (tmp_path / "tests" / "test_other.py").write_text("X = 1\n")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run([*git, "add", "."], cwd=tmp_path, check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], cwd=tmp_path, check=True)
+    (tmp_path / "shop" / "prices.py").write_text("RATE = 2\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CODIGEST_HOME", str(tmp_path / "home"))
+    out = CliRunner().invoke(app, ["pack", "-s", "--no-copy"]).output
+    assert 'path="tests/test_prices.py" reason="tests shop/prices.py"' in out
+    assert "test_other.py" not in out

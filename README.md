@@ -6,6 +6,8 @@
 
 **Hand an LLM your failing command, the code it points at and your changes, in one paste.**
 
+[한국어](README.ko.md)
+
 <p align="center">
   <img src="docs/demo/demo.gif" alt="cdg cap runs a failing pytest, then cdg pack bundles the failure, the test file it names and the changed file" width="760">
 </p>
@@ -162,7 +164,9 @@ knows what it is not seeing and can ask for it.
    A failure is dropped once the same command has passed again, so a fixed test does not come back.
 3. Changed files: since `cdg mark` if you set a baseline, otherwise uncommitted and untracked
    files from Git.
-4. Local Python modules imported by the files above.
+4. Tests that import a changed Python file (`test_*.py`, `*_test.py`), so the model sees how
+   the code is expected to behave.
+5. Local Python modules imported by the files above.
 
 The failed command and the diff are always included. Files named like `.env`, `*.pem`, `*.key` or
 `id_rsa` are never included. Tokens are estimated at four characters each, so treat the budget
@@ -351,7 +355,8 @@ Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command
 | `digest` | Signatures and docstrings only |
 | `tree` | Directory tree |
 
-The tools return the same text the CLI prints. None of them moves the baseline.
+The tools return the same text the CLI prints. None of them moves the baseline, and paths
+outside the project the server was started in are refused.
 
 ## Configuration
 

@@ -22,7 +22,9 @@ DEFAULT_BUDGET = 30_000
 # `File "x.py", line 7` (Python) or `x.py:7` / `x.ts(7,3)` (pytest, tsc, gcc, rustc, eslint, ...)
 _LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path>[\w./\\~-]+\.\w+)[:(](?P<line>\d+)')
 
-_SECRET_FILE_RE = re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx)$|^id_(rsa|dsa|ecdsa|ed25519)$")
+_TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$")
+
+_SECRET_FILE_RE =re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx)$|^id_(rsa|dsa|ecdsa|ed25519)$")
 
 
 def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry | None:
@@ -122,6 +124,11 @@ def handle(
             wanted.setdefault(path.resolve(), "changed")
 
     deps = resolver.DependencyResolver(root)
+    edited = {p for p, why in wanted.items() if why == "changed" and p.suffix == ".py"}
+    for test in sorted(p for p in known if _TEST_FILE_RE.match(p.name)) if edited else []:
+        if hit := sorted(deps.get_imports(test) & edited):
+            wanted.setdefault(test, f"tests {hit[0].relative_to(root).as_posix()}")
+
     for path in [p for p in wanted if p.suffix == ".py"]:
         for dep in sorted(deps.get_imports(path) & known):
             wanted.setdefault(dep, f"imported by {path.relative_to(root).as_posix()}")
