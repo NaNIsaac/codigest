@@ -38,7 +38,7 @@ structure = "toon"
 def handle(
     # target 인자 추가 (기본값: 현재 위치)
     target: Path = typer.Argument(
-        Path.cwd(),
+        Path("."),
         help="Target directory to initialize",
         exists=True,
         file_okay=False,
@@ -48,7 +48,7 @@ def handle(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
 ) -> None:
     """
-    Initialize the .codigest environment and capture the initial state.
+    Create .codigest/config.toml (file filters) and set a baseline.
     """
     root_path = target  # Typer가 이미 resolve_path=True로 절대경로 변환해줌
 

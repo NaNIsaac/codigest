@@ -127,7 +127,7 @@ def changed_paths(diff: str, root: Path) -> list[Path]:
     return paths
 
 
-def _ago(iso: str) -> str:
+def ago(iso: str) -> str:
     try:
         seconds = int((datetime.now().astimezone() - datetime.fromisoformat(iso)).total_seconds())
     except ValueError:
@@ -138,7 +138,7 @@ def _ago(iso: str) -> str:
     return "just now"
 
 
-def _changes(root: Path, files: list[Path]) -> tuple[str, str, list[Path]]:
+def working_changes(root: Path, files: list[Path]) -> tuple[str, str, list[Path]]:
     """(diff, where it came from, changed files). A `cdg mark` baseline wins over Git."""
     anchor = shadow.ContextAnchor(root)
     if anchor.has_history():
@@ -160,12 +160,14 @@ def handle(
     stdout: StdoutOption = False,
 ) -> None:
     """
-    Bundle the failing command, the files it points at and your changes for an LLM.
+    Bundle the last failure, the files it points at and your changes.
 
     Examples:
-        cdg pack                         # last failure here + your changes
-        cdg pack -m "fix the discount bug"
-        cdg pack src/prices.py -b 8000   # add a file, smaller budget
+
+    \b
+        cdg pack                           # last failure here + your changes
+        cdg pack -m "fix the discount bug" # add an instruction
+        cdg pack src/prices.py -b 8000     # add a file, smaller budget
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log = handler.log_console
@@ -188,7 +190,7 @@ def handle(
             shown = ", ".join(map(str, lines[:3])) + (", ..." if len(lines) > 3 else "")
             wanted.setdefault(path, f"line{'s' * (len(lines) > 1)} {shown} in failing output")
 
-    diff, diff_source, changed = _changes(root, sorted(known))
+    diff, diff_source, changed = working_changes(root, sorted(known))
     changed = [p.resolve() for p in changed if p.resolve() in known]
     for path in changed:
         wanted.setdefault(path, "changed")
@@ -254,7 +256,7 @@ def handle(
     over = " [red](fixed parts alone exceed the budget)[/red]" if used > budget else ""
     log.print(f"[bold]Packed ~{used:,} / {budget:,} tokens[/bold]{over}")
     if failure:
-        when = _ago(failure.started_at)
+        when = ago(failure.started_at)
         log.print(f"  [red]failed [/red]  [cyan]{escape(failure.command)}[/cyan] [dim](exit {failure.exit_code}{', ' + when if when else ''})[/dim]")
     if diff.strip():
         log.print(f"  [yellow]changes[/yellow]  [dim]{diff_source}[/dim]")

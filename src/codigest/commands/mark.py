@@ -10,11 +10,11 @@ console = Console()
 
 def handle(
     target: Path = typer.Argument(
-        Path.cwd(), help="Project directory", exists=True, file_okay=False, resolve_path=True
+        Path("."), help="Project directory", exists=True, file_okay=False, resolve_path=True
     ),
 ) -> None:
     """
-    Record the current state as the baseline for `diff`, `semdiff` and `pack`.
+    Set the baseline that `diff`, `semdiff` and `pack` compare against.
     """
     ctx = common.get_context(target)
     anchor = shadow.ContextAnchor(ctx.root_path)

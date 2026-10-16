@@ -13,7 +13,7 @@ app = typer.Typer()
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(
-        Path.cwd(),
+        Path("."),
         help="Target directory to check diff",
         exists=True,
         file_okay=False,
@@ -27,8 +27,7 @@ def handle(
     resolve: ResolveOption = False,
 ) -> None:
     """
-    [Context Update] Shows changes since the last `cdg mark` (or `cdg init`).
-    Useful for updating LLM context without re-uploading everything.
+    Show the text diff since the baseline (`cdg mark`).
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log_console = handler.log_console

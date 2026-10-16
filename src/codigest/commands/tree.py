@@ -55,14 +55,14 @@ def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
 
 @app.callback(invoke_without_command=True)
 def handle(
-    target: Path = typer.Argument(Path.cwd(), help="Target directory"),
+    target: Path = typer.Argument(Path("."), help="Target directory"),
     copy: CopyOption = False,
     stdout: StdoutOption = False,
     all: AllOption = False,
     resolve: ResolveOption = False,
 ) -> None:
     """
-    [Visual] Print the project directory tree.
+    Print the project file tree.
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log_console = handler.log_console

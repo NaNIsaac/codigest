@@ -30,8 +30,7 @@ def handle(
     resolve: ResolveOption = False,
 ) -> None:
     """
-    Scans the codebase.
-    If TARGETS provided, only scans those paths within the project.
+    Bundle the whole project, or only the given paths, as one block.
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log_console = handler.log_console

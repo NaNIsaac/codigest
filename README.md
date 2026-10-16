@@ -248,7 +248,7 @@ instead, `--no-copy` skips the clipboard, and `-m` / `--message` adds an instruc
 | `scan` | The whole project, or chosen paths, as one block | `.codigest/snapshot.txt` |
 | `digest` | Signatures and docstrings, no bodies (Python) | `.codigest/digest.txt` |
 | `tree` | Project tree | nothing |
-| `status` | Baseline age, pending changes, generated files | nothing |
+| `status` | What `pack` would use here: last failure, changes, baseline | nothing |
 | `init` | Config file and baseline; only needed to change [file filters](#configuration) | `.codigest/`, `.gitignore` |
 | `clean` | Deletes `.codigest/` (asks first, `-y` to skip) | removes `.codigest/` |
 | `mcp` | MCP server for agents | nothing |

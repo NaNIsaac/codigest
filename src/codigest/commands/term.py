@@ -81,13 +81,15 @@ def handle(
     stdout: StdoutOption = False,
 ) -> None:
     """
-    [Recall] Pull recent terminal commands and their captured output.
+    Show recently captured commands and their output.
 
     Examples:
-        cdg term            # the last command
-        cdg term -n 3       # the last 3 commands
-        cdg term -i 3       # only the command from 3 runs ago
-        cdg term -f         # the last failed command
+
+    \b
+        cdg term              # the last command
+        cdg term -n 3         # the last 3 commands
+        cdg term -i 3         # only the command from 3 runs ago
+        cdg term -f           # the last failed command
         cdg term --here -n 3  # the last 3 commands run in this project
     """
     if ctx.invoked_subcommand:

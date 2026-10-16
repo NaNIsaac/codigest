@@ -190,7 +190,7 @@ def handle_message(msg: JSON) -> JSON | None:
 
 
 def handle() -> None:
-    """[Agents] Serve Codigest tools over MCP (stdio). Register: claude mcp add codigest -- cdg mcp"""
+    """Serve these tools to AI agents over MCP (stdio)."""
     stdin = open(sys.stdin.fileno(), encoding="utf-8", closefd=False)
     stdout = open(sys.stdout.fileno(), "w", encoding="utf-8", newline="\n", closefd=False)
     for line in stdin:

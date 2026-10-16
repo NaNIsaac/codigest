@@ -12,7 +12,7 @@ app = typer.Typer()
 
 @app.callback(invoke_without_command=True)
 def handle(
-    target: Path = typer.Argument(Path.cwd(), help="Target directory"),
+    target: Path = typer.Argument(Path("."), help="Target directory"),
     copy: CopyOption = True,
     save: bool = typer.Option(True, help="Save to .codigest/digest.txt"),
     stdout: StdoutOption = False,
@@ -20,7 +20,7 @@ def handle(
     resolve: ResolveOption = False,
 ) -> None:
     """
-    [Architectural View] Summarizes the codebase structure (Classes/Functions only).
+    Show Python signatures and docstrings without function bodies.
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log_console = handler.log_console

@@ -32,7 +32,7 @@ CommandArgument = Annotated[
 
 def handle(ctx: typer.Context, command: CommandArgument = None) -> None:
     """
-    [Capture] Run a command, show its output as usual, and record it globally.
+    Run a command as usual and keep its output for `pack` and `term`.
 
     Examples:
 

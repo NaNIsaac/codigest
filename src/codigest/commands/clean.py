@@ -11,7 +11,7 @@ console = Console()
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(
-        Path.cwd(),
+        Path("."),
         help="Target directory to clean",
         exists=True,
         file_okay=False,
@@ -21,7 +21,7 @@ def handle(
     yes: bool = typer.Option(False, "-y", "--yes", "-f", "--force", help="Skip confirmation prompt"),
 ) -> None:
     """
-    [Cleanup] Removes the .codigest environment and clears all context anchors and artifacts.
+    Delete .codigest/, including the baseline and saved outputs.
     """
     ctx = common.get_context(target)
     root_path = ctx.root_path

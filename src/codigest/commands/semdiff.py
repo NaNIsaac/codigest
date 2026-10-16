@@ -12,7 +12,7 @@ app = typer.Typer()
 
 @app.callback(invoke_without_command=True)
 def handle(
-    target: Path = typer.Argument(Path.cwd(), help="Target directory"),
+    target: Path = typer.Argument(Path("."), help="Target directory"),
     copy: CopyOption = True,
     save: bool = typer.Option(True, help="Save to .codigest/semdiff.txt"),
     stdout: StdoutOption = False,
@@ -20,8 +20,7 @@ def handle(
     resolve: ResolveOption = False,
 ) -> None:
     """
-    [Advanced] Generates a Semantic Diff (AST-based) report.
-    Shows ADDED/REMOVED/MODIFIED functions & classes instead of raw text lines.
+    Show which Python functions and classes changed since the baseline.
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log_console = handler.log_console

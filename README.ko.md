@@ -244,7 +244,7 @@ cdg tree                # 파일 트리만
 | `scan` | 프로젝트 전체나 지정한 경로를 하나로 묶기 | `.codigest/snapshot.txt` |
 | `digest` | 함수 본문을 뺀 선언과 docstring (Python) | `.codigest/digest.txt` |
 | `tree` | 프로젝트 파일 트리 | 없음 |
-| `status` | 기준점을 잡은 시각, 그 뒤의 변경, 만들어진 파일 | 없음 |
+| `status` | 지금 `pack`이 쓸 내용 확인: 마지막 실패, 변경 사항, 기준점 | 없음 |
 | `init` | 설정 파일 만들기와 기준점 잡기. [파일 필터](#설정)를 바꿀 때만 필요 | `.codigest/`, `.gitignore` |
 | `clean` | `.codigest/` 지우기 (먼저 물어보며, `-y`면 묻지 않음) | `.codigest/` 삭제 |
 | `mcp` | 에이전트용 MCP 서버 실행 | 없음 |
