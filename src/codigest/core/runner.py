@@ -67,6 +67,10 @@ def resolve_shell() -> list[str] | None:
 def build_argv(args: list[str]) -> list[str]:
     """Maps user-supplied arguments onto an argv for subprocess."""
     if not needs_shell(args):
+        # CreateProcess finds neither `.cmd` shims (npm, yarn, pnpm) nor relative paths written
+        # with forward slashes; which() resolves both the way the user's shell would.
+        if sys.platform == "win32" and (found := shutil.which(args[0])):
+            return [found, *args[1:]]
         return args
     if not (prefix := resolve_shell()):
         return args
@@ -131,6 +135,9 @@ def run(args: list[str]) -> tuple[int, str, int]:
         if process.stdout is not None:
             process.stdout.close()
 
+    # Windows reports exit codes as unsigned 32-bit; shells show them signed (-4058, not 4294963238).
+    if sys.platform == "win32" and exit_code >= 2**31:
+        exit_code -= 2**32
     duration_ms = int((time.monotonic() - started) * 1000)
     output = b"".join(chunks).decode("utf-8", errors="replace")
     return exit_code, output, duration_ms

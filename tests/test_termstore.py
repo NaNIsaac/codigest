@@ -63,3 +63,17 @@ def test_mcp_refuses_paths_outside_the_project(tmp_path, monkeypatch):
         result = mcp._call_tool("tree", {"path": path})
         assert result["isError"] and "outside the project" in result["content"][0]["text"]
     assert mcp._in_project(".") == str((tmp_path / "proj").resolve())
+
+
+def test_cap_resolves_cmd_shims_and_relative_paths_on_windows(tmp_path, monkeypatch):
+    import sys
+
+    import pytest
+
+    from codigest.core import runner
+    if sys.platform != "win32":
+        pytest.skip("CreateProcess lookup rules are Windows-only")
+    (tmp_path / "tool.cmd").write_text("@echo off\r\nexit /b 3\r\n")
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert runner.build_argv(["tool", "-x"])[0].lower() == str(tmp_path / "tool.cmd").lower()
+    assert runner.run(["tool"])[0] == 3
