@@ -7,7 +7,7 @@ from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, Al
 lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from rich.panel import Panel
 lazy from rich.filesize import decimal
-lazy from ..core import structure, tags, prompts, processor, shadow, tokenizer, common, cache
+lazy from ..core import structure, tags, prompts, processor, tokenizer, common, cache
 lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
@@ -52,7 +52,6 @@ def handle(
 
     output_path = artifact_dir / output
     prompt_engine = prompts.get_engine(root_path)
-    anchor = shadow.ContextAnchor(root_path)
 
     # [2] File Discovery via Context
     with Progress(
@@ -105,15 +104,6 @@ def handle(
         console=log_console
     ) as progress:
 
-        if anchor.has_history():
-            try:
-                diff_content = anchor.get_changes(files)
-                if diff_content.strip():
-                    pre_diff_path = artifact_dir / "previous_changes.diff"
-                    pre_diff_path.write_text(diff_content, encoding="utf-8")
-            except Exception:
-                pass
-
         tree_str = structure.generate_ascii_tree(files, root_path)
 
         content_cache = cache.ContentCache(root_path)
@@ -165,11 +155,6 @@ def handle(
             log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
             raise typer.Exit(1) from e
 
-    try:
-        anchor.update(files)
-    except Exception as e:
-        log_console.print(f"[yellow][Warning] Failed to update context anchor: {e}[/yellow]")
-
     def _save():
         try:
             output_path.write_text(snapshot_content, encoding="utf-8")
@@ -178,11 +163,6 @@ def handle(
             log_console.print("[bold green]Snapshot Saved![/bold green]")
             log_console.print(f"  Path: [underline]{output_path}[/underline]")
             log_console.print(f"  Final Tokens: [bold cyan]~{final_token_count:,}[/bold cyan]")
-
-            if anchor.has_history():
-                pre_diff_path = artifact_dir / "previous_changes.diff"
-                if pre_diff_path.exists() and pre_diff_path.stat().st_size > 0:
-                    log_console.print(f"  [dim]Changes before this scan saved to: {pre_diff_path.name}[/dim]")
 
         except Exception as e:
             log_console.print(f"[bold red][Error] Save Failed:[/bold red] {e}")

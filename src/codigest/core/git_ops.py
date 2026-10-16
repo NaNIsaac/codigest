@@ -1,73 +1,28 @@
 """
-Git Operations.
-Retains the 'Untracked File' detection logic from the prototype.
+Git Operations (read-only, against the user's real repository).
 """
 lazy import subprocess
 from pathlib import Path
-from loguru import logger
+
 
 def is_git_repo(root_path: Path) -> bool:
     return (root_path / ".git").exists()
 
-def get_smart_diff(root_path: Path) -> str:
+
+def _git(root_path: Path, *args: str) -> str | None:
+    result = subprocess.run(
+        ["git", *args], cwd=root_path, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def working_changes(root_path: Path) -> tuple[str, list[Path]] | None:
     """
-    Fetches git diff AND content of untracked (new) files.
+    `git diff HEAD` (staged + unstaged) and the untracked files, or None outside a
+    repository with commits. Untracked files are returned as paths, not inlined
+    into the diff, so callers can budget them like any other file.
     """
-    if not is_git_repo(root_path):
-        return "Warning: Not a git repository."
-
-    try:
-        # 1. Standard Git Diff (Staged + Unstaged)
-        diff_output = subprocess.check_output(
-            ["git", "diff", "HEAD"], 
-            cwd=root_path, 
-            text=True, 
-            encoding='utf-8',
-            stderr=subprocess.DEVNULL 
-        )
-        
-        # 2. Untracked Files (The 'Killer Feature' from prototype)
-        untracked_files = subprocess.check_output(
-            ["git", "ls-files", "--others", "--exclude-standard"],
-            cwd=root_path,
-            text=True,
-            encoding='utf-8',
-            stderr=subprocess.DEVNULL
-        ).splitlines()
-        
-        full_output = diff_output
-        new_files_content = []
-
-        for f in untracked_files:
-            file_path = root_path / f
-            if not file_path.is_file(): 
-                continue
-
-            try:
-                # Basic binary check (skip if cannot decode)
-                content = file_path.read_text(encoding='utf-8')
-                line_count = len(content.splitlines())
-                
-                # Manually construct a Diff Header
-                header = (
-                    f"diff --git a/{f} b/{f}\n"
-                    f"new file mode 100644\n"
-                    f"--- /dev/null\n"
-                    f"+++ b/{f}\n"
-                    f"@@ -0,0 +1,{line_count} @@\n"
-                    f"{content}\n"
-                )
-                new_files_content.append(header)
-                
-            except UnicodeDecodeError:
-                logger.debug(f"Skipping binary untracked file: {f}")
-                continue
-
-        if new_files_content:
-            full_output += "\n# Untracked (New) Source Files:\n" + "".join(new_files_content)
-
-        return full_output.strip()
-
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Git command failed: {e}")
-        return "Error: Failed to run git diff."
+    if not is_git_repo(root_path) or (diff := _git(root_path, "diff", "HEAD")) is None:
+        return None
+    untracked = _git(root_path, "ls-files", "--others", "--exclude-standard") or ""
+    return diff, [root_path / line for line in untracked.splitlines()]

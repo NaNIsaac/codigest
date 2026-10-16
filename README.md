@@ -6,8 +6,8 @@
 
 **Hand an LLM your failing command, your recent changes or your whole codebase as one block of XML.**
 
-A test fails. Run it through `cdg cap`, then `cdg term -f` puts the failed command, its output and exit code
-on your clipboard, ready to paste into a chat (`-s` also prints it):
+A test fails. Run it through `cdg cap`, then `cdg pack` puts the failed command, the files its output
+points at and your uncommitted changes on your clipboard, ready to paste into a chat:
 
 ```console
 $ cdg cap -- python -m unittest -q
@@ -24,31 +24,18 @@ AssertionError: -1800 != 180
 Ran 1 test in 0.001s
 
 FAILED (failures=1)
-$ cdg term -f -s
-📋 Copied 1 terminal entry to clipboard
-<terminal_history>
-<command index="1" command="python -m unittest -q" exit_code="1" cwd="~/project" duration="586ms" at="2026-10-16T05:39:44+09:00">
-<output>
-======================================================================
-FAIL: test_ten_percent (test_prices.DiscountTest.test_ten_percent)
-----------------------------------------------------------------------
-Traceback (most recent call last):
-  File "~/project/test_prices.py", line 7, in test_ten_percent
-    self.assertEqual(apply_discount(200, 10), 180)
-    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: -1800 != 180
-
-----------------------------------------------------------------------
-Ran 1 test in 0.001s
-
-FAILED (failures=1)
-</output>
-</command>
-</terminal_history>
+$ cdg pack
+Packed ~415 / 30,000 tokens
+  failed   python -m unittest -q (exit 1, just now)
+  changes  uncommitted changes (git)
+  + test_prices.py  line 7 in failing output
+  + prices.py       changed
+📋 Copied pack to clipboard
 ```
 
-An agent connected over MCP (`cdg mcp`) gets the same block from the `terminal_history` tool
-(`failed: true`), with no copying.
+The clipboard holds one `<context_pack>` block: the command with its output and exit code, the
+`git diff`, and both files with line numbers. Anything that did not fit the budget is listed by name.
+An agent connected over MCP (`cdg mcp`) gets the same block from the `pack` tool, with no copying.
 
 Try it on your own project. `tree` only reads:
 
@@ -64,18 +51,18 @@ Found 3 files.
 
 Codigest is a CLI and MCP server that turns your codebase, your recent changes and your terminal output into XML context for LLMs.
 
-It keeps a private "anchor" (a hidden Git repository inside `.codigest/`) so it can report what changed since your last snapshot without touching your real Git history. It never modifies your source files. The command is `codigest`, or the short alias `cdg`.
+`cdg mark` can also keep a private baseline (a hidden Git repository inside `.codigest/`) so it can report what changed since that point without touching your real Git history. It never modifies your source files. The command is `codigest`, or the short alias `cdg`.
 
 ## Quickstart
 
 ```bash
-uvx codigest scan          # try it without installing
+uvx codigest tree          # try it without installing
 uv tool install codigest  # or install the `cdg` command
 
-cdg scan                  # whole project as LLM-ready XML (copied to clipboard)
-cdg init && cdg diff      # set an anchor, later get only what changed
 cdg cap -- pytest -q      # run a command and keep its output
-cdg term -f               # hand the last failed command + output to your LLM
+cdg pack                  # failure + the files it names + your changes, to the clipboard
+cdg scan                  # whole project as LLM-ready XML
+cdg mark && cdg diff      # set a baseline, later get only what changed
 claude mcp add codigest -- cdg mcp   # let AI agents call all of the above
 ```
 
@@ -101,9 +88,35 @@ If `uv` reports a syntax error on `lazy import`, it picked an early 3.15 alpha: 
 
 Every command that produces context copies it to the clipboard by default (`--no-copy` to skip) and prints it to the terminal with `-s` / `--stdout`. `-m` / `--message` adds an instruction to the output, and `-r` / `--resolve` also pulls in local files imported by the targets.
 
+### `pack`
+
+Builds one block for the task at hand, adding files in this order until the token budget (default 30,000, estimated at 4 characters per token) runs out:
+
+1. files you name (`cdg pack src/prices.py`)
+2. files named in the output of the last failed command run in this project (`File "x.py", line 7`, `x.py:7`, `x.ts(7,3)`). A failure is skipped once the same command has passed again.
+3. changed files: since `cdg mark` if you set one, otherwise uncommitted and untracked files from Git
+4. local Python modules imported by those files
+
+The failed command and the diff are always included. Files named like `.env`, `*.pem`, `*.key` or `id_rsa` are never included. Skipped files are listed in an `<omitted>` block with the reason. `pack` writes nothing to the project.
+
+```bash
+cdg pack
+cdg pack -m "fix the discount bug"
+cdg pack src/prices.py -b 8000
+cdg pack -s > context.xml
+```
+
+### `mark`
+
+Records the current state as the baseline for `diff`, `semdiff` and `pack`. Run it again to move the baseline.
+
+```bash
+cdg mark
+```
+
 ### `init`
 
-Creates `.codigest/` (config and anchor), records the current state as the baseline, and adds `.codigest/` to `.gitignore`.
+Creates `.codigest/` (config and baseline), records the current state as the baseline like `mark`, and adds `.codigest/` to `.gitignore`.
 
 ```bash
 cdg init
@@ -111,7 +124,7 @@ cdg init
 
 ### `scan`
 
-Writes the project tree and file contents as XML to `.codigest/snapshot.txt` and moves the anchor to the current state. It estimates the token count first and asks for confirmation above 30k tokens.
+Writes the project tree and file contents as XML to `.codigest/snapshot.txt`. It does not move the baseline (use `mark`). It estimates the token count first and asks for confirmation above 30k tokens.
 
 ```bash
 cdg scan                              # whole project
@@ -124,7 +137,7 @@ Other options: `-l` adds line numbers, `-a` ignores the config filters, `-o` set
 
 ### `diff`
 
-Text diff of the working tree against the anchor (the last `init` or `scan`), saved to `.codigest/changes.diff`. Your real Git repository is not involved.
+Text diff of the working tree against the baseline (the last `mark` or `init`), saved to `.codigest/changes.diff`. Your real Git repository is not involved.
 
 ```bash
 cdg diff
@@ -211,9 +224,10 @@ cdg term clear        # delete all captures
 
 | Tool | Returns |
 | --- | --- |
+| `pack` | Last failure, the files it names, changes and their imports, cut to a budget (`targets`, `budget`, `message`) |
 | `terminal_history` | Recent commands with output and exit code (`count`, `failed`, `here`: only this project, default on) |
 | `scan` | Project snapshot (`targets`, `resolve`, `message`) |
-| `diff` / `semdiff` | Text / structural changes since the anchor |
+| `diff` / `semdiff` | Text / structural changes since the `mark` baseline |
 | `digest` | Signatures and docstrings only |
 | `tree` | Directory tree |
 
@@ -243,7 +257,7 @@ exclude_patterns = [
 
 ## How it works
 
-- **Anchor.** The anchor is a Git repository at `.codigest/anchor/.shadow_git`. The directory is not named `.git` so that editors don't mistake it for your project's repository. `init` and `scan` commit the current state to it; `diff`, `semdiff` and `status` compare the working tree against it.
+- **Baseline.** The baseline is a Git repository at `.codigest/anchor/.shadow_git`. The directory is not named `.git` so that editors don't mistake it for your project's repository. `mark` and `init` commit the current state to it; `diff`, `semdiff`, `status` and `pack` compare the working tree against it.
 - **Output.** File contents are XML-escaped inside `<file>` blocks, and the blocks are written flush-left so no stray indentation reaches the prompt.
 
 ## License

@@ -29,7 +29,7 @@ class DependencyResolver:
         while queue:
             current_file = queue.popleft()
             try:
-                dependencies = self._get_imports(current_file)
+                dependencies = self.get_imports(current_file)
             except Exception:
                 continue
 
@@ -41,7 +41,7 @@ class DependencyResolver:
         
         return sorted(results)
 
-    def _get_imports(self, file_path: Path) -> set[Path]:
+    def get_imports(self, file_path: Path) -> set[Path]:
         local_deps: set[Path] = set()
         try:
             content = file_path.read_text(encoding="utf-8")

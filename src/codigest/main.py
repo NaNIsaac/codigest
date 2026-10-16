@@ -4,34 +4,41 @@ Entry Point with Global Error Handling & Version Check
 import sys
 
 import typer
+from loguru import logger
 from rich.console import Console
 
 lazy from importlib.metadata import PackageNotFoundError, version
 
-from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp
+from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp, pack, mark
 
 console = Console()
 
+# loguru logs everything from DEBUG up by default; that is noise in a CLI.
+logger.remove()
+logger.add(sys.stderr, level="WARNING")
+
 app = typer.Typer(
     name="codigest",
-    help="Semantic Context Manager for LLM-assisted Development",
+    help="Hand an LLM your failing command, the code it points at and your changes.",
     add_completion=False,
     no_args_is_help=True
 )
 
-app.command(name="init")(init.handle)
-app.command(name="status")(status.handle)
-app.command(name="clean")(clean.handle)
-app.command(name="scan")(scan.handle)
-app.command(name="tree")(tree.handle)
-app.command(name="digest")(digest.handle)
-app.command(name="diff")(diff.handle)
-app.command(name="semdiff")(semdiff.handle)
-app.add_typer(term.app, name="term")
-
+# Registration order is the order `cdg --help` lists them: daily use first.
+app.command(name="pack")(pack.handle)
 # `cap` is a plain command, not a group: its first argument is the wrapped
 # program, which a Typer group would try to resolve as a subcommand.
 app.command(name="cap", context_settings=cap.CONTEXT_SETTINGS)(cap.handle)
+app.add_typer(term.app, name="term")
+app.command(name="mark")(mark.handle)
+app.command(name="diff")(diff.handle)
+app.command(name="semdiff")(semdiff.handle)
+app.command(name="scan")(scan.handle)
+app.command(name="digest")(digest.handle)
+app.command(name="tree")(tree.handle)
+app.command(name="status")(status.handle)
+app.command(name="init")(init.handle)
+app.command(name="clean")(clean.handle)
 app.command(name="mcp")(mcp.handle)
 
 def version_callback(value: bool) -> None:

@@ -50,6 +50,22 @@ TOOLS: list[JSON] = [
         },
     },
     {
+        "name": "pack",
+        "description": (
+            "Start here when fixing a failure or reviewing work in progress: the last failed "
+            "command run in the project, the files its output points at, uncommitted changes and "
+            "the local modules those files import, cut to a token budget. Lists what was left out."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                **_MESSAGE_PROP,
+                "targets": {"type": "array", "items": {"type": "string"}, "description": "Files/dirs to include first"},
+                "budget": {"type": "integer", "minimum": 1000, "default": 30000, "description": "Estimated token budget"},
+            },
+        },
+    },
+    {
         "name": "scan",
         "description": "Full project snapshot: tree plus file contents as XML, filtered by the project's Codigest config.",
         "inputSchema": {
@@ -64,12 +80,12 @@ TOOLS: list[JSON] = [
     },
     {
         "name": "diff",
-        "description": "Code changes since the last Codigest anchor (requires `cdg init` in the project).",
+        "description": "Code changes since the last `cdg mark` baseline (requires one in the project).",
         "inputSchema": {"type": "object", "properties": {**_PATH_PROP, **_MESSAGE_PROP}},
     },
     {
         "name": "semdiff",
-        "description": "Structural (function/class level) changes since the last Codigest anchor.",
+        "description": "Structural (function/class level) changes since the last `cdg mark` baseline.",
         "inputSchema": {"type": "object", "properties": {**_PATH_PROP, **_MESSAGE_PROP}},
     },
     {
@@ -103,8 +119,10 @@ def _cli(command: str, args: JSON) -> str:
         argv.append("-r")
     if message := args.get("message"):
         argv += ["-m", message]
+    if budget := args.get("budget"):
+        argv += ["-b", str(int(budget))]
     match command:
-        case "scan":
+        case "scan" | "pack":
             argv += [str(t) for t in args.get("targets") or []] or ([args["path"]] if "path" in args else [])
         case _ if "path" in args:
             argv.append(args["path"])
@@ -120,7 +138,7 @@ def _call_tool(name: str, args: JSON) -> JSON:
         match name:
             case "terminal_history":
                 text = _terminal_history(args)
-            case "scan" | "diff" | "semdiff" | "digest" | "tree":
+            case "pack" | "scan" | "diff" | "semdiff" | "digest" | "tree":
                 text = _cli(name, args)
             case _:
                 raise ValueError(f"Unknown tool: {name}")

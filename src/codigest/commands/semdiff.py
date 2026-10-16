@@ -34,7 +34,7 @@ def handle(
 
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        log_console.print("[yellow]⚠️  No scan history found. Run [bold]cdg scan[/bold] first.[/yellow]")
+        log_console.print("[yellow]⚠️  No baseline found. Run [bold]cdg mark[/bold] first.[/yellow]")
         raise typer.Exit(1)
 
     log_console.print(f"[dim]Analyzing structural changes since ({last_update})...[/dim]")

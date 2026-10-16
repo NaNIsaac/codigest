@@ -27,7 +27,7 @@ def handle(
     resolve: ResolveOption = False,
 ) -> None:
     """
-    [Context Update] Shows changes since the last 'codigest scan'.
+    [Context Update] Shows changes since the last `cdg mark` (or `cdg init`).
     Useful for updating LLM context without re-uploading everything.
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
@@ -42,11 +42,11 @@ def handle(
     # Check Baseline
     last_update = anchor.get_last_update_time()
     if last_update == "Never":
-        log_console.print("[yellow]⚠️  No scan history found.[/yellow]")
-        log_console.print("   Run [bold cyan]cdg scan[/bold cyan] first to establish a baseline.")
+        log_console.print("[yellow]⚠️  No baseline found.[/yellow]")
+        log_console.print("   Run [bold cyan]cdg mark[/bold cyan] first to set a baseline.")
         raise typer.Exit(1)
 
-    log_console.print(f"[dim]Checking changes since last scan ({last_update})...[/dim]")
+    log_console.print(f"[dim]Checking changes since last mark ({last_update})...[/dim]")
 
     # [2] Calculate Diff via Context
     with Progress(
@@ -66,7 +66,7 @@ def handle(
         progress.update(task, completed=100)
 
     if not diff_content.strip():
-        log_console.print("[green]No changes detected since last scan.[/green]")
+        log_console.print("[green]No changes since the last mark.[/green]")
         return
 
     # [3] Render
@@ -75,7 +75,7 @@ def handle(
         formatted_diff = prompt_engine.render(
             "diff",
             project_name=root_path.name,
-            context_message=f"Changes since last scan ({last_update})",
+            context_message=f"Changes since last mark ({last_update})",
             diff_content=diff_content,
             instruction=message
         )

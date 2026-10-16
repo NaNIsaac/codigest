@@ -60,9 +60,9 @@ def handle(
     console.print(f"  • [bold]Tracked Source Files:[/bold] {total_files} files")
 
     # 2. Pending Working Tree Changes
-    console.print("\n[bold blue]📝 Pending Working Tree Changes[/bold blue] [dim](since last scan)[/dim]")
+    console.print("\n[bold blue]📝 Pending Working Tree Changes[/bold blue] [dim](since last mark)[/dim]")
     if not has_anchor:
-        console.print("  [yellow]⚠️ No baseline scan found. Run [bold cyan]cdg scan[/bold cyan] to create the initial snapshot.[/yellow]")
+        console.print("  [yellow]⚠️ No baseline yet. Run [bold cyan]cdg mark[/bold cyan] to set one.[/yellow]")
     else:
         diff_content = anchor.get_changes(current_files)
         changed_files = anchor.get_changed_files(current_files)
