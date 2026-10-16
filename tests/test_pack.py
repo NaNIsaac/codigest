@@ -50,3 +50,19 @@ def test_pack_adds_the_test_that_imports_a_changed_module(tmp_path, monkeypatch)
     out = CliRunner().invoke(app, ["pack", "-s", "--no-copy"]).output
     assert 'path="tests/test_prices.py" reason="tests shop/prices.py"' in out
     assert "test_other.py" not in out
+
+
+def test_js_imports_resolve_like_tsc(tmp_path):
+    (tmp_path / "lib").mkdir()
+    for name in ("price.ts", "lib/index.ts", "old.cjs", "app.service.ts"):
+        (tmp_path / name).write_text("")
+    main = tmp_path / "main.ts"
+    main.write_text(
+        "import { a } from './price.js'\n"
+        "export * from \"./lib\"\n"
+        "const o = require('./old.cjs')\n"
+        "import './app.service'\n"
+        "import React from 'react'\n"
+    )
+    found = {p.relative_to(tmp_path).as_posix() for p in pack.js_imports(main)}
+    assert found == {"price.ts", "lib/index.ts", "old.cjs", "app.service.ts"}

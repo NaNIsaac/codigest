@@ -22,9 +22,13 @@ DEFAULT_BUDGET = 30_000
 # `File "x.py", line 7` (Python) or `x.py:7` / `x.ts(7,3)` (pytest, tsc, gcc, rustc, eslint, ...)
 _LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path>[\w./\\~-]+\.\w+)[:(](?P<line>\d+)')
 
-_TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$")
+_TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$|\.(test|spec)\.[cm]?[jt]sx?$")
 
-_SECRET_FILE_RE =re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx)$|^id_(rsa|dsa|ecdsa|ed25519)$")
+_JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+# Relative specifiers only: `from './x'`, `import './x'`, `require('./x')`, `import('./x')`.
+_JS_IMPORT_RE = re.compile(r"""(?:\bfrom|\bimport|\brequire\(|\bimport\()\s*['"](\.{1,2}/[^'"]+)['"]""")
+
+_SECRET_FILE_RE = re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx)$|^id_(rsa|dsa|ecdsa|ed25519)$")
 
 
 def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry | None:
@@ -46,6 +50,25 @@ def referenced_files(output: str, bases: list[Path], known: set[Path]) -> dict[P
         for base in bases:
             if (path := (base / raw).resolve()) in known:
                 found.setdefault(path, int(m["py_line"] or m["line"]))
+                break
+    return found
+
+
+def js_imports(path: Path) -> set[Path]:
+    """Files a JS/TS module imports by relative path, resolved the way bundlers and tsc do."""
+    try:
+        source = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+    found = set()
+    for spec in _JS_IMPORT_RE.findall(source):
+        base = (path.parent / spec).resolve()
+        # TS ESM code imports `./x.js` for a file that is `x.ts` on disk.
+        stem = base.with_suffix("") if base.suffix in _JS_SUFFIXES else base
+        for candidate in (base, *(stem.with_name(stem.name + s) for s in _JS_SUFFIXES),
+                          *(base / f"index{s}" for s in _JS_SUFFIXES)):
+            if candidate.is_file():
+                found.add(candidate)
                 break
     return found
 
@@ -124,13 +147,19 @@ def handle(
             wanted.setdefault(path.resolve(), "changed")
 
     deps = resolver.DependencyResolver(root)
-    edited = {p for p, why in wanted.items() if why == "changed" and p.suffix == ".py"}
-    for test in sorted(p for p in known if _TEST_FILE_RE.match(p.name)) if edited else []:
-        if hit := sorted(deps.get_imports(test) & edited):
+
+    def imports(path: Path) -> set[Path]:
+        if path.suffix == ".py":
+            return deps.get_imports(path) & known
+        return js_imports(path) & known if path.suffix in _JS_SUFFIXES else set()
+
+    edited = {p for p, why in wanted.items() if why == "changed"}
+    for test in sorted(p for p in known if _TEST_FILE_RE.search(p.name)) if edited else []:
+        if hit := sorted(imports(test) & edited):
             wanted.setdefault(test, f"tests {hit[0].relative_to(root).as_posix()}")
 
-    for path in [p for p in wanted if p.suffix == ".py"]:
-        for dep in sorted(deps.get_imports(path) & known):
+    for path in list(wanted):
+        for dep in sorted(imports(path)):
             wanted.setdefault(dep, f"imported by {path.relative_to(root).as_posix()}")
 
     if not (failure or diff.strip() or wanted):
