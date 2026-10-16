@@ -10,8 +10,8 @@ def generate_ascii_tree(paths: list[Path], root_dir: Path) -> str:
     Ref: Ported from original codigest prototype.
     """
     lines = []
-    # Set for fast lookup
     path_set = set(paths)
+    dirs_with_files = {parent for path in paths for parent in path.parents}
     
     def _walk(current_path: Path, prefix: str = ""):
         try:
@@ -26,12 +26,8 @@ def generate_ascii_tree(paths: list[Path], root_dir: Path) -> str:
             if item.is_file():
                 if item in path_set:
                     filtered_items.append(item)
-            elif item.is_dir():
-                # 디렉토리 안에 유효한 파일이 하나라도 있는지 확인 (Deep Check)
-                # 성능 최적화를 위해 문자열 startswith 체크
-                item_str = str(item)
-                if any(str(p).startswith(item_str) for p in path_set):
-                    filtered_items.append(item)
+            elif item.is_dir() and item in dirs_with_files:
+                filtered_items.append(item)
 
         count = len(filtered_items)
         for i, item in enumerate(filtered_items):
