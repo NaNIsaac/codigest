@@ -20,6 +20,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 lazy from ..core import termstore, shellhist
+lazy from ..core.redact import redact
 
 type JSON = dict[str, Any]
 
@@ -34,7 +35,9 @@ TOOLS: list[JSON] = [
         "description": (
             "Recent terminal commands with their full output, exit code and cwd, as captured "
             "by Codigest. Use this to see what the user just ran and why it failed, instead of "
-            "asking them to paste it."
+            "asking them to paste it. If nothing was captured, falls back to the native shell "
+            "history: commands only (redacted), with no output, exit code or cwd, so only when "
+            "here=false and failed=false."
         ),
         "inputSchema": {
             "type": "object",
@@ -104,8 +107,15 @@ TOOLS: list[JSON] = [
 def _terminal_history(args: JSON) -> str:
     count = int(args.get("count", 1))
     if not (entries := termstore.load_entries()):
-        # Nothing captured at all: native shell history still names the commands.
+        # Nothing captured at all: native shell history still names the commands, but has no
+        # cwd or exit code to filter on, so it is only returned when no filter was asked for.
+        if args.get("here", True):
+            return "No captured commands. Native shell history has no working directory, so it may hold other projects' commands; pass here=false to read it."
+        if args.get("failed"):
+            return "No captured commands. Native shell history has no exit codes, so failed commands cannot be picked out; pass failed=false to read it."
         entries, _ = shellhist.read_recent(count)
+        for entry in entries:
+            entry.command = redact(entry.command)
         return termstore.render(entries)
     under = Path.cwd() if args.get("here", True) else None
     return termstore.render(termstore.select(entries, failed=bool(args.get("failed")), under=under)[-count:])

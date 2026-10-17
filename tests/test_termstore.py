@@ -46,6 +46,24 @@ def test_select_filters_failed_and_directory(tmp_path):
     assert [e.command for e in termstore.select(entries, failed=True, under=project)] == ["a"]
 
 
+def test_mcp_native_history_fallback_is_redacted_and_unscoped_only_on_request(tmp_path, monkeypatch):
+    from codigest.commands import mcp
+    from codigest.core import shellhist
+    token = "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2"
+    hist = tmp_path / "ConsoleHost_history.txt"
+    hist.write_text(f"cd D:/other-project\ngh auth login --with-token {token}\ndeploy --password=hunter2secret\n", encoding="utf-8")
+    monkeypatch.setenv("CODIGEST_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(shellhist, "_candidates", lambda: [("powershell", hist, shellhist._parse_plain)])
+
+    for args in ({"count": 5}, {"count": 5, "here": True}, {"count": 5, "here": False, "failed": True}):
+        text = mcp._terminal_history(args)
+        assert "other-project" not in text and "<command" not in text
+
+    text = mcp._terminal_history({"count": 5, "here": False})
+    assert "other-project" in text
+    assert token not in text and "hunter2secret" not in text and "[REDACTED]" in text
+
+
 if __name__ == "__main__":
     test_crlf_output_survives_normalization()
     test_progress_redraw_keeps_last_frame()
