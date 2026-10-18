@@ -1,5 +1,6 @@
 
 from codigest.commands import pack
+from codigest.core import resolver
 from codigest.core.termstore import Entry
 
 
@@ -71,7 +72,7 @@ def test_js_imports_resolve_like_tsc(tmp_path):
         "import './app.service'\n"
         "import React from 'react'\n"
     )
-    found = {p.relative_to(tmp_path).as_posix() for p in pack.js_imports(main)}
+    found = {p.relative_to(tmp_path).as_posix() for p in resolver.js_imports(main)}
     assert found == {"price.ts", "lib/index.ts", "old.cjs", "app.service.ts"}
 
 
@@ -85,3 +86,20 @@ def test_excerpt_merges_nearby_references_and_skips_short_files(tmp_path):
     short = tmp_path / "short.py"
     short.write_text("a = 1\n" * 30)
     assert pack.excerpt(short, [3]) is None
+
+
+def test_scan_resolve_follows_ts_imports_recursively(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from codigest.main import app
+
+    (tmp_path / ".git").mkdir()  # project root marker
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.ts").write_text("import { p } from './prices.js'\n")
+    (tmp_path / "src" / "prices.ts").write_text("import { RATE } from './rate'\nexport const p = 1\n")
+    (tmp_path / "src" / "rate.ts").write_text("export const RATE = 0.1\n")
+    (tmp_path / "src" / "unrelated.ts").write_text("export const X = 1\n")
+    monkeypatch.chdir(tmp_path)
+    out = CliRunner().invoke(app, ["scan", "src/main.ts", "-r", "-s", "--no-copy", "-y"]).output
+    assert all(f'path="src/{name}"' in out for name in ("main.ts", "prices.ts", "rate.ts"))
+    assert "unrelated.ts" not in out

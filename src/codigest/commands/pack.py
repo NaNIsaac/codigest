@@ -30,9 +30,6 @@ _LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path
 
 _TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$|\.(test|spec)\.[cm]?[jt]sx?$")
 
-_JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
-# Relative specifiers only: `from './x'`, `import './x'`, `require('./x')`, `import('./x')`.
-_JS_IMPORT_RE = re.compile(r"""(?:\bfrom|\bimport|\brequire\(|\bimport\()\s*['"](\.{1,2}/[^'"]+)['"]""")
 
 def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry | None:
     """
@@ -94,25 +91,6 @@ def excerpt(path: Path, lines: list[int]) -> tuple[str, str] | None:
         "\n".join(f"{i:>{width}}: {rows[i - 1]}" for i in range(lo, hi + 1)) for lo, hi in spans
     )
     return text, ",".join(f"{lo}-{hi}" for lo, hi in spans)
-
-
-def js_imports(path: Path) -> set[Path]:
-    """Files a JS/TS module imports by relative path, resolved the way bundlers and tsc do."""
-    try:
-        source = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return set()
-    found = set()
-    for spec in _JS_IMPORT_RE.findall(source):
-        base = (path.parent / spec).resolve()
-        # TS ESM code imports `./x.js` for a file that is `x.ts` on disk.
-        stem = base.with_suffix("") if base.suffix in _JS_SUFFIXES else base
-        for candidate in (base, *(stem.with_name(stem.name + s) for s in _JS_SUFFIXES),
-                          *(base / f"index{s}" for s in _JS_SUFFIXES)):
-            if candidate.is_file():
-                found.add(candidate)
-                break
-    return found
 
 
 def changed_paths(diff: str, root: Path) -> list[Path]:
@@ -196,9 +174,7 @@ def handle(
     deps = resolver.DependencyResolver(root)
 
     def imports(path: Path) -> set[Path]:
-        if path.suffix == ".py":
-            return deps.get_imports(path) & known
-        return js_imports(path) & known if path.suffix in _JS_SUFFIXES else set()
+        return deps.imports_of(path) & known
 
     edited = {p for p, why in wanted.items() if why == "changed"}
     for test in sorted(p for p in known if _TEST_FILE_RE.search(p.name)) if edited else []:

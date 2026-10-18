@@ -1,12 +1,37 @@
 """
 Dependency Resolver Module.
-Analyzes Python AST to resolve local imports recursively.
-Optimized: Stdlib check -> Cache -> Local File Check.
+Finds the project files a file imports: Python through its AST, JS/TS through
+relative import specifiers. `scan -r` follows them recursively, `pack` one hop.
 """
 lazy import ast
+import re
 import sys
 from collections import deque
 from pathlib import Path
+
+JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+# Relative specifiers only: `from './x'`, `import './x'`, `require('./x')`, `import('./x')`.
+JS_IMPORT_RE = re.compile(r"""(?:\bfrom|\bimport|\brequire\(|\bimport\()\s*['"](\.{1,2}/[^'"]+)['"]""")
+
+
+def js_imports(path: Path) -> set[Path]:
+    """Files a JS/TS module imports by relative path, resolved the way bundlers and tsc do."""
+    try:
+        source = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+    found = set()
+    for spec in JS_IMPORT_RE.findall(source):
+        base = (path.parent / spec).resolve()
+        # TS ESM code imports `./x.js` for a file that is `x.ts` on disk.
+        stem = base.with_suffix("") if base.suffix in JS_SUFFIXES else base
+        for candidate in (base, *(stem.with_name(stem.name + s) for s in JS_SUFFIXES),
+                          *(base / f"index{s}" for s in JS_SUFFIXES)):
+            if candidate.is_file():
+                found.add(candidate)
+                break
+    return found
+
 
 class DependencyResolver:
     def __init__(self, root_path: Path):
@@ -21,15 +46,23 @@ class DependencyResolver:
         """Get set of standard library module names."""
         return sys.stdlib_module_names
 
+    def imports_of(self, file_path: Path) -> set[Path]:
+        """Project files that `file_path` imports, for any supported language."""
+        if file_path.suffix in (".py", ".pyi"):
+            return self.get_imports(file_path)
+        if file_path.suffix in JS_SUFFIXES:
+            return js_imports(file_path)
+        return set()
+
     def resolve(self, initial_files: list[Path]) -> list[Path]:
-        queue = deque(f.resolve() for f in initial_files if f.suffix == ".py")
+        queue = deque(f.resolve() for f in initial_files)
         self.visited = set(queue)
         results = set(initial_files)
 
         while queue:
             current_file = queue.popleft()
             try:
-                dependencies = self.get_imports(current_file)
+                dependencies = self.imports_of(current_file)
             except Exception:
                 continue
 
