@@ -4,10 +4,9 @@ import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, OutputOption
 
-lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from ..core import prompts, shadow, tags, common
 lazy from ..core.redact import redact_diff
-lazy from ..core.output import OutputHandler
+lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
@@ -49,13 +48,7 @@ def handle(
     log_console.print(f"[dim]Checking changes since last mark ({last_update})...[/dim]")
 
     # [2] Calculate Diff via Context
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]Analyzing changes...[/bold blue]"),
-        transient=True,
-        console=log_console
-    ) as progress:
-        task = progress.add_task("diff", total=None)
+    with spinner(log_console, "[bold blue]Analyzing changes...[/bold blue]"):
 
         
         current_files = ctx.get_target_files(resolve_deps=resolve)
@@ -63,7 +56,6 @@ def handle(
         # Compare Working Tree vs Anchor
         diff_content = redact_diff(anchor.get_changes(current_files))
 
-        progress.update(task, completed=100)
 
     if not diff_content.strip():
         log_console.print("[green]No changes since the last mark.[/green]")

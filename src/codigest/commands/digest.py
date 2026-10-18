@@ -4,9 +4,8 @@ import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, OutputOption
 
-lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from ..core import structure, prompts, semdiff, tags, tokenizer, common, cache
-lazy from ..core.output import OutputHandler
+lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
@@ -31,14 +30,8 @@ def handle(
 
     prompt_engine = prompts.get_engine(root_path)
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]Digesting Architecture...[/bold blue]"),
-        transient=True,
-        console=log_console
-    ) as progress:
+    with spinner(log_console, "[bold blue]Digesting Architecture...[/bold blue]"):
 
-        task = progress.add_task("digest", total=None)
 
         # [2] File Discovery via Context
         files = ctx.get_target_files(ignore_config=False, resolve_deps=resolve)
@@ -87,7 +80,6 @@ def handle(
             log_console.print(f"[red]Rendering failed:[/red] {e}")
             raise typer.Exit(1) from e
 
-        progress.update(task, completed=100)
 
     token_count = tokenizer.estimate_tokens(digest_content)
     log_console.print(f"[bold green]Digest Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")

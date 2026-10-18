@@ -4,11 +4,9 @@ import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, AllOption, OutputOption
 
-lazy from rich.progress import Progress, SpinnerColumn, TextColumn
-lazy from rich.panel import Panel
 lazy from rich.filesize import decimal
 lazy from ..core import structure, tags, prompts, processor, tokenizer, common, cache
-lazy from ..core.output import OutputHandler
+lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
@@ -42,13 +40,7 @@ def handle(
     prompt_engine = prompts.get_engine(root_path)
 
     # [2] File Discovery via Context
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]Scanning...[/bold blue]"),
-        transient=True,
-        console=log_console
-    ) as progress:
-        task = progress.add_task("scanning", total=None)
+    with spinner(log_console, "[bold blue]Scanning...[/bold blue]"):
 
         
         files = ctx.get_target_files(
@@ -57,18 +49,12 @@ def handle(
             resolve_deps=resolve
         )
 
-        progress.update(task, completed=100)
 
     # [3] Pre-flight Check
     total_files = len(files)
     total_size = sum(f.stat().st_size for f in files)
     est_tokens = int(total_size / 4)
 
-    log_console.print(Panel(f"""[bold]Scan Plan[/bold]
-  Target: [cyan]{root_path}[/cyan]
-  Scope: {total_files} files
-  Est. Size: {decimal(total_size)}
-  Est. Tokens: ~{est_tokens:,}""", expand=False))
     if ctx.withheld:
         names = ", ".join(p.relative_to(root_path).as_posix() for p in ctx.withheld)
         log_console.print(f"[yellow]Withheld (may contain secrets):[/yellow] {names}", highlight=False)
@@ -80,20 +66,16 @@ def handle(
     if yes:
         pass
     elif is_large_context:
-        log_console.print(f"[yellow][Warning] Large context detected (> {TOKEN_THRESHOLD:,} tokens or > {FILE_COUNT_THRESHOLD} files).[/yellow]")
-        if not typer.confirm("Proceed with digestion?"):
-            log_console.print("[red]Aborted.[/red]")
+        log_console.print(
+            f"[yellow]Large:[/yellow] {total_files} files, {decimal(total_size)}, about {est_tokens:,} tokens "
+            f"(asks above {TOKEN_THRESHOLD:,} tokens or {FILE_COUNT_THRESHOLD} files; -y skips this)"
+        )
+        if not typer.confirm("Copy it anyway?"):
+            log_console.print("Nothing copied. Name a folder or file to share less: cdg scan src/")
             raise typer.Exit()
-    else:
-        log_console.print("[dim]Small context detected. Automatically proceeding...[/dim]")
 
     # [4] Execution
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]Generating Snapshot...[/bold blue]"),
-        transient=True,
-        console=log_console
-    ) as progress:
+    with spinner(log_console, "[bold blue]Generating Snapshot...[/bold blue]"):
 
         tree_str = structure.generate_ascii_tree(files, root_path)
 
@@ -147,6 +129,6 @@ def handle(
             raise typer.Exit(1) from e
 
     def _summary():
-        log_console.print(f"[bold green]Snapshot ready[/bold green] (~{tokenizer.estimate_tokens(snapshot_content):,} tokens)")
+        log_console.print(f"[bold]Snapshot[/bold] {total_files} files, ~{tokenizer.estimate_tokens(snapshot_content):,} tokens")
 
     handler.handle_output(snapshot_content, summary=_summary, item_name="snapshot")

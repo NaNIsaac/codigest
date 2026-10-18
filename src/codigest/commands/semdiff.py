@@ -4,9 +4,8 @@ import typer
 
 from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, OutputOption
 
-lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from ..core import prompts, shadow, semdiff, tags, tokenizer, common
-lazy from ..core.output import OutputHandler
+lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
@@ -40,13 +39,7 @@ def handle(
 
     reports = []
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]Parsing AST...[/bold blue]"),
-        transient=True,
-        console=log_console
-    ) as progress:
-        task = progress.add_task("semdiff", total=None)
+    with spinner(log_console, "[bold blue]Parsing AST...[/bold blue]"):
 
         # [2] Get Files via Context
         current_files = ctx.get_target_files(resolve_deps=resolve)
@@ -101,7 +94,6 @@ def handle(
                 block = tags.file(rel_path_str, raw_body, status=file_status)
                 reports.append(block)
 
-        progress.update(task, completed=100)
 
     if not reports:
         log_console.print("[green]No structural (AST) changes detected.[/green]")

@@ -2,7 +2,8 @@
 Unified Output Handler for CLI commands.
 Manages stderr log console, clipboard copying, and file vs stdout output.
 """
-from collections.abc import Callable
+import contextlib
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 lazy import pyperclip
@@ -12,6 +13,20 @@ from .redact import redact_code
 
 console = Console()
 err_console = Console(stderr=True)
+
+
+@contextlib.contextmanager
+def spinner(log: Console, text: str) -> Iterator[None]:
+    """A transient spinner in a terminal and nothing elsewhere: rich's Progress leaves a
+    blank line behind when its output is a pipe or a log, even when disabled."""
+    if not log.is_terminal:
+        yield
+        return
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    with Progress(SpinnerColumn(), TextColumn(text), transient=True, console=log) as progress:
+        progress.add_task(text, total=None)
+        yield
 
 @dataclass(slots=True)
 class OutputHandler:

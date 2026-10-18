@@ -4,30 +4,32 @@
 
 <!-- mcp-name: io.github.NaNIsaac/codigest -->
 
-**Collects what an AI model needs to help with your code, from your terminal and your project.**
+**Share the code context you choose with an AI: your project, a few files, what changed, or the command that failed.**
 
 [한국어](README.ko.md)
 
-Codigest is a command-line tool. When you ask ChatGPT, Claude or a coding agent about a failing
-test or code you are working on, it gathers the material the model needs to answer.
+Codigest is a command-line tool for the moment you ask ChatGPT, Claude or a coding agent about
+your code. It turns the part of your project you pick into one block of text you can paste into
+any chat.
 
-A model only knows what you show it. To help, it needs the error, the code involved, and what you
-changed. Collecting that by hand is slow, and it is easy to leave out the one file that matters,
-or to paste far more than the question needs.
-
-Codigest remembers the commands you run and their output, finds the files an error points at and
-the changes Git knows about, and puts them together as one block of text. You paste it into a
-chat, or let an agent fetch it directly.
+A model only knows what you show it. Copying files by hand is slow, it is easy to miss the one
+file that matters, and it is just as easy to paste far more than the question needs. Codigest
+lets you decide what to share and then collects it for you: the whole project, a file and the
+files it imports, what changed since a point you marked, or a failing test with the code it points
+at.
 
 ## What it does
 
-- **Remembers terminal output.** Commands are stored with their output and exit code. Values that
-  look like tokens or passwords are masked before anything is written.
-- **Picks the relevant code.** It finds the files and lines an error names and the files you
-  changed, then follows the tests and imports connected to them.
-- **Says why.** Each file carries the reason it was included, and files left out for size are
-  still listed by name.
-- **Fits a budget.** Large files come as excerpts around the lines that matter.
+- **Bundles code you pick.** The whole project, chosen files and folders, or the local files they
+  import (Python, JS/TS), as one block with the file tree.
+- **Shows what changed.** Text or function-level diffs since a baseline you set, without touching
+  your Git history.
+- **Brings in terminal output.** It records commands you run and can hand over a failing one
+  together with the files its error points at.
+- **Says what it included.** Every bundle reports its size, and `pack` gives the reason for each
+  file and names the ones it left out.
+- **Keeps secrets out.** `.env` files and keys are never included, and tokens in code or output
+  are masked.
 - **Works with agents.** Claude Code, Cursor and other MCP clients can request the same output.
 
 Codigest does not call any AI model; it only prepares what you send to one. Everything runs on
@@ -36,7 +38,7 @@ your machine, and your source files and Git history are only read.
 <p align="center">
   <img src="docs/demo/demo.gif" alt="cdg cap runs a failing pytest, then cdg pack bundles the failure, the test file it names and the changed file" width="760">
   <br>
-  <sub>A test fails; one command collects what the model needs.</sub>
+  <sub>One of the workflows below: a test fails, and one command collects what the model needs.</sub>
 </p>
 
 ## Install
@@ -52,21 +54,91 @@ uv tool install codigest
 uv tool update-shell                              # then restart your terminal
 ```
 
-The command is `codigest`, or `cdg` for short.
+The command is `codigest`, or `cdg` for short. No setup is needed in your projects.
 If the install fails with a syntax error on `lazy import`, run `uv self update` and try again.
 
-## Getting started
+Every command below copies its result to the clipboard. Add `-s` to also print it (for pipes and
+redirects), `-o FILE` to also write it to a file, `--no-copy` to leave the clipboard alone, and
+`-m "..."` to put your question or instruction in it.
 
-Try it in any project with a failing test. No setup is needed.
+## 1. Share your project with an AI chat
 
-**1. Run the test through `cdg cap`.** Put `--` before your command. The output looks exactly as
-it would without `cdg cap`; Codigest just keeps a copy.
+Run `scan` in your project and paste:
+
+```bash
+cdg scan
+```
+
+```console
+$ cdg scan
+Copied snapshot to clipboard
+Snapshot 3 files, ~121 tokens
+```
+
+The clipboard now holds the file tree and every file, honoring `.gitignore`:
+
+```xml
+<project_snapshot project="project">
+<project_structure>
+├── .gitignore
+├── prices.py
+└── test_prices.py
+</project_structure>
+<source_code>
+<file path=".gitignore">
+.venv/
+__pycache__/
+.pytest_cache/
+</file>
+
+<file path="prices.py">
+def apply_discount(price, percent):
+    return price * (1 - percent)
+</file>
+
+<file path="test_prices.py">
+from prices import apply_discount
+
+
+def test_ten_percent():
+    assert apply_discount(200, 10) == 180
+</file>
+</source_code>
+</project_snapshot>
+```
+
+Large projects ask before copying (above 30k tokens or 100 files). For those, share less, as in
+the next section.
+
+## 2. Share only part of it, or what changed
+
+```bash
+cdg scan src/app.py -r       # one file and the local files it imports, recursively
+cdg scan src/billing/        # one folder
+cdg digest                   # Python signatures and docstrings only, much smaller
+cdg tree                     # just the file tree
+```
+
+To share what changed while you work, set a baseline first:
+
+```bash
+cdg mark                     # e.g. before a refactor
+# ... work ...
+cdg diff                     # text diff since the mark
+cdg semdiff                  # Python: which functions and classes changed
+```
+
+A baseline is a private copy kept in `.codigest/`; your Git history is not touched.
+
+## 3. Hand over a failing command
+
+Run the command through `cdg cap`. The output looks exactly as it would without it; Codigest
+keeps a copy. Then ask for a pack:
 
 ```bash
 cdg cap -- pytest -q        # or npm test, cargo test, go test ./..., make
+cdg pack
 ```
-
-**2. Run `cdg pack`.** It tells you what it picked and why:
 
 ```console
 $ cdg pack
@@ -81,14 +153,8 @@ Copied pack to clipboard
 Read it as: the failing command, your uncommitted Git changes, `test_prices.py` because the error
 points at its line 5, and `prices.py` because you edited it.
 
-**3. Paste into the chat** and say what you want. You can also put the request in the pack:
-`cdg pack -m "fix the discount calculation"`.
-
 <details>
 <summary>What exactly was copied</summary>
-
-One XML block: the command with its output, the diff, and each file with line numbers and the
-reason it was included. This is the pack above, unedited apart from the working directory:
 
 ```xml
 <context_pack project="project">
@@ -140,87 +206,48 @@ what it is not seeing.
 
 </details>
 
-## Making it smoother
+### How `pack` decides
 
-Once the basic loop works, each of these removes one manual step.
+Plain `cdg pack` fills its token budget (default 30,000) in this order:
 
-**Stop typing `cdg cap`.** Hook your shell once and every command is captured automatically:
+1. Files named in the output of the last failed command run in this project in the past hour:
+   `File "x.py", line 7` (Python), `x.py:7` (pytest, ruff, gcc, rustc, eslint), `x.ts(7,3)` (tsc).
+   Once the same command passes again, that failure is no longer used. A file that is only named
+   in the output, not changed by you, comes as an excerpt: ten lines around each place the output
+   points at, marked with a `lines="40-60"` attribute. Short files come whole.
+2. Files you changed: uncommitted and untracked files in Git, or changes since `cdg mark`.
+3. Tests that import those files (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js`, ...).
+4. Project files they import: Python imports, and relative imports in JS/TS (`./x`, `./x.js` for
+   `x.ts`, `./dir` for `dir/index.ts`).
+
+When you name files, you get only those files. `--with` adds automatic sources back:
 
 ```bash
-cdg term install            # cdg term uninstall to undo
+cdg pack src/prices.py                         # just this file
+cdg pack src/prices.py --with tests            # this file and its tests
+cdg pack --with changes                        # only your changes, no failure
+cdg pack --with failure,changes,tests,imports  # the same as plain `cdg pack`
 ```
 
-**Stop pasting.** Connect your coding agent over MCP and it fetches the pack itself:
+The failed command and the diff are always included when their source is on. Tokens are estimated
+at four characters each, so the budget is approximate.
+
+### Making it smoother
+
+`cdg term install` hooks your shell so every command is captured without typing `cdg cap`
+(`cdg term uninstall` removes it). `cdg term` shows what was captured; see
+[Terminal capture](#terminal-capture).
+
+## 4. Let an agent fetch it
+
+Connect your coding agent over MCP and it requests context itself instead of asking you to paste:
 
 ```bash
 claude mcp add --scope user codigest -- cdg mcp      # Claude Code
 ```
 
 Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command `cdg` and args
-`["mcp"]`. Details for both are in the [reference](#automatic-capture).
-
-## How `pack` decides
-
-When a file you expected is missing, or one you didn't expect is there, this is the order `pack`
-fills its token budget (default 30,000):
-
-1. Files you name: `cdg pack src/prices.py`.
-2. Files named in the output of the last failed command run in this project in the past hour:
-   `File "x.py", line 7` (Python), `x.py:7` (pytest, ruff, gcc, rustc, eslint), `x.ts(7,3)` (tsc).
-   Once the same command passes again, that failure is no longer used. A file that is only named
-   in the output, not changed by you, comes as an excerpt: ten lines around each place the output
-   points at, marked with a `lines="40-60"` attribute. Short files come whole.
-3. Files you changed: uncommitted and untracked files in Git, or changes since `cdg mark` if you
-   set a baseline (see [below](#see-what-changed-since-a-point)).
-4. Tests that import a changed file (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js`, ...).
-5. Project files imported by the files from steps 1, 3 and 4: Python imports, and relative imports in
-   JS/TS (`./x`, `./x.js` for `x.ts`, `./dir` for `dir/index.ts`).
-
-The failed command and the diff are always included. `.env`, `*.pem`, `*.key` and SSH keys never
-are. Tokens are estimated at four characters each, so the budget is approximate.
-
-```bash
-cdg pack -b 8000            # smaller budget
-cdg pack -s > context.xml   # print instead of copying
-```
-
-## Other things you can hand an LLM
-
-`pack` covers the failing-test case. These cover the rest, grouped by what you want to do.
-
-### Recall an earlier command
-
-Every captured command stays available, not only the last failure:
-
-```bash
-cdg term              # last command and its output
-cdg term -n 3         # last 3
-cdg term -f           # last failed one
-cdg term --here -n 3  # last 3 run in this project
-```
-
-### See what changed since a point
-
-Set a baseline before you start, then ask for everything since:
-
-```bash
-cdg mark              # e.g. before a refactor
-# ... work ...
-cdg diff              # text diff since the mark
-cdg semdiff           # Python only: which functions and classes changed
-```
-
-A baseline is a private copy kept in `.codigest/`; your Git history is not touched. Once you set
-one, `pack` also uses it instead of `git diff`.
-
-### Give the whole project, or its shape
-
-```bash
-cdg scan              # every file, as one block (asks first above 30k tokens)
-cdg scan src/app.py -r  # one file plus the local files it imports
-cdg digest            # Python signatures and docstrings only, much smaller
-cdg tree              # just the file tree
-```
+`["mcp"]`. The tools are listed under [MCP tools](#mcp-tools).
 
 ## Reference
 
@@ -229,32 +256,35 @@ cdg tree              # just the file tree
 - [MCP tools](#mcp-tools)
 - [Configuration](#configuration)
 - [Privacy and safety](#privacy-and-safety)
+- [Upgrading from 0.8](#upgrading-from-08)
 - [How it works](#how-it-works)
 - [Development](#development)
 
 ### All commands
 
-Every command that produces context copies it to the clipboard. `-s` / `--stdout` prints it
-instead, `--no-copy` skips the clipboard, and `-m` / `--message` adds an instruction.
+`cdg --help` lists them in the same groups.
 
 | Command | What it gives you | Writes to your project |
 | --- | --- | --- |
-| `pack` | Last failure, the files it names, your changes | nothing |
+| `scan` | The whole project, or chosen paths, as one block | nothing |
+| `digest` | Signatures and docstrings, no bodies (Python) | nothing |
+| `tree` | Project tree | nothing |
+| `mark` | Sets the baseline | `.codigest/` |
+| `diff` | Text diff since the baseline | nothing |
+| `semdiff` | Function and class level changes since the baseline (Python) | nothing |
 | `cap` | Runs a command and keeps its output | nothing |
 | `term` | Recent captured commands with output | nothing |
-| `mark` | Sets the baseline | `.codigest/` |
-| `diff` | Text diff since the baseline | `.codigest/changes.diff` |
-| `semdiff` | Function and class level changes since the baseline (Python) | `.codigest/semdiff.txt` |
-| `scan` | The whole project, or chosen paths, as one block | `.codigest/snapshot.txt` |
-| `digest` | Signatures and docstrings, no bodies (Python) | `.codigest/digest.txt` |
-| `tree` | Project tree | nothing |
-| `status` | What `pack` would use here: last failure, changes, baseline | nothing |
-| `init` | Config file and baseline; only needed to change [file filters](#configuration) | `.codigest/`, `.gitignore` |
-| `clean` | Deletes `.codigest/` (asks first, `-y` to skip) | removes `.codigest/` |
+| `pack` | Last failure, the files it names, your changes | nothing |
 | `mcp` | MCP server for agents | nothing |
+| `status` | What `pack` would use here: last failure, changes, baseline | nothing |
+| `init` | `.codigest/config.toml` for [file filters](#configuration) | `.codigest/`, `.gitignore` |
+| `clean` | Deletes `.codigest/` (asks first, `-y` to skip) | removes `.codigest/` |
 
-More options: `scan -l` adds line numbers, `scan -a` ignores the config filters, `scan -y` skips
-the confirmation (CI). `-r` / `--resolve` on `scan`, `diff`, `semdiff` and `digest` also pulls in
+Shared options: `-s` / `--stdout` also prints the result (status messages go to stderr),
+`--no-copy` skips the clipboard, `-o FILE` also writes it to a file, `-m` / `--message` adds an
+instruction.
+`scan -l` adds line numbers, `scan -a` ignores the config filters, `scan -y` skips the
+confirmation (CI). `-r` / `--resolve` on `scan`, `diff`, `semdiff` and `digest` also pulls in
 local files imported by the targets. `cdg <command> --help` lists everything.
 
 ### Terminal capture
@@ -265,6 +295,10 @@ your machine, so `cap` and `term` work in any directory.
 
 ```bash
 cdg cap "npm run build | tail -20"  # quote pipelines
+cdg term              # last command and its output
+cdg term -n 3         # last 3
+cdg term -f           # last failed one
+cdg term --here -n 3  # last 3 run in this project
 cdg term -i 2         # only the command from 2 runs ago
 cdg term path         # where captures are stored (override with CODIGEST_HOME)
 cdg term clear        # delete all captures
@@ -299,16 +333,12 @@ Limitations:
 
 | Tool | Returns |
 | --- | --- |
-| `pack` | Last failure, the files it names, changes and their imports, cut to a budget (`targets`, `budget`, `message`) |
+| `pack` | Last failure, the files it names, changes and their imports, cut to a budget (`targets`, `with`, `budget`, `message`) |
 | `terminal_history` | Recent commands with output and exit code (`count`, `failed`, `here`: only this project, default on) |
 | `scan` | Project snapshot (`targets`, `resolve`, `message`) |
 | `diff` / `semdiff` | Text / structural changes since the baseline |
 | `digest` | Signatures and docstrings only |
 | `tree` | Directory tree |
-
-When nothing has been captured, `terminal_history` falls back to the native shell history, which
-has no output, exit code or working directory. The fallback is refused with `here` (the default)
-or `failed` set, since it cannot be filtered on either, and command text is redacted.
 
 The tools return the same text the CLI prints. None of them moves the baseline, and paths
 outside the project the server was started in are refused.
@@ -336,26 +366,40 @@ skipped.
 
 ### Privacy and safety
 
-- **Secrets in captures.** Known secret shapes (API keys, tokens, `password=...`, private keys,
-  URL credentials) are masked before a capture is written to disk. Output of credential commands
-  (`env`, `printenv`, `gh auth token`, `aws configure`, ...) is never stored. This catches common
-  formats, not every possible secret.
-- **Secret files.** `pack` never includes `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx` or SSH
-  private keys, and lists them as omitted instead.
-- **Your project.** No command changes your source files. Commands that save output, and the
-  baseline, live only inside `.codigest/`, which `init` adds to `.gitignore`. `pack` without a
-  baseline creates nothing at all.
+- **Credential files.** `.env*` (except `.env.example` and similar templates), `*.pem`, `*.key`,
+  `*.p12`, `*.pfx`, keystores, `.netrc`, `.pgpass` and SSH private keys are never included by any
+  command. `scan` says which it withheld, `pack` lists them as omitted, and their hunks in a diff
+  are replaced with a notice.
+- **Tokens in code and diffs.** Private keys, JWTs, vendor tokens (OpenAI, GitHub, AWS, Google,
+  Slack, GitLab, npm) and passwords in URLs are masked in everything Codigest outputs. Ordinary
+  code such as `token = get_token()` is left alone.
+- **Secrets in captures.** On top of that, terminal output is checked for `password=...` style
+  values and `Authorization` headers before it is written to disk, and the output of credential
+  commands (`env`, `printenv`, `gh auth token`, `aws configure`, ...) is never stored.
+- These rules catch common formats, not every possible secret.
+- **Your project.** No command changes your source files. Only `mark` and `init` create
+  `.codigest/`, which `init` adds to `.gitignore`.
 - **Where captures live.** `cdg term path` shows the file. On macOS and Linux it is readable only
   by you. `cdg term clear` deletes it.
 - **Nothing leaves your machine.** Codigest makes no network requests. Context goes where you
   paste it, or to the MCP client you connected.
 
+### Upgrading from 0.8
+
+- `scan`, `diff`, `semdiff` and `digest` no longer save into `.codigest/*.txt`; use `-o FILE`.
+  `diff --no-save` and the like are gone.
+- `cdg init` no longer sets a baseline; run `cdg mark`.
+- `cdg pack FILES` packs only those files; add `--with failure,changes,tests,imports` for the
+  previous behavior.
+- Outputs no longer start with built-in instructions to the model ("You are an expert..."). Put
+  your own with `-m`, or a template in `.codigest/prompts.toml`.
+
 ### How it works
 
 - **Baseline.** A Git repository at `.codigest/anchor/.shadow_git`, separate from your project's
-  repository. The directory is not named `.git` so editors don't mistake it for yours. `mark` and
-  `init` commit the current state to it; `diff`, `semdiff`, `status` and `pack` compare the
-  working tree against it.
+  repository. The directory is not named `.git` so editors don't mistake it for yours. `mark`
+  commits the current state to it; `diff`, `semdiff`, `status` and `pack` compare the working tree
+  against it.
 - **Captures.** One newline-delimited JSON file holds the last 200 commands; each output is capped
   at 64 KB, keeping the head and tail.
 - **Output.** File contents are XML-escaped inside `<file>` blocks, written flush-left so no stray

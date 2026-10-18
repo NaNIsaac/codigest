@@ -29,8 +29,9 @@ def file(path: str, content: str, status: str = "") -> str:
     Generates a safe <file> block.
     Automatically escapes the content to prevent XML injection.
     """
-    safe_content = escape_xml_value(content)
-    
+    # A file's own trailing newline would otherwise show up as a blank line before </file>.
+    safe_content = escape_xml_value(content).rstrip("\n")
+
     # f-string을 왼쪽 벽에 붙여 들여쓰기 문제 원천 차단
     return f"""<file path="{path}{status}">
 {safe_content}
