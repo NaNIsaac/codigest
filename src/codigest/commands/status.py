@@ -9,8 +9,6 @@ lazy from . import pack
 
 console = Console()
 
-SAVED_OUTPUTS = ("snapshot.txt", "changes.diff", "semdiff.txt", "digest.txt")
-
 
 def handle(
     target: Path = typer.Argument(
@@ -53,8 +51,6 @@ def handle(
         console.print(f"  baseline  [dim]none{', so pack compares against Git' if source else ''}[/dim]")
 
     codigest_dir = root / ".codigest"
-    if saved := [name for name in SAVED_OUTPUTS if (codigest_dir / name).is_file()]:
-        console.print(f"  saved     [dim].codigest/: {', '.join(saved)}[/dim]")
     if (codigest_dir / "config.toml").is_file():
         exts = ", ".join(sorted(ctx.config_extensions)) if ctx.config_extensions else "all"
         console.print(f"  filters   [dim].codigest/config.toml: extensions {exts}[/dim]")

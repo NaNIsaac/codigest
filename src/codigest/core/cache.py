@@ -38,8 +38,11 @@ class ContentCache:
                 self._data = {}
 
     def save(self) -> None:
+        # Only in projects that already have .codigest/ (init or mark): reading must not
+        # leave a folder behind in a project that never asked for one.
+        if not self.cache_file.parent.is_dir():
+            return
         try:
-            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, ensure_ascii=False, indent=2)
         except Exception:

@@ -3,8 +3,6 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-lazy from ..core import common, shadow
-
 app = typer.Typer()
 console = Console()
 
@@ -47,7 +45,7 @@ def handle(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
 ) -> None:
     """
-    Create .codigest/config.toml (file filters) and set a baseline.
+    Create .codigest/config.toml (file filters). `cdg mark` sets a baseline.
     """
     root_path = target  # Typer가 이미 resolve_path=True로 절대경로 변환해줌
 
@@ -66,14 +64,8 @@ def handle(
 
     _update_gitignore(gitignore_file)
 
-    try:
-        # Same file set as `cdg mark`, so the config filters apply to the baseline too.
-        shadow.ContextAnchor(root_path).update(common.get_context(root_path).get_target_files())
-        console.print("  [green]Set[/green] the baseline")
-    except Exception as e:
-        console.print(f"  [red]Could not set the baseline:[/red] {e}")
-
     console.print("\nEdit .codigest/config.toml to choose which files are included.")
+    console.print("[dim]To compare against this point later, run cdg mark.[/dim]")
 
 def _update_gitignore(path: Path) -> None:
     entry = ".codigest/"

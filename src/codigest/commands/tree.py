@@ -91,4 +91,4 @@ def handle(
         log_console.print(tree_viz)
         log_console.print(f"\n[dim]Found {len(files)} files.[/dim]")
 
-    handler.handle_output(ascii_tree, save_action=_print_tree_viz, item_name="tree")
+    handler.handle_output(ascii_tree, summary=_print_tree_viz, item_name="tree")

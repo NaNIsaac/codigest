@@ -12,7 +12,7 @@ from pathlib import Path
 import typer
 from rich.markup import escape
 
-from ..options import CopyOption, MessageOption, StdoutOption
+from ..options import CopyOption, MessageOption, StdoutOption, OutputOption
 
 lazy import html
 lazy from ..core import common, git_ops, processor, resolver, shadow, tags, termstore, tokenizer
@@ -148,6 +148,7 @@ def handle(
     ),
     copy: CopyOption = True,
     stdout: StdoutOption = False,
+    output: OutputOption = None,
 ) -> None:
     """
     Bundle the last failure, the files it points at and your changes.
@@ -161,7 +162,7 @@ def handle(
         cdg pack --with changes              # only your changes, no failure
         cdg pack -m "fix the discount bug"   # add an instruction
     """
-    handler = OutputHandler(stdout=stdout, copy=copy)
+    handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log = handler.log_console
 
     ctx = common.get_context(targets)

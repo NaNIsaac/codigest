@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, AllOption
+from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, AllOption, OutputOption
 
 lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from rich.panel import Panel
@@ -20,7 +20,7 @@ def handle(
         exists=True,
         resolve_path=True
     ),
-    output: str = typer.Option("snapshot.txt", "-o", "--output", help="Output filename inside .codigest/"),
+    output: OutputOption = None,
     copy: CopyOption = True,
     stdout: StdoutOption = False,
     all: AllOption = False,
@@ -32,24 +32,13 @@ def handle(
     """
     Bundle the whole project, or only the given paths, as one block.
     """
-    handler = OutputHandler(stdout=stdout, copy=copy)
+    handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log_console = handler.log_console
 
     # [1] Context Setup (Centralized)
     ctx = common.get_context(targets)
     root_path = ctx.root_path
 
-    # Init check
-    artifact_dir = root_path / ".codigest"
-    if not artifact_dir.exists():
-        log_console.print(f"[yellow][Warning] .codigest directory missing in {root_path.name}. Running init...[/yellow]")
-        try:
-            artifact_dir.mkdir(exist_ok=True)
-        except PermissionError as e:
-            log_console.print(f"[red][Error] Cannot create .codigest at {root_path}[/red]")
-            raise typer.Exit(1) from e
-
-    output_path = artifact_dir / output
     prompt_engine = prompts.get_engine(root_path)
 
     # [2] File Discovery via Context
@@ -157,17 +146,7 @@ def handle(
             log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
             raise typer.Exit(1) from e
 
-    def _save():
-        try:
-            output_path.write_text(snapshot_content, encoding="utf-8")
-            final_token_count = tokenizer.estimate_tokens(snapshot_content)
+    def _summary():
+        log_console.print(f"[bold green]Snapshot ready[/bold green] (~{tokenizer.estimate_tokens(snapshot_content):,} tokens)")
 
-            log_console.print("[bold green]Snapshot Saved![/bold green]")
-            log_console.print(f"  Path: [underline]{output_path}[/underline]")
-            log_console.print(f"  Final Tokens: [bold cyan]~{final_token_count:,}[/bold cyan]")
-
-        except Exception as e:
-            log_console.print(f"[bold red][Error] Save Failed:[/bold red] {e}")
-            raise typer.Exit(1) from e
-
-    handler.handle_output(snapshot_content, save_action=_save)
+    handler.handle_output(snapshot_content, summary=_summary, item_name="snapshot")

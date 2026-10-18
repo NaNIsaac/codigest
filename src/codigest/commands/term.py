@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from ..options import CopyOption, StdoutOption
+from ..options import CopyOption, OutputOption, StdoutOption
 
 lazy import json
 lazy import shutil
@@ -79,6 +79,7 @@ def handle(
     history_only: HistoryOnlyOption = False,
     copy: CopyOption = True,
     stdout: StdoutOption = False,
+    output: OutputOption = None,
 ) -> None:
     """
     Show recently captured commands and their output.
@@ -95,7 +96,7 @@ def handle(
     if ctx.invoked_subcommand:
         return
 
-    handler = OutputHandler(stdout=stdout, copy=copy)
+    handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log = handler.log_console
 
     # -i N needs N entries loaded so the Nth-from-last exists.
@@ -139,7 +140,7 @@ def handle(
     content = termstore.render(selected)
     handler.handle_output(
         content,
-        save_action=lambda: _summarize(handler, selected),
+        summary=lambda: _summarize(handler, selected),
         item_name=f"{len(selected)} terminal entr{'y' if len(selected) == 1 else 'ies'}",
     )
 

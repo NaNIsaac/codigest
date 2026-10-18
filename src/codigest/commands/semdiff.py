@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
+from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, OutputOption
 
 lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from ..core import prompts, shadow, semdiff, tags, tokenizer, common
@@ -14,7 +14,7 @@ app = typer.Typer()
 def handle(
     target: Path = typer.Argument(Path("."), help="Target directory"),
     copy: CopyOption = True,
-    save: bool = typer.Option(True, help="Save to .codigest/semdiff.txt"),
+    output: OutputOption = None,
     stdout: StdoutOption = False,
     message: MessageOption = "",
     resolve: ResolveOption = False,
@@ -22,7 +22,7 @@ def handle(
     """
     Show which Python functions and classes changed since the baseline.
     """
-    handler = OutputHandler(stdout=stdout, copy=copy)
+    handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log_console = handler.log_console
 
     # [1] Context Setup
@@ -126,11 +126,4 @@ def handle(
     token_count = tokenizer.estimate_tokens(final_output)
     log_console.print(f"[bold green]SemDiff Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
 
-    def _save():
-        if save:
-            out_path = root_path / ".codigest" / "semdiff.txt"
-            out_path.parent.mkdir(exist_ok=True)
-            out_path.write_text(final_output, encoding="utf-8")
-            log_console.print(f"[dim]Saved to {out_path}[/dim]")
-
-    handler.handle_output(final_output, save_action=_save, item_name="semdiff")
+    handler.handle_output(final_output, item_name="semdiff")

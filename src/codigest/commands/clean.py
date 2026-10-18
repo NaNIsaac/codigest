@@ -21,7 +21,7 @@ def handle(
     yes: bool = typer.Option(False, "-y", "--yes", "-f", "--force", help="Skip confirmation prompt"),
 ) -> None:
     """
-    Delete .codigest/, including the baseline and saved outputs.
+    Delete .codigest/: the config, the baseline and the cache.
     """
     ctx = common.get_context(target)
     root_path = ctx.root_path

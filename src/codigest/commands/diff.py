@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
+from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, OutputOption
 
 lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from ..core import prompts, shadow, tags, common
@@ -22,7 +22,7 @@ def handle(
         resolve_path=True
     ),
     copy: CopyOption = True,
-    save: bool = typer.Option(True, help="Save to .codigest/changes.diff"),
+    output: OutputOption = None,
     stdout: StdoutOption = False,
     message: MessageOption = "",
     resolve: ResolveOption = False,
@@ -30,7 +30,7 @@ def handle(
     """
     Show the text diff since the baseline (`cdg mark`).
     """
-    handler = OutputHandler(stdout=stdout, copy=copy)
+    handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log_console = handler.log_console
 
     # [1] Context Setup
@@ -87,11 +87,4 @@ def handle(
     # [4] Output
     log_console.print(f"[bold green]Changes Detected![/bold green] ({len(formatted_diff)} chars)")
 
-    def _save():
-        if save:
-            out_path = root_path / ".codigest" / "changes.diff"
-            out_path.parent.mkdir(exist_ok=True)
-            out_path.write_text(formatted_diff, encoding="utf-8")
-            log_console.print(f"[dim]Saved to {out_path}[/dim]")
-
-    handler.handle_output(formatted_diff, save_action=_save, item_name="diff")
+    handler.handle_output(formatted_diff, item_name="diff")
