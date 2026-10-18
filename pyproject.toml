@@ -38,3 +38,5 @@ cdg = "codigest.main:app"
 requires = ["uv_build>=0.12.7,<0.13"]
 build-backend = "uv_build"
 
+[tool.ruff]
+line-length = 100
