@@ -1,6 +1,6 @@
 # Codigest
 
-[![PyPI](https://img.shields.io/pypi/v/codigest)](https://pypi.org/project/codigest/) [![Tests](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml/badge.svg)](https://github.com/NaNIsaac/codigest/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/codigest)](https://pypi.org/project/codigest/) [![Tests](https://github.com/NaNIsaac/codigest/actions/workflows/ci.yml/badge.svg)](https://github.com/NaNIsaac/codigest/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **AI에게 보여 줄 코드를 내가 고르게 해 주는 도구. 프로젝트 전체든, 파일 몇 개든, 바뀐 부분이든, 실패한 명령이든.**
 
