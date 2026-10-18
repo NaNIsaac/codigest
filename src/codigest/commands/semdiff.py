@@ -115,7 +115,7 @@ def handle(
         final_output = prompt_engine.render(
             "semdiff",
             project_name=root_path.name,
-            context_message=f"Structural changes since {last_update}",
+            context_message=f"since cdg mark ({last_update})",
             semdiff_content=report_content,
             instruction=message
         )

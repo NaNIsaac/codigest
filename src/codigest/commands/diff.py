@@ -75,7 +75,7 @@ def handle(
         formatted_diff = prompt_engine.render(
             "diff",
             project_name=root_path.name,
-            context_message=f"Changes since last mark ({last_update})",
+            context_message=f"since cdg mark ({last_update})",
             diff_content=diff_content,
             instruction=message
         )

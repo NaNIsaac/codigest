@@ -2,6 +2,7 @@
 Prompt Management Module.
 Templates are aligned flush-left to prevent indentation issues when injecting large code blocks.
 """
+lazy import html
 lazy import tomllib
 from collections.abc import Callable
 from pathlib import Path
@@ -13,93 +14,46 @@ type RenderFunc = Callable[..., str]
 def _instruction_block(instruction: str) -> str:
     if not instruction:
         return ""
-    safe_instruction = tags.escape_xml_value(instruction)
-    return tags.dedent(f"""
-<user_instruction>
-{safe_instruction}
-</user_instruction>
-""")
+    return f"<user_instruction>\n{tags.escape_xml_value(instruction)}\n</user_instruction>"
 
-# 1. Snapshot Template (codigest scan)
+
+def _block(root: str, attrs: dict[str, str], instruction: str, *parts: str) -> str:
+    """One root element holding the context. No canned instructions to the model:
+    what to do with it is the user's `-m` (or their own prompts.toml template)."""
+    head = " ".join(f'{k}="{html.escape(v)}"' for k, v in attrs.items() if v)
+    body = [b for b in (_instruction_block(instruction), *parts) if b]
+    return f"<{root} {head}>\n" + "\n".join(body) + f"\n</{root}>"
+
+
+# Note: source_code / digest_content arrive already formatted via tags.file().
 def _default_snapshot(project_name: str, tree_structure: str, source_code: str, instruction: str = "") -> str:
-    instruction_block = _instruction_block(instruction)
+    return _block(
+        "project_snapshot", {"project": project_name}, instruction,
+        f"<project_structure>\n{tree_structure}\n</project_structure>",
+        f"<source_code>\n{source_code}\n</source_code>",
+    )
 
-    # Note: source_code is assumed to be already formatted via tags.file()
-    return tags.dedent(f"""
-[SYSTEM: CODIGEST - INITIAL CONTEXT]
-You are an expert AI developer. I am providing the full context of a project named "{project_name}".
-Please digest this structure and code to build your internal mental model.
-{instruction_block}
 
-<project_root>
-{project_name}
-</project_root>
-
-<project_structure>
-{tree_structure}
-</project_structure>
-
-<source_code>
-{source_code}
-</source_code>
-""")
-
-# 2. Diff Template (codigest diff)
 def _default_diff(project_name: str, context_message: str, diff_content: str, instruction: str = "") -> str:
-    instruction_block = _instruction_block(instruction)
+    return _block(
+        "changes", {"project": project_name, "source": context_message}, instruction,
+        tags.escape_xml_value(diff_content),
+    )
 
-    # Escape raw diff content to prevent XML injection
-    safe_diff = tags.escape_xml_value(diff_content)
 
-    return tags.dedent(f"""
-[SYSTEM: CODIGEST - INCREMENTAL UPDATE]
-Here are the latest changes for the project "{project_name}".
-{context_message}.
-{instruction_block}
-
-Focus on these modifications to update your context.
-
-<git_diff>
-{safe_diff}
-</git_diff>
-""")
-
-# 3. SemDiff Template (codigest semdiff)
 def _default_semdiff(project_name: str, context_message: str, semdiff_content: str, instruction: str = "") -> str:
-    instruction_block = _instruction_block(instruction)
+    return _block(
+        "semantic_diff", {"project": project_name, "source": context_message}, instruction,
+        semdiff_content,
+    )
 
-    return tags.dedent(f"""
-[SYSTEM: CODIGEST - SEMANTIC ANALYSIS]
-Structural changes detected in "{project_name}".
-{context_message}.
-{instruction_block}
 
-This report focuses on High-Level Architecture changes (Classes, Functions, Signatures).
-
-<semantic_diff>
-{semdiff_content}
-</semantic_diff>
-""")
-
-# 4. Digest Template (codigest digest)
 def _default_digest(project_name: str, tree_structure: str, digest_content: str, instruction: str = "") -> str:
-    instruction_block = _instruction_block(instruction)
-
-    return tags.dedent(f"""
-[SYSTEM: CODIGEST - ARCHITECTURE DIGEST]
-Here is the high-level architecture of "{project_name}".
-This contains ONLY definitions (Classes, Functions), no implementation details.
-Use this to understand the project structure and relationships.
-{instruction_block}
-
-<project_structure>
-{tree_structure}
-</project_structure>
-
-<code_digest>
-{digest_content}
-</code_digest>
-""")
+    return _block(
+        "code_digest", {"project": project_name, "contents": "signatures and docstrings, no bodies"}, instruction,
+        f"<project_structure>\n{tree_structure}\n</project_structure>",
+        digest_content,
+    )
 
 
 # Registry of default implementations
