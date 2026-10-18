@@ -31,6 +31,16 @@ _LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path
 _TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$|\.(test|spec)\.[cm]?[jt]sx?$")
 
 
+SOURCES = ("failure", "changes", "tests", "imports")
+
+
+def parse_sources(text: str) -> set[str]:
+    chosen = {s.strip() for s in text.split(",") if s.strip()}
+    if unknown := chosen - set(SOURCES) - {"none"}:
+        raise typer.BadParameter(f"unknown source {', '.join(sorted(unknown))}; choose from {', '.join(SOURCES)}")
+    return chosen - {"none"}
+
+
 def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry | None:
     """
     Latest failed command run under `root` within the last hour, unless the same command has
@@ -132,6 +142,10 @@ def handle(
     ),
     message: MessageOption = "",
     budget: int = typer.Option(DEFAULT_BUDGET, "-b", "--budget", min=1000, help="Token budget (estimated)"),
+    with_: str | None = typer.Option(
+        None, "--with", metavar="SOURCES",
+        help="Automatic sources to add: failure,changes,tests,imports (all, or none when you name files)",
+    ),
     copy: CopyOption = True,
     stdout: StdoutOption = False,
 ) -> None:
@@ -141,9 +155,11 @@ def handle(
     Examples:
 
     \b
-        cdg pack                           # last failure here + your changes
-        cdg pack -m "fix the discount bug" # add an instruction
-        cdg pack src/prices.py -b 8000     # add a file, smaller budget
+        cdg pack                             # last failure here + your changes
+        cdg pack src/prices.py               # just this file
+        cdg pack src/prices.py --with tests  # this file and its tests
+        cdg pack --with changes              # only your changes, no failure
+        cdg pack -m "fix the discount bug"   # add an instruction
     """
     handler = OutputHandler(stdout=stdout, copy=copy)
     log = handler.log_console
@@ -157,8 +173,11 @@ def handle(
     for path in ctx.get_target_files(targets=targets) if targets else []:
         wanted.setdefault(path, "requested")
 
+    # Naming files means "these files": nothing is added unless --with asks for it.
+    auto = parse_sources(with_) if with_ is not None else (set() if targets else set(SOURCES))
+
     refs: dict[Path, list[int]] = {}
-    failure = pick_failure(termstore.load_entries(), root)
+    failure = pick_failure(termstore.load_entries(), root) if "failure" in auto else None
     if failure:
         bases = [Path(failure.cwd), root] if failure.cwd else [root]
         refs = referenced_files(failure.output, bases, known)
@@ -166,7 +185,7 @@ def handle(
             shown = ", ".join(map(str, lines[:3])) + (", ..." if len(lines) > 3 else "")
             wanted.setdefault(path, f"line{'s' * (len(lines) > 1)} {shown} in failing output")
 
-    diff, diff_source, changed_all = working_changes(root, sorted(known))
+    diff, diff_source, changed_all = working_changes(root, sorted(known)) if "changes" in auto else ("", "", [])
     changed = [p.resolve() for p in changed_all if p.resolve() in known]
     for path in changed:
         wanted.setdefault(path, "changed")
@@ -176,12 +195,12 @@ def handle(
     def imports(path: Path) -> set[Path]:
         return deps.imports_of(path) & known
 
-    edited = {p for p, why in wanted.items() if why == "changed"}
-    for test in sorted(p for p in known if _TEST_FILE_RE.search(p.name)) if edited else []:
+    edited = {p for p, why in wanted.items() if why in ("requested", "changed")}
+    for test in sorted(p for p in known if _TEST_FILE_RE.search(p.name)) if edited and "tests" in auto else []:
         if hit := sorted(imports(test) & edited):
             wanted.setdefault(test, f"tests {hit[0].relative_to(root).as_posix()}")
 
-    for path in [p for p, why in wanted.items() if not why.endswith("failing output")]:
+    for path in [p for p, why in wanted.items() if not why.endswith("failing output")] if "imports" in auto else []:
         for dep in sorted(imports(path)):
             wanted.setdefault(dep, f"imported by {path.relative_to(root).as_posix()}")
 
@@ -232,6 +251,9 @@ def handle(
 
     over = " [red](fixed parts alone exceed the budget)[/red]" if used > budget else ""
     log.print(f"[bold]Packed ~{used:,} / {budget:,} tokens[/bold]{over}")
+    if auto != set(SOURCES):
+        on = ", ".join(s for s in SOURCES if s in auto) or "none"
+        log.print(f"  [dim]auto     {on} (--with {','.join(SOURCES)} adds more)[/dim]")
     if failure:
         when = ago(failure.started_at)
         log.print(f"  [red]failed [/red]  [cyan]{escape(failure.command)}[/cyan] [dim](exit {failure.exit_code}{', ' + when if when else ''})[/dim]")

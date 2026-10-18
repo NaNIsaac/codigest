@@ -103,3 +103,39 @@ def test_scan_resolve_follows_ts_imports_recursively(tmp_path, monkeypatch):
     out = CliRunner().invoke(app, ["scan", "src/main.ts", "-r", "-s", "--no-copy", "-y"]).output
     assert all(f'path="src/{name}"' in out for name in ("main.ts", "prices.ts", "rate.ts"))
     assert "unrelated.ts" not in out
+
+
+def test_naming_files_turns_automatic_sources_off_until_with_asks(tmp_path, monkeypatch):
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    from codigest.main import app
+
+    (tmp_path / "shop").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "shop" / "prices.py").write_text("RATE = 1\n")
+    (tmp_path / "shop" / "tax.py").write_text("TAX = 1\n")
+    (tmp_path / "tests" / "test_prices.py").write_text("from shop.prices import RATE\n")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run([*git, "add", "."], cwd=tmp_path, check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], cwd=tmp_path, check=True)
+    (tmp_path / "shop" / "prices.py").write_text("RATE = 2\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CODIGEST_HOME", str(tmp_path / "home"))
+    runner = CliRunner()
+
+    only = runner.invoke(app, ["pack", "shop/tax.py", "-s", "--no-copy"]).output
+    assert 'path="shop/tax.py" reason="requested"' in only
+    assert "<changes" not in only and "prices.py" not in only
+    assert "auto     none" in only
+
+    more = runner.invoke(app, ["pack", "shop/tax.py", "--with", "changes,tests", "-s", "--no-copy"]).output
+    assert "<changes" in more and 'path="tests/test_prices.py"' in more
+
+    own_tests = runner.invoke(app, ["pack", "shop/prices.py", "--with", "tests", "-s", "--no-copy"]).output
+    assert 'path="tests/test_prices.py" reason="tests shop/prices.py"' in own_tests and "<changes" not in own_tests
+
+    bad = runner.invoke(app, ["pack", "--with", "everything"])
+    assert bad.exit_code == 2 and "unknown source everything" in bad.output

@@ -65,6 +65,11 @@ TOOLS: list[JSON] = [
                 **_MESSAGE_PROP,
                 "targets": {"type": "array", "items": {"type": "string"}, "description": "Files/dirs to include first"},
                 "budget": {"type": "integer", "minimum": 1000, "default": 30000, "description": "Estimated token budget"},
+                "with": {
+                    "type": "array",
+                    "items": {"enum": ["failure", "changes", "tests", "imports"]},
+                    "description": "Automatic sources to include. Default: all of them, or none when targets are given",
+                },
             },
         },
     },
@@ -138,6 +143,8 @@ def _cli(command: str, args: JSON) -> str:
         argv.append("-r")
     if message := args.get("message"):
         argv += ["-m", message]
+    if (sources := args.get("with")) is not None:
+        argv += ["--with", ",".join(sources) or "none"]
     if budget := args.get("budget"):
         argv += ["-b", str(int(budget))]
     match command:
