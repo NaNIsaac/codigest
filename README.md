@@ -33,7 +33,7 @@ at.
 - **Works with agents.** Claude Code, Cursor and other MCP clients can request the same output.
 
 Codigest does not call any AI model; it only prepares what you send to one. Everything runs on
-your machine, and your source files and Git history are only read.
+your machine.
 
 <p align="center">
   <img src="docs/demo/demo.gif" alt="cdg cap runs a failing pytest, then cdg pack bundles the failure, the test file it names and the changed file" width="760">
@@ -397,13 +397,12 @@ skipped.
 ### How it works
 
 - **Baseline.** A Git repository at `.codigest/anchor/.shadow_git`, separate from your project's
-  repository. The directory is not named `.git` so editors don't mistake it for yours. `mark`
+  repository. `mark`
   commits the current state to it; `diff`, `semdiff`, `status` and `pack` compare the working tree
   against it.
 - **Captures.** One newline-delimited JSON file holds the last 200 commands; each output is capped
   at 64 KB, keeping the head and tail.
-- **Output.** File contents are XML-escaped inside `<file>` blocks, written flush-left so no stray
-  indentation reaches the prompt.
+- **Output.** File contents are XML-escaped inside `<file>` blocks.
 - **MCP.** The server is a small JSON-RPC loop over stdio. Each tool runs the regular CLI with
   `-s --no-copy`, so an agent sees exactly what you would paste.
 
@@ -415,9 +414,6 @@ cd codigest
 uv run cdg --help              # run from the checkout
 uv run --with pytest pytest -q # tests
 ```
-
-The demo GIF is rendered from recorded output by
-[`docs/demo/make_gif.py`](docs/demo/make_gif.py); its docstring explains how to record a new one.
 
 ## License
 

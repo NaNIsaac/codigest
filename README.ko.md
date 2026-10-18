@@ -29,7 +29,7 @@ Codigest는 ChatGPT나 Claude, 코딩 에이전트에게 코드에 대해 물어
 - **에이전트와 연결됩니다.** Claude Code, Cursor 같은 MCP 클라이언트가 같은 결과를 직접 받아 갑니다.
 
 Codigest는 AI 모델을 호출하지 않습니다. 모델에게 보낼 자료를 준비할 뿐입니다. 모든 작업은 내
-컴퓨터 안에서 이루어지고, 소스 파일과 Git 기록은 읽기만 합니다.
+컴퓨터 안에서 이루어집니다.
 
 <p align="center">
   <img src="docs/demo/demo.gif" alt="cdg cap으로 실패하는 pytest를 실행한 뒤, cdg pack이 실패 출력과 오류가 가리키는 테스트 파일, 바뀐 파일을 묶는 화면" width="760">
@@ -390,13 +390,11 @@ exclude_patterns = [
 
 ### 동작 방식
 
-- **기준점.** `.codigest/anchor/.shadow_git`에 있는 별도의 Git 저장소입니다. 편집기가 프로젝트
-  저장소로 착각하지 않도록 이름을 `.git`으로 짓지 않았습니다. `mark`가 현재 상태를 여기에
+- **기준점.** `.codigest/anchor/.shadow_git`에 있는 별도의 Git 저장소입니다. `mark`가 현재 상태를 여기에
   커밋하고, `diff`, `semdiff`, `status`, `pack`이 지금 파일과 비교합니다.
 - **터미널 기록.** 한 줄에 하나씩 JSON으로 적는 파일 하나에 최근 명령 200개를 보관합니다. 출력은
   명령 하나당 64 KB까지 저장하고, 넘치면 앞부분과 뒷부분만 남깁니다.
-- **출력 형식.** 파일 내용은 `<file>` 블록 안에 XML 이스케이프해서 넣고, 블록을 들여쓰지 않아
-  프롬프트에 불필요한 공백이 섞이지 않게 합니다.
+- **출력 형식.** 파일 내용은 `<file>` 블록 안에 XML 이스케이프해서 넣습니다.
 - **MCP.** stdio로 JSON-RPC를 주고받는 작은 서버입니다. 각 도구는 일반 CLI를 `-s --no-copy`로
   실행하므로, 에이전트는 내가 붙여 넣을 내용과 똑같은 것을 받습니다.
 
@@ -408,9 +406,6 @@ cd codigest
 uv run cdg --help              # 내려받은 소스에서 바로 실행
 uv run --with pytest pytest -q # 테스트
 ```
-
-데모 GIF는 실제로 기록한 출력을 [`docs/demo/make_gif.py`](docs/demo/make_gif.py)가 그려서 만듭니다.
-다시 녹화하는 방법은 그 파일 맨 위의 설명에 있습니다.
 
 ## 라이선스
 
