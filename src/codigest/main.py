@@ -19,27 +19,30 @@ logger.add(sys.stderr, level="WARNING")
 
 app = typer.Typer(
     name="codigest",
-    help="Hand an LLM your failing command, the code it points at and your changes.",
+    help="Share the code context you choose with an AI: the project, a few files, what changed, or a failing command.",
     add_completion=False,
     no_args_is_help=True
 )
 
-# Registration order is the order `cdg --help` lists them: daily use first.
-app.command(name="pack")(pack.handle)
+# `cdg --help` groups commands by what you are trying to do, in the order most people need them.
+SHARE, CHANGES, TERMINAL, AGENTS, SETUP = (
+    "Share code", "Share changes", "Share a failing command", "Agents", "Setup",
+)
+app.command(name="scan", rich_help_panel=SHARE)(scan.handle)
+app.command(name="digest", rich_help_panel=SHARE)(digest.handle)
+app.command(name="tree", rich_help_panel=SHARE)(tree.handle)
+app.command(name="mark", rich_help_panel=CHANGES)(mark.handle)
+app.command(name="diff", rich_help_panel=CHANGES)(diff.handle)
+app.command(name="semdiff", rich_help_panel=CHANGES)(semdiff.handle)
 # `cap` is a plain command, not a group: its first argument is the wrapped
 # program, which a Typer group would try to resolve as a subcommand.
-app.command(name="cap", context_settings=cap.CONTEXT_SETTINGS)(cap.handle)
-app.add_typer(term.app, name="term")
-app.command(name="mark")(mark.handle)
-app.command(name="diff")(diff.handle)
-app.command(name="semdiff")(semdiff.handle)
-app.command(name="scan")(scan.handle)
-app.command(name="digest")(digest.handle)
-app.command(name="tree")(tree.handle)
-app.command(name="status")(status.handle)
-app.command(name="init")(init.handle)
-app.command(name="clean")(clean.handle)
-app.command(name="mcp")(mcp.handle)
+app.command(name="cap", context_settings=cap.CONTEXT_SETTINGS, rich_help_panel=TERMINAL)(cap.handle)
+app.add_typer(term.app, name="term", rich_help_panel=TERMINAL)
+app.command(name="pack", rich_help_panel=TERMINAL)(pack.handle)
+app.command(name="mcp", rich_help_panel=AGENTS)(mcp.handle)
+app.command(name="status", rich_help_panel=SETUP)(status.handle)
+app.command(name="init", rich_help_panel=SETUP)(init.handle)
+app.command(name="clean", rich_help_panel=SETUP)(clean.handle)
 
 def version_callback(value: bool) -> None:
     """
