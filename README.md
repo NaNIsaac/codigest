@@ -306,6 +306,10 @@ Limitations:
 | `digest` | Signatures and docstrings only |
 | `tree` | Directory tree |
 
+When nothing has been captured, `terminal_history` falls back to the native shell history, which
+has no output, exit code or working directory. The fallback is refused with `here` (the default)
+or `failed` set, since it cannot be filtered on either, and command text is redacted.
+
 The tools return the same text the CLI prints. None of them moves the baseline, and paths
 outside the project the server was started in are refused.
 
