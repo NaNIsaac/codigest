@@ -6,6 +6,7 @@ from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption
 
 lazy from rich.progress import Progress, SpinnerColumn, TextColumn
 lazy from ..core import prompts, shadow, tags, common
+lazy from ..core.redact import redact_diff
 lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
@@ -60,7 +61,7 @@ def handle(
         current_files = ctx.get_target_files(resolve_deps=resolve)
 
         # Compare Working Tree vs Anchor
-        diff_content = anchor.get_changes(current_files)
+        diff_content = redact_diff(anchor.get_changes(current_files))
 
         progress.update(task, completed=100)
 

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 lazy import pyperclip
 from rich.console import Console
 
+from .redact import redact_code
+
 console = Console()
 err_console = Console(stderr=True)
 
@@ -42,6 +44,9 @@ class OutputHandler:
         """
         Executes clipboard copy, stdout print, or file save action cleanly.
         """
+        # Every command's context passes through here, so this is the one place that
+        # guarantees no unambiguous token (API key, private key, URL password) leaves.
+        content = redact_code(content)
         self.copy_to_clipboard(content, item_name=item_name)
 
         if self.stdout:

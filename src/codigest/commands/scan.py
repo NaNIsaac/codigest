@@ -80,6 +80,9 @@ def handle(
   Scope: {total_files} files
   Est. Size: {decimal(total_size)}
   Est. Tokens: ~{est_tokens:,}""", expand=False))
+    if ctx.withheld:
+        names = ", ".join(p.relative_to(root_path).as_posix() for p in ctx.withheld)
+        log_console.print(f"[yellow]Withheld (may contain secrets):[/yellow] {names}", highlight=False)
 
     TOKEN_THRESHOLD = 30000
     FILE_COUNT_THRESHOLD = 100

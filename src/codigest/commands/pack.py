@@ -16,6 +16,7 @@ from ..options import CopyOption, MessageOption, StdoutOption
 
 lazy import html
 lazy from ..core import common, git_ops, processor, resolver, shadow, tags, termstore, tokenizer
+lazy from ..core.redact import redact_diff
 lazy from ..core.output import OutputHandler
 
 DEFAULT_BUDGET = 30_000
@@ -32,9 +33,6 @@ _TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$|\.(test|spec)\.[cm]?[jt
 _JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
 # Relative specifiers only: `from './x'`, `import './x'`, `require('./x')`, `import('./x')`.
 _JS_IMPORT_RE = re.compile(r"""(?:\bfrom|\bimport|\brequire\(|\bimport\()\s*['"](\.{1,2}/[^'"]+)['"]""")
-
-_SECRET_FILE_RE = re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx)$|^id_(rsa|dsa|ecdsa|ed25519)$")
-
 
 def pick_failure(entries: list[termstore.Entry], root: Path) -> termstore.Entry | None:
     """
@@ -143,10 +141,10 @@ def working_changes(root: Path, files: list[Path]) -> tuple[str, str, list[Path]
     anchor = shadow.ContextAnchor(root)
     if anchor.has_history():
         diff = anchor.get_changes(files)
-        return diff, f"since cdg mark ({anchor.get_last_update_time()})", changed_paths(diff, root)
+        return redact_diff(diff), f"since cdg mark ({anchor.get_last_update_time()})", changed_paths(diff, root)
     if git := git_ops.working_changes(root):
         diff, untracked = git
-        return diff, "uncommitted changes (git)", changed_paths(diff, root) + untracked
+        return redact_diff(diff), "uncommitted changes (git)", changed_paths(diff, root) + untracked
     return "", "", []
 
 
@@ -190,8 +188,8 @@ def handle(
             shown = ", ".join(map(str, lines[:3])) + (", ..." if len(lines) > 3 else "")
             wanted.setdefault(path, f"line{'s' * (len(lines) > 1)} {shown} in failing output")
 
-    diff, diff_source, changed = working_changes(root, sorted(known))
-    changed = [p.resolve() for p in changed if p.resolve() in known]
+    diff, diff_source, changed_all = working_changes(root, sorted(known))
+    changed = [p.resolve() for p in changed_all if p.resolve() in known]
     for path in changed:
         wanted.setdefault(path, "changed")
 
@@ -228,11 +226,14 @@ def handle(
     blocks: list[str] = []
     included: list[tuple[str, str]] = []
     omitted: list[tuple[str, str]] = []
+    # Credential files never get here (file selection withholds them); name the ones that
+    # were asked for or changed, so it is clear they were left out on purpose.
+    named_or_changed = {p.resolve() for p in targets or []} | {p.resolve() for p in changed_all}
+    for path in ctx.withheld:
+        if path.resolve() in named_or_changed or any(path.is_relative_to(t.resolve()) for t in targets or [] if t.is_dir()):
+            omitted.append((path.relative_to(root).as_posix(), "may contain secrets"))
     for path, reason in wanted.items():
         rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
-        if _SECRET_FILE_RE.search(path.name):
-            omitted.append((rel, "may contain secrets"))
-            continue
         # Files you changed or asked for come whole; files the output only points at come as excerpts.
         part = excerpt(path, refs[path]) if path in refs and reason.endswith("failing output") and path not in changed else None
         content, shown = part or (processor.read_file_content(path, add_line_numbers=True), "")

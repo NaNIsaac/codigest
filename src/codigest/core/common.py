@@ -12,6 +12,7 @@ from rich.console import Console
 
 # Core modules
 from . import scanner, resolver
+from .redact import is_secret_file
 
 console = Console()
 
@@ -33,6 +34,7 @@ class ProjectContext:
             
         # 2. 루트 찾기
         self.root_path = self._find_project_root(self.start_path)
+        self.withheld: list[Path] = []
         self.config_extensions, self.config_ignores = self._load_config_filters()
 
     def _find_project_root(self, start_path: Path) -> Path:
@@ -109,7 +111,9 @@ class ProjectContext:
         if resolve_deps:
             files = resolver.resolve_dependencies(self.root_path, files)
 
-        return files
+        # 5. Never hand out credential files, but remember them so commands can say so.
+        self.withheld = sorted({f for f in files if is_secret_file(f.name)} | set(self.withheld))
+        return [f for f in files if not is_secret_file(f.name)]
 
 # Helper for quick access
 def get_context(targets: Targets | None = None) -> ProjectContext:
