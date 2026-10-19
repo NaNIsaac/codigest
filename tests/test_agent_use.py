@@ -170,6 +170,15 @@ def test_scan_shares_a_line_range_numbered(tmp_path, monkeypatch):
     assert "x1 = 1\n" not in out
 
 
+def test_a_mistyped_range_says_what_the_syntax_is(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"a.py": "a = 1\n"})
+
+    result = CliRunner().invoke(app, ["scan", "a.py:1:3"])
+
+    assert result.exit_code == 2
+    assert "FILE:START-END" in result.output
+
+
 def test_a_range_past_the_end_is_cut_to_the_file(tmp_path, monkeypatch):
     project(tmp_path, monkeypatch, {"a.py": "a = 1\nb = 2\n"})
 

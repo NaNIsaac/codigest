@@ -26,7 +26,8 @@ def _parse_targets(raw: list[str]) -> tuple[list[Path], dict[Path, list[tuple[in
             path = Path(m["path"])
             span = (int(m["lo"]), int(m["hi"]) if m["hi"] else None)
         if not path.exists():
-            raise typer.BadParameter(f"{item} does not exist", param_hint="targets")
+            hint = " (a line range is FILE:START-END or FILE:LINE)" if ":" in item[2:] else ""
+            raise typer.BadParameter(f"{item} does not exist{hint}", param_hint="targets")
         path = path.resolve()
         if span:
             ranges.setdefault(path, []).append(span)
