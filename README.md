@@ -57,9 +57,11 @@ uv tool update-shell                              # then restart your terminal
 The command is `codigest`, or `cdg` for short. No setup is needed in your projects.
 If the install fails with a syntax error on `lazy import`, run `uv self update` and try again.
 
-Every command below copies its result to the clipboard. Add `-s` to also print it (for pipes and
-redirects), `-o FILE` to also write it to a file, `--no-copy` to leave the clipboard alone, and
-`-m "..."` to put your question or instruction in it.
+In a terminal, every command below copies its result to the clipboard. Add `-s` to also print it,
+`-o FILE` to also write it to a file, `--no-copy` to leave the clipboard alone, and `-m "..."` to
+put your question or instruction in it. When the output goes to a pipe or a file instead
+(`cdg scan > ctx.xml`, `cdg digest | less`, a script, a coding agent's shell), it is printed and
+the clipboard is left alone; add `--copy` to copy it anyway.
 
 ## 1. Share your project with an AI chat
 
@@ -114,9 +116,61 @@ the next section.
 
 ```bash
 cdg scan src/app.py -r       # one file and the local files it imports, recursively
-cdg scan src/billing/        # one folder
-cdg digest                   # Python signatures and docstrings only, much smaller
-cdg tree                     # just the file tree
+cdg scan src/billing/ docs/  # folders, files, or both
+cdg scan src/app.py -l       # with line numbers, so answers can say "line 42"
+cdg digest                   # signatures and docstrings only, much smaller
+cdg digest src/billing/      # the same for one folder
+cdg tree -L 2                # the file tree, two levels deep
+```
+
+`digest` is the overview to start a conversation with. It lists every function, class and
+top-level variable of Python files, and the functions and `%%` sections of MATLAB files, in the
+order they appear, with the line they start on and the first line of their docstring (or, in
+MATLAB, of their help comment):
+
+```console
+$ cdg digest -s
+<code_digest project="project" contents="signatures and docstrings, no bodies">
+<project_structure>
+├── .gitignore
+├── legacy
+│   └── discount.m
+├── prices.py
+└── test_prices.py
+</project_structure>
+<file path="legacy/discount.m">
+1: function p = discount(price, percent)
+       Price after taking off percent percent.
+3: %% Apply
+</file>
+<file path="prices.py">
+ 1: TAX_RATE = 0.1
+ 4: def apply_discount(price: float, percent: float) -> float
+        Price after taking off `percent` percent.
+ 9: class Cart
+        Items and the discount that applies to all of them.
+12:   def __init__(self, percent: float=0)
+16:   def total(self) -> float
+          Sum after discount and tax.
+</file>
+<file path="test_prices.py">
+4: def test_ten_percent()
+</file>
+</code_digest>
+Digest 3 files, ~192 tokens
+```
+
+A model that has seen this can ask for exactly what it needs ("show me `Cart.total`"), and
+`cdg scan prices.py -l` gives it the code with the same line numbers.
+
+`tree -L` keeps a large or vendored folder from flooding the output:
+
+```console
+$ cdg tree -L 1
+├── .gitignore
+├── legacy/ (1 file)
+├── prices.py
+└── test_prices.py
 ```
 
 To share what changed while you work, set a baseline first:
@@ -166,7 +220,7 @@ F                                                                      [100%]
 _____________________________ test_ten_percent ______________________________
 
     def test_ten_percent():
-&gt;       assert apply_discount(200, 10) == 180
+>       assert apply_discount(200, 10) == 180
 E       assert -1800 == 180
 E        +  where -1800 = apply_discount(200, 10)
 
@@ -249,6 +303,22 @@ claude mcp add --scope user codigest -- cdg mcp      # Claude Code
 Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command `cdg` and args
 `["mcp"]`. The tools are listed under [MCP tools](#mcp-tools).
 
+An agent that can run shell commands needs no setup at all. Its shell is not a terminal, so `cdg`
+prints the result for it and never touches your clipboard. A way of working that suits agents:
+
+```bash
+cdg tree -L 2                      # where things are
+cdg digest src/                    # what is defined where, with line numbers
+cdg scan src/prices.py -l          # read the parts that matter, numbered the same way
+cdg mark                           # before editing
+cdg semdiff                        # afterwards: which functions it changed
+cdg cap -- pytest -q && cdg pack   # run the tests; on failure, the pack has what to fix
+```
+
+The code in every block is exactly as written in the file (`->`, `<`, `&` are not escaped), so
+code copied out of it can be pasted back. A large `scan` with nobody to answer the size question
+stops with a hint instead of waiting; `-y` takes it all.
+
 ## Reference
 
 - [All commands](#all-commands)
@@ -256,7 +326,7 @@ Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command
 - [MCP tools](#mcp-tools)
 - [Configuration](#configuration)
 - [Privacy and safety](#privacy-and-safety)
-- [Upgrading from 0.8](#upgrading-from-08)
+- [Upgrading from 0.9](#upgrading-from-09)
 - [How it works](#how-it-works)
 - [Development](#development)
 
@@ -267,8 +337,8 @@ Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command
 | Command | What it gives you | Writes to your project |
 | --- | --- | --- |
 | `scan` | The whole project, or chosen paths, as one block | nothing |
-| `digest` | Signatures and docstrings, no bodies (Python) | nothing |
-| `tree` | Project tree | nothing |
+| `digest` | Numbered signatures and docstrings, no bodies (Python, MATLAB) | nothing |
+| `tree` | Project tree (`-L N` limits the depth) | nothing |
 | `mark` | Sets the baseline | `.codigest/` |
 | `diff` | Text diff since the baseline | nothing |
 | `semdiff` | Function and class level changes since the baseline (Python) | nothing |
@@ -280,8 +350,9 @@ Other clients (Cursor, VS Code, Claude Desktop): add a stdio server with command
 | `init` | `.codigest/config.toml` for [file filters](#configuration) | `.codigest/`, `.gitignore` |
 | `clean` | Deletes `.codigest/` (asks first, `-y` to skip) | removes `.codigest/` |
 
-Shared options: `-s` / `--stdout` also prints the result (status messages go to stderr),
-`--no-copy` skips the clipboard, `-o FILE` also writes it to a file, `-m` / `--message` adds an
+Shared options: `-s` / `--stdout` also prints the result (status messages go to stderr; on by
+default when piped), `--copy` / `--no-copy` overrides the clipboard default (copy in a terminal,
+not when piped), `-o FILE` also writes it to a file, `-m` / `--message` adds an
 instruction.
 `scan -l` adds line numbers, `scan -a` ignores the config filters, `scan -y` skips the
 confirmation (CI). `-r` / `--resolve` on `scan`, `diff`, `semdiff` and `digest` also pulls in
@@ -384,6 +455,14 @@ skipped.
 - **Nothing leaves your machine.** Codigest makes no network requests. Context goes where you
   paste it, or to the MCP client you connected.
 
+### Upgrading from 0.9
+
+- Piped or redirected output is printed without `-s` and no longer copied; add `--copy` if a
+  script relied on the clipboard.
+- `<file>` blocks hold the code verbatim instead of XML-escaped. A custom template in
+  `.codigest/prompts.toml` now receives the blocks unescaped too; only `{instruction}` is escaped.
+- `digest` output is numbered, in source order, with docstrings, and takes several paths.
+
 ### Upgrading from 0.8
 
 - `scan`, `diff`, `semdiff` and `digest` no longer save into `.codigest/*.txt`; use `-o FILE`.
@@ -402,7 +481,9 @@ skipped.
   against it.
 - **Captures.** One newline-delimited JSON file holds the last 200 commands; each output is capped
   at 64 KB, keeping the head and tail.
-- **Output.** File contents are XML-escaped inside `<file>` blocks.
+- **Output.** File contents go into `<file>` blocks verbatim. Only a closing tag of one of
+  Codigest's own blocks inside a file (a literal `</file>`) is written as `&lt;/file>`, so it
+  cannot end the block early.
 - **MCP.** The server is a small JSON-RPC loop over stdio. Each tool runs the regular CLI with
   `-s --no-copy`, so an agent sees exactly what you would paste.
 

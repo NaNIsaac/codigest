@@ -54,9 +54,11 @@ uv tool update-shell                              # 끝나면 터미널을 다�
 없습니다. 설치할 때 `lazy import` 부분에서 문법 오류가 나면 `uv self update`를 한 뒤 다시
 설치하세요.
 
-아래 명령은 모두 결과를 클립보드에 복사합니다. `-s`를 붙이면 화면에도 출력하고(파이프나
-리다이렉트용), `-o 파일`을 붙이면 파일로도 저장하며, `--no-copy`를 붙이면 클립보드를 건드리지
-않습니다. `-m "..."`로 질문이나 요청을 함께 넣을 수 있습니다.
+터미널에서 실행하면 아래 명령은 모두 결과를 클립보드에 복사합니다. `-s`를 붙이면 화면에도
+출력하고, `-o 파일`을 붙이면 파일로도 저장하며, `--no-copy`를 붙이면 클립보드를 건드리지
+않습니다. `-m "..."`로 질문이나 요청을 함께 넣을 수 있습니다. 출력이 파이프나 파일로 갈 때는
+(`cdg scan > ctx.xml`, `cdg digest | less`, 스크립트, 코딩 에이전트의 셸) 결과를 그대로 출력하고
+클립보드는 건드리지 않습니다. 그래도 복사하려면 `--copy`를 붙입니다.
 
 ## 1. 프로젝트를 AI 채팅에 보여 주기
 
@@ -111,9 +113,60 @@ def test_ten_percent():
 
 ```bash
 cdg scan src/app.py -r       # 파일 하나와, 그 파일이 import하는 프로젝트 파일 전부
-cdg scan src/billing/        # 폴더 하나
-cdg digest                   # Python 함수 선언과 docstring만, 훨씬 짧음
-cdg tree                     # 파일 트리만
+cdg scan src/billing/ docs/  # 폴더나 파일 여러 개
+cdg scan src/app.py -l       # 줄 번호를 붙여서 ("42번째 줄"처럼 답할 수 있게)
+cdg digest                   # 선언과 docstring만, 훨씬 짧음
+cdg digest src/billing/      # 폴더 하나만
+cdg tree -L 2                # 파일 트리, 두 단계까지만
+```
+
+`digest`는 대화를 시작할 때 보여 주기 좋은 개요입니다. Python 파일의 함수, 클래스, 최상위 변수와
+MATLAB 파일의 함수, `%%` 섹션을 나오는 순서대로, 시작하는 줄 번호와 docstring(MATLAB은 도움말
+주석)의 첫 줄을 붙여 보여 줍니다.
+
+```console
+$ cdg digest -s
+<code_digest project="project" contents="signatures and docstrings, no bodies">
+<project_structure>
+├── .gitignore
+├── legacy
+│   └── discount.m
+├── prices.py
+└── test_prices.py
+</project_structure>
+<file path="legacy/discount.m">
+1: function p = discount(price, percent)
+       Price after taking off percent percent.
+3: %% Apply
+</file>
+<file path="prices.py">
+ 1: TAX_RATE = 0.1
+ 4: def apply_discount(price: float, percent: float) -> float
+        Price after taking off `percent` percent.
+ 9: class Cart
+        Items and the discount that applies to all of them.
+12:   def __init__(self, percent: float=0)
+16:   def total(self) -> float
+          Sum after discount and tax.
+</file>
+<file path="test_prices.py">
+4: def test_ten_percent()
+</file>
+</code_digest>
+Digest 3 files, ~192 tokens
+```
+
+이걸 본 모델은 필요한 것만 콕 집어 달라고 할 수 있고("`Cart.total`을 보여 줘"),
+`cdg scan prices.py -l`은 같은 줄 번호로 코드를 보여 줍니다.
+
+`tree -L`을 쓰면 크거나 외부 라이브러리가 들어 있는 폴더가 출력을 덮지 않습니다.
+
+```console
+$ cdg tree -L 1
+├── .gitignore
+├── legacy/ (1 file)
+├── prices.py
+└── test_prices.py
 ```
 
 작업하면서 바뀐 부분을 보여 주려면 먼저 기준점을 잡아 둡니다.
@@ -163,7 +216,7 @@ F                                                                      [100%]
 _____________________________ test_ten_percent ______________________________
 
     def test_ten_percent():
-&gt;       assert apply_discount(200, 10) == 180
+>       assert apply_discount(200, 10) == 180
 E       assert -1800 == 180
 E        +  where -1800 = apply_discount(200, 10)
 
@@ -245,6 +298,23 @@ claude mcp add --scope user codigest -- cdg mcp      # Claude Code
 Cursor, VS Code, Claude Desktop 같은 다른 클라이언트에서는 명령 `cdg`, 인자 `["mcp"]`로 stdio
 서버를 추가하면 됩니다. 제공하는 도구는 [MCP 도구](#mcp-도구)에 있습니다.
 
+셸 명령을 실행할 수 있는 에이전트라면 아무 설정도 필요 없습니다. 에이전트의 셸은 터미널이 아니라서
+`cdg`가 결과를 그대로 출력해 주고, 내 클립보드는 건드리지 않습니다. 에이전트에게 맞는 사용 순서는
+이렇습니다.
+
+```bash
+cdg tree -L 2                      # 어디에 무엇이 있는지
+cdg digest src/                    # 무엇이 어디에 정의되어 있는지, 줄 번호와 함께
+cdg scan src/prices.py -l          # 필요한 부분만, 같은 줄 번호로
+cdg mark                           # 고치기 전에
+cdg semdiff                        # 고친 뒤: 어떤 함수가 바뀌었는지
+cdg cap -- pytest -q && cdg pack   # 테스트 실행, 실패하면 pack에 고칠 거리가 모임
+```
+
+모든 블록의 코드는 파일에 적힌 그대로입니다(`->`, `<`, `&`를 이스케이프하지 않음). 그래서 블록에서
+복사한 코드를 그대로 붙여 넣을 수 있습니다. 대답해 줄 사람이 없을 때 큰 `scan`은 크기를 묻고
+기다리는 대신 안내와 함께 멈춥니다. 전부 받으려면 `-y`를 붙입니다.
+
 ## 참고 자료
 
 - [전체 명령](#전체-명령)
@@ -252,7 +322,7 @@ Cursor, VS Code, Claude Desktop 같은 다른 클라이언트에서는 명령 `c
 - [MCP 도구](#mcp-도구)
 - [설정](#설정)
 - [개인정보와 안전](#개인정보와-안전)
-- [0.8에서 올라올 때](#08에서-올라올-때)
+- [0.9에서 올라올 때](#09에서-올라올-때)
 - [동작 방식](#동작-방식)
 - [개발](#개발)
 
@@ -263,8 +333,8 @@ Cursor, VS Code, Claude Desktop 같은 다른 클라이언트에서는 명령 `c
 | 명령 | 하는 일 | 프로젝트에 만드는 파일 |
 | --- | --- | --- |
 | `scan` | 프로젝트 전체나 지정한 경로를 하나로 묶기 | 없음 |
-| `digest` | 함수 본문을 뺀 선언과 docstring (Python) | 없음 |
-| `tree` | 프로젝트 파일 트리 | 없음 |
+| `digest` | 줄 번호가 붙은 선언과 docstring, 본문 제외 (Python, MATLAB) | 없음 |
+| `tree` | 프로젝트 파일 트리 (`-L N`으로 깊이 제한) | 없음 |
 | `mark` | 기준점 잡기 | `.codigest/` |
 | `diff` | 기준점 이후의 diff | 없음 |
 | `semdiff` | 기준점 이후 함수·클래스 단위 변경 (Python) | 없음 |
@@ -276,8 +346,9 @@ Cursor, VS Code, Claude Desktop 같은 다른 클라이언트에서는 명령 `c
 | `init` | [파일 필터](#설정)용 `.codigest/config.toml` 만들기 | `.codigest/`, `.gitignore` |
 | `clean` | `.codigest/` 지우기 (먼저 물어보며, `-y`면 묻지 않음) | `.codigest/` 삭제 |
 
-공통 옵션: `-s` / `--stdout`은 결과를 화면에도 출력하고(상태 메시지는 stderr로), `--no-copy`는
-복사하지 않으며, `-o 파일`은 파일로도 저장하고, `-m` / `--message`는 요청 문구를 덧붙입니다.
+공통 옵션: `-s` / `--stdout`은 결과를 화면에도 출력하고(상태 메시지는 stderr로, 파이프로 보낼
+때는 기본으로 켜짐), `--copy` / `--no-copy`는 클립보드 기본값(터미널에서는 복사, 파이프로 보낼
+때는 복사 안 함)을 바꾸며, `-o 파일`은 파일로도 저장하고, `-m` / `--message`는 요청 문구를 덧붙입니다.
 `scan -l`은 줄 번호를 붙이고, `scan -a`는 설정 필터를 무시하며, `scan -y`는 확인 없이
 진행합니다(CI용). `scan`, `diff`, `semdiff`, `digest`에 `-r` / `--resolve`를 붙이면 대상 파일이
 import하는 프로젝트 파일도 함께 넣습니다. `cdg <명령> --help`로 모든 옵션을 볼 수 있습니다.
@@ -378,6 +449,14 @@ exclude_patterns = [
 - **외부로 보내지 않습니다.** Codigest는 네트워크를 쓰지 않습니다. 결과는 내가 붙여 넣은 곳이나
   내가 연결한 MCP 클라이언트로만 갑니다.
 
+### 0.9에서 올라올 때
+
+- 파이프나 리다이렉트로 보낸 출력은 `-s` 없이도 출력되고 클립보드에 복사되지 않습니다. 스크립트가
+  클립보드에 기대고 있었다면 `--copy`를 붙이세요.
+- `<file>` 블록에 코드를 XML 이스케이프하지 않고 그대로 넣습니다. `.codigest/prompts.toml`의
+  사용자 템플릿도 블록을 이스케이프 없이 받으며, `{instruction}`만 이스케이프합니다.
+- `digest` 출력에 줄 번호와 docstring이 붙고, 소스 순서대로 나오며, 경로를 여러 개 받습니다.
+
 ### 0.8에서 올라올 때
 
 - `scan`, `diff`, `semdiff`, `digest`가 더 이상 `.codigest/*.txt`에 저장하지 않습니다. 파일이
@@ -394,7 +473,8 @@ exclude_patterns = [
   커밋하고, `diff`, `semdiff`, `status`, `pack`이 지금 파일과 비교합니다.
 - **터미널 기록.** 한 줄에 하나씩 JSON으로 적는 파일 하나에 최근 명령 200개를 보관합니다. 출력은
   명령 하나당 64 KB까지 저장하고, 넘치면 앞부분과 뒷부분만 남깁니다.
-- **출력 형식.** 파일 내용은 `<file>` 블록 안에 XML 이스케이프해서 넣습니다.
+- **출력 형식.** 파일 내용은 `<file>` 블록 안에 그대로 넣습니다. 파일 안에 Codigest 블록의 닫는
+  태그(`</file>` 같은)가 그대로 있을 때만 `&lt;/file>`로 바꿔, 블록이 중간에 끝나지 않게 합니다.
 - **MCP.** stdio로 JSON-RPC를 주고받는 작은 서버입니다. 각 도구는 일반 CLI를 `-s --no-copy`로
   실행하므로, 에이전트는 내가 붙여 넣을 내용과 똑같은 것을 받습니다.
 
