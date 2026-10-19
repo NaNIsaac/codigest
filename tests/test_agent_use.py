@@ -78,6 +78,14 @@ def test_digest_is_numbered_in_source_order_with_docstrings(tmp_path, monkeypatc
     assert "6:   def run(self)" in out
 
 
+def test_digest_starts_with_the_module_docstring(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"m.py": '"""Coherence kernels.\n\nLonger text."""\n\nX = 1\n'})
+
+    out = CliRunner().invoke(app, ["digest"]).stdout
+
+    assert '1: """Coherence kernels."""\n5: X = 1' in out
+
+
 def test_digest_covers_only_the_paths_given(tmp_path, monkeypatch):
     project(tmp_path, monkeypatch, {"src/a.py": "def a(): pass\n", "tests/t.py": "def t(): pass\n"})
 

@@ -170,14 +170,33 @@ def _first_line(doc: str) -> str:
     return line if len(line) <= DOC_WIDTH else line[: DOC_WIDTH - 3] + "..."
 
 
+def _module_docstring(code: str) -> tuple[int, str] | None:
+    """Line and text of the module docstring, which says what the file is for."""
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(code)
+    except SyntaxError, ValueError:
+        return None
+    if (doc := ast.get_docstring(tree)) and doc.strip():
+        return tree.body[0].lineno, doc
+    return None
+
+
 def summarize(code: str) -> str:
     """One line per definition in source order, numbered like `scan -l` so a reader can
-    jump to it, with the first line of its docstring underneath."""
-    if not (symbols := parse_code(code)):
+    jump to it, with the first line of its docstring underneath. The module docstring
+    comes first."""
+    symbols = parse_code(code)
+    module_doc = _module_docstring(code)
+    if not symbols and not module_doc:
         return ""
 
-    width = len(str(max(sym.line for sym in symbols.values())))
+    numbers = [sym.line for sym in symbols.values()] + ([module_doc[0]] if module_doc else [])
+    width = len(str(max(numbers)))
     lines = []
+    if module_doc:
+        lines.append(f'{module_doc[0]:>{width}}: """{_first_line(module_doc[1])}"""')
     for sym in sorted(symbols.values(), key=lambda s: s.line):
         depth = sym.name.count(".") if sym.type in ("method", "attribute") else 0
         indent = "  " * depth
