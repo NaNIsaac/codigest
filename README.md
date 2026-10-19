@@ -124,6 +124,9 @@ cdg digest src/billing/      # the same for one folder
 cdg tree -L 2                # the file tree, two levels deep
 ```
 
+The examples from here on are the same project a little later: `prices.py` has grown a `Cart`
+class, and an old MATLAB version sits in `legacy/`.
+
 `digest` is the overview to start a conversation with. It lists every function, class and
 top-level variable of Python files, and the functions and `%%` sections of MATLAB files, in the
 order they appear, with the line they start on and the first line of their docstring (or, in

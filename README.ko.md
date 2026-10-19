@@ -121,6 +121,9 @@ cdg digest src/billing/      # 폴더 하나만
 cdg tree -L 2                # 파일 트리, 두 단계까지만
 ```
 
+여기부터의 예시는 같은 프로젝트가 조금 자란 뒤입니다. `prices.py`에 `Cart` 클래스가 생겼고,
+`legacy/`에 예전 MATLAB 버전이 있습니다.
+
 `digest`는 대화를 시작할 때 보여 주기 좋은 개요입니다. Python 파일의 함수, 클래스, 최상위 변수와
 MATLAB 파일의 함수, `%%` 섹션을 나오는 순서대로, 시작하는 줄 번호와 docstring(MATLAB은 도움말
 주석)의 첫 줄을 붙여 보여 줍니다. 클래스 속성과 dataclass 필드는 값과 함께 나오며, 길면 줄여서
