@@ -118,6 +118,7 @@ the next section.
 cdg scan src/app.py -r       # one file and the local files it imports, recursively
 cdg scan src/billing/ docs/  # folders, files, or both
 cdg scan src/app.py -l       # with line numbers, so answers can say "line 42"
+cdg scan src/app.py:40-80    # only lines 40 to 80, numbered (src/app.py:42 for one line)
 cdg digest                   # signatures and docstrings only, much smaller
 cdg digest src/billing/      # the same for one folder
 cdg tree -L 2                # the file tree, two levels deep
@@ -126,7 +127,8 @@ cdg tree -L 2                # the file tree, two levels deep
 `digest` is the overview to start a conversation with. It lists every function, class and
 top-level variable of Python files, and the functions and `%%` sections of MATLAB files, in the
 order they appear, with the line they start on and the first line of their docstring (or, in
-MATLAB, of their help comment):
+MATLAB, of their help comment). Class attributes and dataclass fields are listed with their
+values, shortened when long:
 
 ```console
 $ cdg digest -s
@@ -161,7 +163,24 @@ Digest 3 files, ~192 tokens
 ```
 
 A model that has seen this can ask for exactly what it needs ("show me `Cart.total`"), and
-`cdg scan prices.py -l` gives it the code with the same line numbers.
+`cdg scan prices.py:16-19` gives it just that method, numbered the same way:
+
+```console
+$ cdg scan prices.py:16-19 -s
+<project_snapshot project="project">
+<project_structure>
+└── prices.py
+</project_structure>
+<source_code>
+<file path="prices.py" lines="16-19">
+16:     def total(self) -> float:
+17:         """Sum after discount and tax."""
+18:         subtotal = sum(apply_discount(p, self.percent) for p in self.items)
+19:         return subtotal * (1 + TAX_RATE)
+</file>
+</source_code>
+</project_snapshot>
+```
 
 `tree -L` keeps a large or vendored folder from flooding the output:
 
@@ -309,7 +328,7 @@ prints the result for it and never touches your clipboard. A way of working that
 ```bash
 cdg tree -L 2                      # where things are
 cdg digest src/                    # what is defined where, with line numbers
-cdg scan src/prices.py -l          # read the parts that matter, numbered the same way
+cdg scan src/prices.py:16-19      # read the parts that matter, numbered the same way
 cdg mark                           # before editing
 cdg semdiff                        # afterwards: which functions it changed
 cdg cap -- pytest -q && cdg pack   # run the tests; on failure, the pack has what to fix

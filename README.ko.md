@@ -115,6 +115,7 @@ def test_ten_percent():
 cdg scan src/app.py -r       # 파일 하나와, 그 파일이 import하는 프로젝트 파일 전부
 cdg scan src/billing/ docs/  # 폴더나 파일 여러 개
 cdg scan src/app.py -l       # 줄 번호를 붙여서 ("42번째 줄"처럼 답할 수 있게)
+cdg scan src/app.py:40-80    # 40~80번째 줄만, 번호를 붙여서 (한 줄은 src/app.py:42)
 cdg digest                   # 선언과 docstring만, 훨씬 짧음
 cdg digest src/billing/      # 폴더 하나만
 cdg tree -L 2                # 파일 트리, 두 단계까지만
@@ -122,7 +123,8 @@ cdg tree -L 2                # 파일 트리, 두 단계까지만
 
 `digest`는 대화를 시작할 때 보여 주기 좋은 개요입니다. Python 파일의 함수, 클래스, 최상위 변수와
 MATLAB 파일의 함수, `%%` 섹션을 나오는 순서대로, 시작하는 줄 번호와 docstring(MATLAB은 도움말
-주석)의 첫 줄을 붙여 보여 줍니다.
+주석)의 첫 줄을 붙여 보여 줍니다. 클래스 속성과 dataclass 필드는 값과 함께 나오며, 길면 줄여서
+보여 줍니다.
 
 ```console
 $ cdg digest -s
@@ -157,7 +159,7 @@ Digest 3 files, ~192 tokens
 ```
 
 이걸 본 모델은 필요한 것만 콕 집어 달라고 할 수 있고("`Cart.total`을 보여 줘"),
-`cdg scan prices.py -l`은 같은 줄 번호로 코드를 보여 줍니다.
+`cdg scan prices.py:16-19`는 그 메서드만 같은 줄 번호로 보여 줍니다.
 
 `tree -L`을 쓰면 크거나 외부 라이브러리가 들어 있는 폴더가 출력을 덮지 않습니다.
 
@@ -305,7 +307,7 @@ Cursor, VS Code, Claude Desktop 같은 다른 클라이언트에서는 명령 `c
 ```bash
 cdg tree -L 2                      # 어디에 무엇이 있는지
 cdg digest src/                    # 무엇이 어디에 정의되어 있는지, 줄 번호와 함께
-cdg scan src/prices.py -l          # 필요한 부분만, 같은 줄 번호로
+cdg scan src/prices.py:16-19      # 필요한 부분만, 같은 줄 번호로
 cdg mark                           # 고치기 전에
 cdg semdiff                        # 고친 뒤: 어떤 함수가 바뀌었는지
 cdg cap -- pytest -q && cdg pack   # 테스트 실행, 실패하면 pack에 고칠 거리가 모임
