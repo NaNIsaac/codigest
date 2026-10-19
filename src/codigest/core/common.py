@@ -14,7 +14,8 @@ from rich.console import Console
 from . import scanner, resolver
 from .redact import is_secret_file
 
-console = Console()
+# Warnings go to stderr so they never end up inside piped context.
+console = Console(stderr=True)
 
 type Targets = list[Path] | Path
 
@@ -27,10 +28,14 @@ class ProjectContext:
             targets = [targets]
 
         # 1. 탐색 시작점 결정
-        if targets:
-            self.start_path = targets[0].resolve()
+        # Paths in different folders of the same project (aps/a.m Auto_run/b.m) share the
+        # project you are in; starting from the first path alone made its folder the root.
+        cwd = Path.cwd().resolve()
+        resolved = [t.resolve() for t in targets or []]
+        if not resolved or all(t.is_relative_to(cwd) for t in resolved):
+            self.start_path = cwd
         else:
-            self.start_path = Path.cwd().resolve()
+            self.start_path = Path(os.path.commonpath(resolved))
             
         # 2. 루트 찾기
         self.root_path = self._find_project_root(self.start_path)

@@ -77,7 +77,7 @@ def handle(
     failed: FailedOption = False,
     here: HereOption = False,
     history_only: HistoryOnlyOption = False,
-    copy: CopyOption = True,
+    copy: CopyOption = None,
     stdout: StdoutOption = False,
     output: OutputOption = None,
 ) -> None:

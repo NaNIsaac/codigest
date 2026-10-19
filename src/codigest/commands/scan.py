@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import typer
@@ -19,7 +20,7 @@ def handle(
         resolve_path=True
     ),
     output: OutputOption = None,
-    copy: CopyOption = True,
+    copy: CopyOption = None,
     stdout: StdoutOption = False,
     all: AllOption = False,
     message: MessageOption = "",
@@ -70,8 +71,13 @@ def handle(
             f"[yellow]Large:[/yellow] {total_files} files, {decimal(total_size)}, about {est_tokens:,} tokens "
             f"(asks above {TOKEN_THRESHOLD:,} tokens or {FILE_COUNT_THRESHOLD} files; -y skips this)"
         )
-        if not typer.confirm("Copy it anyway?"):
-            log_console.print("Nothing copied. Name a folder or file to share less: cdg scan src/")
+        hint = "Share less by naming paths (cdg scan src/), or cdg digest for signatures only."
+        if not sys.stdin.isatty():
+            # Nobody can answer the question: say how to go on instead of a bare "Aborted!".
+            log_console.print(f"Stopped. {hint} -y takes it all.")
+            raise typer.Exit(1)
+        if not typer.confirm("Continue anyway?"):
+            log_console.print(f"Nothing shared. {hint}")
             raise typer.Exit()
 
     # [4] Execution

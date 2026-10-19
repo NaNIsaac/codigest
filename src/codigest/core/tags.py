@@ -2,16 +2,24 @@
 Core Template Engine & XML Factory.
 Centralizes XML escaping and block generation logic.
 """
-lazy import html
+import re
 import textwrap
 
+# The elements codigest itself wraps context in. Only a closing tag of one of these inside
+# the content could end a block early; everything else is left exactly as written.
+WRAPPERS = (
+    "file", "source_code", "project_snapshot", "project_structure", "code_digest",
+    "changes", "semantic_diff", "user_instruction", "context_pack", "omitted",
+    "terminal_history", "command", "output", "note",
+)
+_CLOSING = re.compile(rf"</({'|'.join(WRAPPERS)})>")
+
+
 def escape_xml_value(value: object) -> str:
-    """[XML] Escapes characters for XML safety."""
-    raw_value = str(value)
-    safe_value = html.escape(raw_value, quote=False)
-    if "</" in safe_value:
-        safe_value = safe_value.replace("</", "&lt;/")
-    return safe_value
+    """Code goes in verbatim: `a -> b` must reach the reader as `a -> b`, not `a -&gt; b`,
+    or it comes back escaped in the edits a model suggests. Only closing tags that would end
+    one of codigest's own blocks are neutralised."""
+    return _CLOSING.sub(r"&lt;/\1>", str(value))
 
 def dedent(template: str) -> str:
     """[Plain] Removes common leading whitespace."""
@@ -25,10 +33,7 @@ def xml(template: str) -> str:
 
 # 파일 블록 생성기 (이스케이프 자동화)
 def file(path: str, content: str, status: str = "") -> str:
-    """
-    Generates a safe <file> block.
-    Automatically escapes the content to prevent XML injection.
-    """
+    """A <file> block with the content verbatim (see escape_xml_value)."""
     # A file's own trailing newline would otherwise show up as a blank line before </file>.
     safe_content = escape_xml_value(content).rstrip("\n")
 

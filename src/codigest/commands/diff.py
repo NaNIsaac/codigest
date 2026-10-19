@@ -20,7 +20,7 @@ def handle(
         dir_okay=True,
         resolve_path=True
     ),
-    copy: CopyOption = True,
+    copy: CopyOption = None,
     output: OutputOption = None,
     stdout: StdoutOption = False,
     message: MessageOption = "",

@@ -7,13 +7,17 @@ import typer
 
 # Plain aliases, not PEP 695 `type X = ...`: Typer can't unwrap TypeAliasType.
 CopyOption = Annotated[
-    bool,
-    typer.Option("--copy/--no-copy", "-c", help="Auto-copy output to clipboard")
+    bool | None,
+    typer.Option(
+        "--copy/--no-copy", "-c",
+        help="Copy the result to the clipboard [default: copy in a terminal, not when piped]",
+        show_default=False,
+    ),
 ]
 
 StdoutOption = Annotated[
     bool,
-    typer.Option("-s", "--stdout", help="Print output to terminal (stdout) instead of file")
+    typer.Option("-s", "--stdout", help="Also print the result (on by default when piped)")
 ]
 
 ResolveOption = Annotated[

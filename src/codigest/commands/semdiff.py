@@ -12,7 +12,7 @@ app = typer.Typer()
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(Path("."), help="Target directory"),
-    copy: CopyOption = True,
+    copy: CopyOption = None,
     output: OutputOption = None,
     stdout: StdoutOption = False,
     message: MessageOption = "",

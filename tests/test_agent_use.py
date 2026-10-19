@@ -1,0 +1,124 @@
+"""What a script or an agent's shell sees: output on a pipe, code verbatim, outlines it can jump from."""
+import pyperclip
+from typer.testing import CliRunner
+
+from codigest.core import outline, tags
+from codigest.main import app
+
+
+def project(tmp_path, monkeypatch, files):
+    (tmp_path / ".git").mkdir()
+    for name, text in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+
+def test_a_pipe_gets_the_output_and_the_clipboard_is_left_alone(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"a.py": "x = 1\n"})
+    copied = []
+    monkeypatch.setattr(pyperclip, "copy", copied.append)
+
+    result = CliRunner().invoke(app, ["scan"])
+
+    assert '<file path="a.py">' in result.stdout
+    assert copied == []
+
+
+def test_copy_can_still_be_asked_for_on_a_pipe(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"a.py": "x = 1\n"})
+    copied = []
+    monkeypatch.setattr(pyperclip, "copy", copied.append)
+
+    CliRunner().invoke(app, ["scan", "--copy"])
+
+    assert len(copied) == 1
+
+
+def test_code_is_shared_exactly_as_written(tmp_path, monkeypatch):
+    code = 'def f(a: int) -> bool:\n    return a < 2 and "&" != "<b>"\n'
+    project(tmp_path, monkeypatch, {"a.py": code})
+
+    out = CliRunner().invoke(app, ["scan"]).stdout
+
+    assert code.rstrip() in out
+
+
+def test_only_a_closing_tag_of_our_own_blocks_is_neutralised():
+    text = 'html = "</div>"\nend = "</file>"'
+    assert tags.escape_xml_value(text) == 'html = "</div>"\nend = "&lt;/file>"'
+
+
+def test_large_scan_without_a_terminal_says_how_to_continue(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {f"m{i}.py": "x = 1\n" for i in range(120)})
+
+    result = CliRunner().invoke(app, ["scan"])
+
+    assert result.exit_code == 1
+    assert "-y" in result.stderr
+
+
+def test_digest_is_numbered_in_source_order_with_docstrings(tmp_path, monkeypatch):
+    code = (
+        "def zeta(x) -> int:\n"
+        '    """Last letter, first in the file."""\n'
+        "    return x\n"
+        "\n"
+        "class Alpha:\n"
+        "    def run(self):\n"
+        "        pass\n"
+    )
+    project(tmp_path, monkeypatch, {"m.py": code})
+
+    out = CliRunner().invoke(app, ["digest"]).stdout
+
+    assert "1: def zeta(x) -> int\n       Last letter, first in the file." in out
+    assert out.index("def zeta") < out.index("class Alpha")
+    assert "6:   def run(self)" in out
+
+
+def test_digest_covers_only_the_paths_given(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"src/a.py": "def a(): pass\n", "tests/t.py": "def t(): pass\n"})
+
+    out = CliRunner().invoke(app, ["digest", "tests"]).stdout
+
+    assert "t.py" in out
+    assert "a.py" not in out
+
+
+def test_paths_in_two_folders_keep_the_project_as_root(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"aps/a.m": "x = 1;\n", "run/b.m": "y = 2;\n"})
+
+    out = CliRunner().invoke(app, ["scan", "aps/a.m", "run/b.m"]).stdout
+
+    assert f'project="{tmp_path.name}"' in out
+    assert '<file path="aps/a.m">' in out and '<file path="run/b.m">' in out
+
+
+def test_matlab_outline_lists_functions_help_lines_and_sections():
+    code = (
+        "function [q, r] = det2lab(p, params)\n"
+        "% detector frame to lab frame\n"
+        "%% 1. Geometry\n"
+        "%% continues the title\n"
+        "%%%%%%%%%%%%\n"
+        "%%not a section\n"
+        "x = 1;\n"
+        "function y = helper(x)\n"
+    )
+
+    assert outline.matlab(code).splitlines() == [
+        "1: function [q, r] = det2lab(p, params)",
+        "       detector frame to lab frame",
+        "3: %% 1. Geometry",
+        "8: function y = helper(x)",
+    ]
+
+
+def test_tree_depth_folds_deeper_folders_into_a_count(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"lib/a/x.m": "", "lib/b.m": "", "top.m": ""})
+
+    out = CliRunner().invoke(app, ["tree", "-L", "1"]).stdout
+
+    assert out.splitlines() == ["├── lib/ (2 files)", "└── top.m"]

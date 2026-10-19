@@ -90,10 +90,9 @@ class PromptEngine:
         """
         # 1. Check for TOML Override (String-based)
         if (raw_template := self.overrides.get(key)) is not None:
-            # Safety: Automatically escape values when using user-defined templates
-            safe_kwargs = {
-                k: tags.escape_xml_value(v) for k, v in kwargs.items()
-            }
+            # Code blocks arrive already wrapped by tags.file(); escaping them again would
+            # turn their own <file> tags into text.
+            safe_kwargs = {**kwargs, "instruction": tags.escape_xml_value(kwargs.get("instruction", ""))}
             try:
                 return raw_template.format(**safe_kwargs)
             except KeyError as e:

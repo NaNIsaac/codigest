@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from ..options import CopyOption, StdoutOption, ResolveOption, AllOption
+from ..options import CopyOption, StdoutOption, ResolveOption, AllOption, OutputOption
 
 lazy from rich.tree import Tree
 lazy from rich.text import Text
@@ -57,14 +57,18 @@ def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
 def handle(
     target: Path = typer.Argument(Path("."), help="Target directory"),
     copy: CopyOption = False,
+    output: OutputOption = None,
     stdout: StdoutOption = False,
     all: AllOption = False,
     resolve: ResolveOption = False,
+    depth: int | None = typer.Option(
+        None, "-L", "--depth", min=1, help="Show this many levels; deeper folders become a file count"
+    ),
 ) -> None:
     """
     Print the project file tree.
     """
-    handler = OutputHandler(stdout=stdout, copy=copy)
+    handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log_console = handler.log_console
 
     # 1. Context 생성 (루트 찾기용)
@@ -84,9 +88,12 @@ def handle(
         return
 
     # 3. Visualize
-    ascii_tree = structure.generate_ascii_tree(files, root_path)
+    ascii_tree = structure.generate_ascii_tree(files, root_path, depth)
 
     def _print_tree_viz():
+        if depth is not None:
+            log_console.print(ascii_tree, highlight=False)
+            return
         tree_viz = _build_rich_tree(root_path, files)
         log_console.print(tree_viz)
         log_console.print(f"\n[dim]Found {len(files)} files.[/dim]")

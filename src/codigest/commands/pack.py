@@ -146,7 +146,7 @@ def handle(
         None, "--with", metavar="SOURCES",
         help="Automatic sources to add: failure,changes,tests,imports (all, or none when you name files)",
     ),
-    copy: CopyOption = True,
+    copy: CopyOption = None,
     stdout: StdoutOption = False,
     output: OutputOption = None,
 ) -> None:

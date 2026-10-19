@@ -3,6 +3,7 @@ Unified Output Handler for CLI commands.
 Manages stderr log console, clipboard copying, and file vs stdout output.
 """
 import contextlib
+import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,8 +32,19 @@ def spinner(log: Console, text: str) -> Iterator[None]:
 @dataclass(slots=True)
 class OutputHandler:
     stdout: bool = False
-    copy: bool = True
+    copy: bool | None = True
     output: Path | None = None
+
+    def __post_init__(self) -> None:
+        # Redirected or run by an agent's shell: whoever reads the pipe needs the text, and
+        # silently replacing the user's clipboard from a background process would be a surprise.
+        # `copy=None` means "not chosen on the command line".
+        if not sys.stdout.isatty():
+            self.stdout = True
+            if self.copy is None:
+                self.copy = False
+        elif self.copy is None:
+            self.copy = True
 
     @property
     def log_console(self) -> Console:

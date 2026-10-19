@@ -4,6 +4,7 @@ Tracks: Functions, Classes, Methods, Global Variables.
 Detects: Signature Changes AND Logic Body Changes.
 """
 import ast
+import warnings
 lazy import hashlib
 from dataclasses import dataclass
 from typing import Literal
@@ -18,6 +19,7 @@ class SymbolInfo:
     signature: str
     content_hash: str # For logic change detection
     docstring: str | None = None
+    line: int = 0
 
 @dataclass(slots=True)
 class SemanticChange:
@@ -41,9 +43,11 @@ class CodeParser(ast.NodeVisitor):
 
     def _get_signature(self, node: ast.AST) -> str:
         """Reconstructs signature."""
-        if hasattr(node, 'args'):
+        if (args := getattr(node, "args", None)) is not None:
             try:
-                return f"({ast.unparse(node.args)})"
+                ret = getattr(node, "returns", None)
+                returns = f" -> {ast.unparse(ret)}" if ret else ""
+                return f"({ast.unparse(args)}){returns}"
             except Exception:
                 pass
         return ""
@@ -65,7 +69,8 @@ class CodeParser(ast.NodeVisitor):
             type=type_label,
             signature=self._get_signature(node),
             content_hash=self._get_hash(node), # Hash entire function body
-            docstring=ast.get_docstring(node)
+            docstring=ast.get_docstring(node),
+            line=node.lineno,
         )
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -80,7 +85,8 @@ class CodeParser(ast.NodeVisitor):
             type="class",
             signature=base_str,
             content_hash=self._get_hash(node), # Hash class structure
-            docstring=ast.get_docstring(node)
+            docstring=ast.get_docstring(node),
+            line=node.lineno,
         )
 
         self.generic_visit(node)
@@ -107,7 +113,8 @@ class CodeParser(ast.NodeVisitor):
                     name=name,
                     type="variable",
                     signature=sig,
-                    content_hash=self._get_hash(node)
+                    content_hash=self._get_hash(node),
+                    line=node.lineno,
                 )
 
     # Annotated Assignment (x: int = 1)
@@ -125,15 +132,19 @@ class CodeParser(ast.NodeVisitor):
                 name=name,
                 type="variable",
                 signature=sig,
-                content_hash=self._get_hash(node)
+                content_hash=self._get_hash(node),
+                line=node.lineno,
             )
 
 def parse_code(code: str) -> dict[str, SymbolInfo]:
     if not code:
         return {}
     try:
-        tree = ast.parse(code)
-    except SyntaxError:
+        # Invalid escapes in someone else's code are their problem, not noise in our output.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(code)
+    except SyntaxError, ValueError:
         return {}
     parser = CodeParser()
     parser.visit(tree)
@@ -160,12 +171,36 @@ def compare(old_code: str, new_code: str) -> list[SemanticChange]:
 
     return changes
 
+DOC_WIDTH = 100
+
+
+def _first_line(doc: str) -> str:
+    line = doc.strip().splitlines()[0].strip()
+    return line if len(line) <= DOC_WIDTH else line[: DOC_WIDTH - 3] + "..."
+
+
 def summarize(code: str) -> str:
+    """One line per definition in source order, numbered like `scan -l` so a reader can
+    jump to it, with the first line of its docstring underneath."""
     if not (symbols := parse_code(code)):
         return ""
 
+    width = len(str(max(sym.line for sym in symbols.values())))
     lines = []
-    for _, sym in sorted(symbols.items()):
-        indent = "  " if sym.type == "method" else ""
-        lines.append(f"{indent}{sym.type} {sym.name}{sym.signature}")
+    for sym in sorted(symbols.values(), key=lambda s: s.line):
+        depth = sym.name.count(".") if sym.type == "method" else 0
+        indent = "  " * depth
+        name = sym.name.rsplit(".", 1)[-1]
+        match sym.type:
+            case "class":
+                head = f"class {name}{sym.signature}"
+            case "variable":
+                head = f"{name}{sym.signature}"
+            case "async_function":
+                head = f"async def {name}{sym.signature}"
+            case _:
+                head = f"def {name}{sym.signature}"
+        lines.append(f"{sym.line:>{width}}: {indent}{head}")
+        if sym.docstring:
+            lines.append(f"{' ' * width}  {indent}    {_first_line(sym.docstring)}")
     return "\n".join(lines)

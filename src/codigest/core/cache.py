@@ -19,6 +19,10 @@ def get_file_blob_hash(file_path: Path) -> str | None:
     except Exception:
         return None
 
+# Bump when the shape of a cached block or summary changes, so stale ones are dropped.
+FORMAT = 2
+
+
 class ContentCache:
     def __init__(self, root_path: Path):
         self.root_path = root_path
@@ -36,6 +40,8 @@ class ContentCache:
                     self._data = json.load(f)
             except Exception:
                 self._data = {}
+        if self._data.get("format") != FORMAT:
+            self._data = {"format": FORMAT}
 
     def save(self) -> None:
         # Only in projects that already have .codigest/ (init or mark): reading must not
@@ -82,12 +88,6 @@ class ContentCache:
                             pass
                     return block
 
-            # Backward compatibility check for old flat cache keys
-            cache_key = f"{rel_path}:{blob_hash}:lines={line_numbers}"
-            if (val := self._data.get("file_blocks", {}).get(cache_key)) is not None:
-                self.hits += 1
-                return val
-
         self.misses += 1
         return None
 
@@ -112,11 +112,6 @@ class ContentCache:
                 pass
 
         entry.setdefault("blocks", {})[str(line_numbers)] = block
-
-        # Legacy format support
-        if blob_hash:
-            cache_key = f"{rel_path}:{blob_hash}:lines={line_numbers}"
-            self._data.setdefault("file_blocks", {})[cache_key] = block
 
     def get_summary(self, rel_path: str, blob_hash: str, file_path: Path | None = None) -> str | None:
         if file_path is not None:
