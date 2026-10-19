@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -11,13 +12,36 @@ lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
+# `src/app.py:40-60` or `src/app.py:42`; the last colon, so `C:\x.py:3` still works.
+_RANGE = re.compile(r"^(?P<path>.+):(?P<lo>\d+)(?:-(?P<hi>\d+))?$")
+
+
+def _parse_targets(raw: list[str]) -> tuple[list[Path], dict[Path, list[tuple[int, int | None]]]]:
+    paths, ranges = [], {}
+    for item in raw:
+        path, span = Path(item), None
+        # Range syntax wins: on NTFS `a.py:12` names an alternate data stream of a.py,
+        # which the path checks below would not reject.
+        if (m := _RANGE.match(item)) and Path(m["path"]).is_file():
+            path = Path(m["path"])
+            span = (int(m["lo"]), int(m["hi"]) if m["hi"] else None)
+        if not path.exists():
+            raise typer.BadParameter(f"{item} does not exist", param_hint="targets")
+        path = path.resolve()
+        if span:
+            ranges.setdefault(path, []).append(span)
+        if path not in paths:
+            paths.append(path)
+    return paths, ranges
+
+
 @app.callback(invoke_without_command=True)
 def handle(
-    targets: list[Path] = typer.Argument(
+    raw_targets: list[str] = typer.Argument(
         None,
-        help="Specific files or directories to scan (Scope)",
-        exists=True,
-        resolve_path=True
+        metavar="[targets]...",
+        help="Files or directories to share; FILE:40-60 or FILE:42 shares only those lines",
+        show_default=False,
     ),
     output: OutputOption = None,
     copy: CopyOption = None,
@@ -33,6 +57,7 @@ def handle(
     """
     handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log_console = handler.log_console
+    targets, ranges = _parse_targets(raw_targets or [])
 
     # [1] Context Setup (Centralized)
     ctx = common.get_context(targets)
@@ -93,6 +118,12 @@ def handle(
                 rel_path = file_path.relative_to(root_path).as_posix()
             except ValueError:
                 rel_path = f"[EXTERNAL]/{file_path.name}"
+
+            if spans := ranges.get(file_path):
+                for lo, hi in spans:
+                    content, shown = processor.read_line_range(file_path, lo, hi)
+                    file_blocks.append(tags.file(rel_path, content, lines=shown))
+                continue
 
             cached_block = content_cache.get_file_block(
                 rel_path=rel_path,

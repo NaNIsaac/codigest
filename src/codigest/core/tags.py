@@ -32,12 +32,14 @@ def xml(template: str) -> str:
     return dedent(template)
 
 # 파일 블록 생성기 (이스케이프 자동화)
-def file(path: str, content: str, status: str = "") -> str:
-    """A <file> block with the content verbatim (see escape_xml_value)."""
+def file(path: str, content: str, status: str = "", lines: str = "") -> str:
+    """A <file> block with the content verbatim (see escape_xml_value).
+    `lines` ("40-60") marks a block that holds only those lines."""
     # A file's own trailing newline would otherwise show up as a blank line before </file>.
     safe_content = escape_xml_value(content).rstrip("\n")
+    lines_attr = f' lines="{lines}"' if lines else ""
 
     # f-string을 왼쪽 벽에 붙여 들여쓰기 문제 원천 차단
-    return f"""<file path="{path}{status}">
+    return f"""<file path="{path}{status}"{lines_attr}>
 {safe_content}
 </file>"""

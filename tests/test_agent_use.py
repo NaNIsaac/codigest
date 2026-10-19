@@ -116,6 +116,60 @@ def test_matlab_outline_lists_functions_help_lines_and_sections():
     ]
 
 
+def test_matlab_banner_sections_take_the_title_under_them():
+    code = (
+        "%% ==========\n"
+        "%% Nominal voxel sizes\n"
+        "%% ==========\n"
+        "% computed from the detector distance\n"
+        "x = 1;\n"
+        "%% ----------\n"
+        "% Interpolation\n"
+        "y = 2;\n"
+    )
+
+    assert outline.matlab(code).splitlines() == [
+        "1: %% Nominal voxel sizes",
+        "6: %% Interpolation",
+    ]
+
+
+def test_digest_lists_class_attributes_and_dataclass_fields(tmp_path, monkeypatch):
+    code = (
+        "class Table:\n"
+        "    axes = ('y-', 'x-', 'y-')\n"
+        "    name: str = 'id01'\n"
+        "\n"
+        "    def run(self):\n"
+        "        local = 1\n"
+    )
+    project(tmp_path, monkeypatch, {"m.py": code})
+
+    out = CliRunner().invoke(app, ["digest"]).stdout
+
+    assert "2:   axes = ('y-', 'x-', 'y-')" in out
+    assert "3:   name: str = 'id01'" in out
+    assert "local" not in out
+
+
+def test_scan_shares_a_line_range_numbered(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"a.py": "".join(f"x{i} = {i}\n" for i in range(1, 21))})
+
+    out = CliRunner().invoke(app, ["scan", "a.py:9-11", "a.py:20"]).stdout
+
+    assert '<file path="a.py" lines="9-11">\n 9: x9 = 9\n10: x10 = 10\n11: x11 = 11\n</file>' in out
+    assert '<file path="a.py" lines="20">\n20: x20 = 20\n</file>' in out
+    assert "x1 = 1\n" not in out
+
+
+def test_a_range_past_the_end_is_cut_to_the_file(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"a.py": "a = 1\nb = 2\n"})
+
+    out = CliRunner().invoke(app, ["scan", "a.py:2-99"]).stdout
+
+    assert '<file path="a.py" lines="2">\n2: b = 2\n</file>' in out
+
+
 def test_tree_depth_folds_deeper_folders_into_a_count(tmp_path, monkeypatch):
     project(tmp_path, monkeypatch, {"lib/a/x.m": "", "lib/b.m": "", "top.m": ""})
 

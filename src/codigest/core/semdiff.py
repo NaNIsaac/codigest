@@ -9,8 +9,11 @@ lazy import hashlib
 from dataclasses import dataclass
 from typing import Literal
 
-type SymbolKind = Literal["function", "async_function", "method", "class", "variable"]
+type SymbolKind = Literal["function", "async_function", "method", "class", "variable", "attribute"]
 type ChangeType = Literal["ADDED", "REMOVED", "MODIFIED", "LOGIC_CHANGED"]
+
+# Longest value shown for a variable or attribute in an outline.
+VALUE_WIDTH = 60
 
 @dataclass(slots=True)
 class SymbolInfo:
@@ -92,49 +95,37 @@ class CodeParser(ast.NodeVisitor):
         self.generic_visit(node)
         self.current_class = prev_class
 
-    def visit_Assign(self, node: ast.Assign) -> None:
-        # Only track global variables (no indent)
+    def _value(self, node: ast.expr | None) -> str:
+        if node is None:
+            return ""
+        try:
+            text = ast.unparse(node)
+        except Exception:
+            return " = ..."
+        return f" = {text if len(text) <= VALUE_WIDTH else text[: VALUE_WIDTH - 3] + '...'}"
+
+    def _add_variable(self, name: str, sig: str, node: ast.stmt) -> None:
+        # Class-level names are where tables and dataclass fields live, so they count too.
+        kind: SymbolKind = "variable"
         if self.current_class is not None:
-            return
+            name, kind = f"{self.current_class}.{name}", "attribute"
+        self.symbols[name] = SymbolInfo(
+            name=name, type=kind, signature=sig, content_hash=self._get_hash(node), line=node.lineno
+        )
+
+    def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
             if isinstance(target, ast.Name):
-                name = target.id
-                # Try to infer value type/content roughly
-                try:
-                    val_str = ast.unparse(node.value)
-                    # Truncate long values
-                    if len(val_str) > 50:
-                        val_str = val_str[:47] + "..."
-                    sig = f" = {val_str}"
-                except Exception:
-                    sig = " = ..."
-
-                self.symbols[name] = SymbolInfo(
-                    name=name,
-                    type="variable",
-                    signature=sig,
-                    content_hash=self._get_hash(node),
-                    line=node.lineno,
-                )
+                self._add_variable(target.id, self._value(node.value), node)
 
     # Annotated Assignment (x: int = 1)
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        if self.current_class is None and isinstance(node.target, ast.Name):
-            name = node.target.id
+        if isinstance(node.target, ast.Name):
             try:
                 type_hint = ast.unparse(node.annotation)
-                val_str = f" = {ast.unparse(node.value)}" if node.value else ""
-                sig = f": {type_hint}{val_str}"
             except Exception:
-                sig = ": ..."
-
-            self.symbols[name] = SymbolInfo(
-                name=name,
-                type="variable",
-                signature=sig,
-                content_hash=self._get_hash(node),
-                line=node.lineno,
-            )
+                type_hint = "..."
+            self._add_variable(node.target.id, f": {type_hint}{self._value(node.value)}", node)
 
 def parse_code(code: str) -> dict[str, SymbolInfo]:
     if not code:
@@ -188,13 +179,13 @@ def summarize(code: str) -> str:
     width = len(str(max(sym.line for sym in symbols.values())))
     lines = []
     for sym in sorted(symbols.values(), key=lambda s: s.line):
-        depth = sym.name.count(".") if sym.type == "method" else 0
+        depth = sym.name.count(".") if sym.type in ("method", "attribute") else 0
         indent = "  " * depth
         name = sym.name.rsplit(".", 1)[-1]
         match sym.type:
             case "class":
                 head = f"class {name}{sym.signature}"
-            case "variable":
+            case "variable" | "attribute":
                 head = f"{name}{sym.signature}"
             case "async_function":
                 head = f"async def {name}{sym.signature}"
