@@ -79,7 +79,12 @@ def handle(
 
     # [3] Pre-flight Check
     total_files = len(files)
-    total_size = sum(f.stat().st_size for f in files)
+    # A range of a big file is small: count what will be shared, not the whole file.
+    total_size = sum(
+        sum(len(processor.read_line_range(f, lo, hi)[0]) for lo, hi in ranges[f])
+        if f in ranges else f.stat().st_size
+        for f in files
+    )
     est_tokens = int(total_size / 4)
 
     if ctx.withheld:

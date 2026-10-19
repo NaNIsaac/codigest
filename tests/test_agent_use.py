@@ -170,6 +170,15 @@ def test_scan_shares_a_line_range_numbered(tmp_path, monkeypatch):
     assert "x1 = 1\n" not in out
 
 
+def test_a_range_of_a_large_file_is_not_held_back_as_large(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"big.c": "int x = 0; /* padding padding */\n" * 6000})
+
+    result = CliRunner().invoke(app, ["scan", "big.c:10-12"])
+
+    assert result.exit_code == 0
+    assert '<file path="big.c" lines="10-12">' in result.stdout
+
+
 def test_a_mistyped_range_says_what_the_syntax_is(tmp_path, monkeypatch):
     project(tmp_path, monkeypatch, {"a.py": "a = 1\n"})
 
