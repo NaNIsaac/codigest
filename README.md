@@ -8,6 +8,14 @@
 
 [한국어](README.ko.md)
 
+<p align="center">
+  <a href="https://mcprush.com/to/codigest-mcp?ref=badge">
+    <img src="https://mcprush.com/badge/codigest-mcp/card.svg"
+         alt="Codigest MCP — MCPRush security rating"
+         width="320" loading="lazy">
+  </a>
+</p>
+
 Codigest is a command-line tool for the moment you ask ChatGPT, Claude or a coding agent about
 your code. It turns the part of your project you pick into one block of text you can paste into
 any chat.
