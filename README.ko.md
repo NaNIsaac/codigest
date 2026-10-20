@@ -6,6 +6,14 @@
 
 [English](README.md)
 
+<p align="center">
+  <a href="https://mcprush.com/to/codigest-mcp?ref=badge">
+    <img src="https://mcprush.com/badge/codigest-mcp/card.svg"
+         alt="Codigest MCP — MCPRush 보안 등급"
+         width="320" loading="lazy">
+  </a>
+</p>
+
 Codigest는 ChatGPT나 Claude, 코딩 에이전트에게 코드에 대해 물어볼 때 쓰는 명령줄 도구입니다.
 프로젝트에서 내가 고른 부분을 하나의 텍스트로 묶어 주므로, 어느 채팅창에든 그대로 붙여 넣을 수
 있습니다.
