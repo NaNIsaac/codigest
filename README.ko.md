@@ -12,6 +12,9 @@
          alt="Codigest MCP — MCPRush 보안 등급"
          width="320" loading="lazy">
   </a>
+  <br>
+  <sub>MCPRush의 자동 보안 평가(A~F)로, 특정 릴리스에 대한 검사 결과입니다. 독립 보안 감사나 안전성 인증은 아닙니다.
+  <a href="https://mcprush.com/trust">등급 기준 보기</a>.</sub>
 </p>
 
 Codigest는 ChatGPT나 Claude, 코딩 에이전트에게 코드에 대해 물어볼 때 쓰는 명령줄 도구입니다.
