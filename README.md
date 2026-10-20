@@ -14,6 +14,9 @@
          alt="Codigest MCP — MCPRush security rating"
          width="320" loading="lazy">
   </a>
+  <br>
+  <sub>Automated release-specific security scan (A–F), not an independent security certification.
+  <a href="https://mcprush.com/trust">How ratings work</a>.</sub>
 </p>
 
 Codigest is a command-line tool for the moment you ask ChatGPT, Claude or a coding agent about
