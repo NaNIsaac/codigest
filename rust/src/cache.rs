@@ -79,6 +79,11 @@ impl ContentCache {
 
     /// Only in projects that already have `.codigest/` (init or mark): reading must not
     /// leave a folder behind in a project that never asked for one.
+    /// Whether `save` will write anything: only in a project that already has `.codigest/`.
+    pub fn persists(&self) -> bool {
+        self.cache_file.parent().is_some_and(Path::is_dir)
+    }
+
     pub fn save(&self) {
         if !self.cache_file.parent().is_some_and(Path::is_dir) {
             return;

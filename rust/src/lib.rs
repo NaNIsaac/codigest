@@ -8,6 +8,7 @@ pub mod git_ops;
 pub mod gitwild;
 pub mod outline;
 pub mod output;
+pub mod par;
 pub mod paths;
 pub mod processor;
 pub mod prompts;

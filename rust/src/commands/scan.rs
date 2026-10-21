@@ -10,6 +10,7 @@ use regex::Regex;
 use crate::cache::{ContentCache, get_file_blob_hash};
 use crate::common::{ProjectContext, confirm, stdin_is_terminal};
 use crate::output::{Output, OutputArgs};
+use crate::par;
 use crate::pystr::{filesize, thousands};
 use crate::style::{bold, red, yellow};
 use crate::{processor, prompts, pypath, structure, tags};
@@ -170,29 +171,61 @@ pub fn run(args: ScanArgs) -> anyhow::Result<i32> {
 
     let tree = structure::generate_ascii_tree(&files, &root, None);
     let mut cache = ContentCache::new(&root);
-    let mut blocks = Vec::new();
-    for file in &files {
-        let rel = pypath::rel_posix(file, &root)
-            .unwrap_or_else(|| format!("[EXTERNAL]/{}", pypath::name(file)));
-
-        if let Some(spans) = targets.ranges.get(&pypath::norm(file)) {
-            for &(lo, hi) in spans {
-                let (content, shown) = processor::read_line_range(file, lo, hi)?;
-                blocks.push(tags::file(&rel, &content, "", &shown));
+    let line_numbers = args.line_numbers;
+    let persists = cache.persists();
+    // Cache lookups in order, the reading of the misses in parallel, then the blocks back
+    // in file order.
+    let rels: Vec<(PathBuf, String, Option<String>)> = files
+        .iter()
+        .map(|file| {
+            let rel = pypath::rel_posix(file, &root)
+                .unwrap_or_else(|| format!("[EXTERNAL]/{}", pypath::name(file)));
+            let ranged = targets.ranges.contains_key(&pypath::norm(file));
+            let hit = (!ranged)
+                .then(|| cache.get_file_block(&rel, None, line_numbers, Some(file)))
+                .flatten();
+            (file.clone(), rel, hit)
+        })
+        .collect();
+    let read = par::map(
+        &rels,
+        |(file, rel, hit)| -> anyhow::Result<Vec<(String, Option<String>)>> {
+            if let Some(spans) = targets.ranges.get(&pypath::norm(file)) {
+                return spans
+                    .iter()
+                    .map(|&(lo, hi)| {
+                        let (content, shown) = processor::read_line_range(file, lo, hi)?;
+                        Ok((tags::file(rel, &content, "", &shown), None))
+                    })
+                    .collect();
             }
-            continue;
-        }
-
-        let line_numbers = args.line_numbers;
-        if let Some(block) = cache.get_file_block(&rel, None, line_numbers, Some(file)) {
+            if let Some(block) = hit {
+                return Ok(vec![(block.clone(), None)]);
+            }
+            let blob_hash = if persists {
+                get_file_blob_hash(file)
+            } else {
+                None
+            };
+            let content = processor::read_file_content(file, line_numbers);
+            Ok(vec![(tags::file(rel, &content, "", ""), blob_hash)])
+        },
+    );
+    let mut blocks = Vec::new();
+    for ((file, rel, hit), result) in rels.into_iter().zip(read) {
+        let ranged = targets.ranges.contains_key(&pypath::norm(&file));
+        for (block, blob_hash) in result? {
+            if !ranged && hit.is_none() {
+                cache.set_file_block(
+                    &rel,
+                    blob_hash.as_deref(),
+                    line_numbers,
+                    &block,
+                    Some(&file),
+                );
+            }
             blocks.push(block);
-            continue;
         }
-        let blob_hash = get_file_blob_hash(file);
-        let content = processor::read_file_content(file, line_numbers);
-        let block = tags::file(&rel, &content, "", "");
-        cache.set_file_block(&rel, blob_hash.as_deref(), line_numbers, &block, Some(file));
-        blocks.push(block);
     }
     cache.save();
 

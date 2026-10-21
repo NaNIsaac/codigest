@@ -1,7 +1,6 @@
 //! The ASCII directory tree of `core/structure.py`.
 
 use std::collections::HashSet;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::pypath;
@@ -37,30 +36,26 @@ struct Walker {
 
 impl Walker {
     fn walk(&self, current: &Path, prefix: &str, level: usize, lines: &mut Vec<String>) {
-        let Ok(entries) = fs::read_dir(current) else {
+        let Ok(mut entries) = crate::scanner::read_entries(current) else {
             return;
         };
-        let mut names: Vec<String> = entries
-            .flatten()
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .collect();
-        names.sort();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
 
         // Only scanned files and folders that hold some.
-        let shown: Vec<(String, PathBuf, bool)> = names
+        let shown: Vec<(String, PathBuf, bool)> = entries
             .into_iter()
-            .filter_map(|name| {
+            .filter_map(|(name, kind)| {
                 let path = current.join(&name);
-                if path.is_file() {
-                    self.files
+                match kind.resolve(&path) {
+                    (_, true) => self
+                        .files
                         .contains(&pypath::norm(&path))
-                        .then_some((name, path, false))
-                } else if path.is_dir() {
-                    self.dirs_with_files
+                        .then_some((name, path, false)),
+                    (true, _) => self
+                        .dirs_with_files
                         .contains(&pypath::norm(&path))
-                        .then_some((name, path, true))
-                } else {
-                    None
+                        .then_some((name, path, true)),
+                    _ => None,
                 }
             })
             .collect();
@@ -102,6 +97,7 @@ impl Walker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn project(files: &[&str]) -> (tempfile::TempDir, PathBuf, Vec<PathBuf>) {
         let dir = tempfile::tempdir().unwrap();

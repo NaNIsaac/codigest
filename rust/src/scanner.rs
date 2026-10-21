@@ -55,18 +55,25 @@ impl ProjectScanner {
     }
 
     pub fn is_ignored(&self, path: &Path) -> bool {
-        let Some(mut rel) = pypath::rel_posix(path, &self.root) else {
+        let Some(rel) = pypath::rel_posix(path, &self.root) else {
             return false;
         };
-        if path.is_dir() {
-            rel.push('/');
+        self.ignored_rel(&rel, path.is_dir())
+    }
+
+    fn ignored_rel(&self, rel: &str, is_dir: bool) -> bool {
+        if is_dir {
+            self.spec.match_file(&format!("{rel}/"))
+        } else {
+            self.spec.match_file(rel)
         }
-        self.spec.match_file(&rel)
     }
 
     pub fn scan(&self) -> Result<Vec<PathBuf>> {
         let mut found = Vec::new();
-        let mut stack = Vec::new();
+        // Each folder travels with its path relative to the root, so nothing below has to
+        // work it out again from the ancestors.
+        let mut stack: Vec<(PathBuf, String)> = Vec::new();
         let starts = self
             .include_paths
             .clone()
@@ -77,25 +84,32 @@ impl ProjectScanner {
                     found.push(start);
                 }
             } else if start.is_dir() {
-                stack.push(start);
+                let rel = pypath::rel_posix(&start, &self.root).unwrap_or_default();
+                stack.push((start, if rel == "." { String::new() } else { rel }));
             }
         }
 
-        while let Some(current) = stack.pop() {
-            let mut names = match read_names(&current) {
-                Ok(names) => names,
+        while let Some((current, current_rel)) = stack.pop() {
+            let mut entries = match read_entries(&current) {
+                Ok(entries) => entries,
                 Err(err) if err.kind() == io::ErrorKind::PermissionDenied => continue,
                 Err(err) => return Err(err.into()),
             };
-            names.sort();
-            for name in names {
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            for (name, kind) in entries {
                 let entry = current.join(&name);
-                if self.is_ignored(&entry) {
+                let (is_dir, is_file) = kind.resolve(&entry);
+                let rel = if current_rel.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{current_rel}/{name}")
+                };
+                if self.ignored_rel(&rel, is_dir) {
                     continue;
                 }
-                if entry.is_dir() {
-                    stack.push(entry);
-                } else if entry.is_file() && self.keeps(&name) {
+                if is_dir {
+                    stack.push((entry, rel));
+                } else if is_file && self.keeps(&name) {
                     found.push(entry);
                 }
             }
@@ -120,9 +134,38 @@ pub fn scan_project(
     ProjectScanner::new(root, extensions, extra_ignores, include_paths)?.scan()
 }
 
-fn read_names(dir: &Path) -> io::Result<Vec<String>> {
+/// What a directory entry is, from the listing itself where the platform says so: a stat
+/// per entry is the expensive part of walking a large tree on Windows.
+#[derive(Clone, Copy)]
+pub enum Kind {
+    Dir,
+    File,
+    /// A link or anything unusual: ask the file system, following links like Python does.
+    Other,
+}
+
+impl Kind {
+    pub fn resolve(self, path: &Path) -> (bool, bool) {
+        match self {
+            Kind::Dir => (true, false),
+            Kind::File => (false, true),
+            Kind::Other => (path.is_dir(), path.is_file()),
+        }
+    }
+}
+
+pub fn read_entries(dir: &Path) -> io::Result<Vec<(String, Kind)>> {
     fs::read_dir(dir)?
-        .map(|entry| entry.map(|e| e.file_name().to_string_lossy().into_owned()))
+        .map(|entry| {
+            entry.map(|e| {
+                let kind = match e.file_type() {
+                    Ok(t) if t.is_dir() => Kind::Dir,
+                    Ok(t) if t.is_file() => Kind::File,
+                    _ => Kind::Other,
+                };
+                (e.file_name().to_string_lossy().into_owned(), kind)
+            })
+        })
         .collect()
 }
 

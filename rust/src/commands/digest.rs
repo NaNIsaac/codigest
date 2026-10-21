@@ -5,9 +5,10 @@ use std::path::PathBuf;
 
 use clap::Args;
 
-use crate::cache::{ContentCache, get_file_blob_hash};
+use crate::cache::{ContentCache, compute_git_blob_hash};
 use crate::common::ProjectContext;
 use crate::output::{Output, OutputArgs};
+use crate::par;
 use crate::pystr::{thousands, universal_newlines};
 use crate::style::{bold, yellow};
 use crate::{outline, prompts, pypath, structure, tags};
@@ -48,6 +49,9 @@ pub fn run(args: DigestArgs) -> anyhow::Result<i32> {
     let mut cache = ContentCache::new(&root);
     let mut blocks = Vec::new();
     let mut unreadable = Vec::new();
+    // Cache lookups in order, the outlines of the misses in parallel, then everything back
+    // in file order.
+    let mut wanted: Vec<(String, Option<String>, PathBuf, String)> = Vec::new();
     for file in &files {
         let suffix = pypath::suffix(&pypath::name(file)).to_owned();
         let Some(extension) = suffix.strip_prefix('.') else {
@@ -58,26 +62,38 @@ pub fn run(args: DigestArgs) -> anyhow::Result<i32> {
         }
         let rel = pypath::rel_posix(file, &root)
             .unwrap_or_else(|| format!("[EXTERNAL]/{}", pypath::name(file)));
-
         // The original looks the summary up under a missing hash, so only the stat check
         // can hit.
-        let mut summary = cache.get_summary(&rel, "None", Some(file));
-        if summary.is_none() {
-            let Ok(bytes) = fs::read(file) else {
+        let hit = cache.get_summary(&rel, "None", Some(file));
+        wanted.push((rel, hit, file.clone(), extension.to_owned()));
+    }
+    let persists = cache.persists();
+    let computed = par::map(&wanted, |(_, hit, file, extension)| {
+        if hit.is_some() {
+            return None;
+        }
+        let bytes = fs::read(file).ok()?;
+        let content = universal_newlines(&String::from_utf8_lossy(&bytes));
+        let text = outline::summarize(extension, &content);
+        let hash = (persists && !text.is_empty()).then(|| compute_git_blob_hash(&bytes));
+        Some((text, hash))
+    });
+    for ((rel, hit, file, _), fresh) in wanted.into_iter().zip(computed) {
+        let summary = match (hit, fresh) {
+            (Some(text), _) => text,
+            (None, Some((text, hash))) => {
+                if let Some(hash) = hash {
+                    cache.set_summary(&rel, &hash, &text, Some(&file));
+                }
+                text
+            }
+            (None, None) => {
                 unreadable.push(rel);
                 continue;
-            };
-            let content = universal_newlines(&String::from_utf8_lossy(&bytes));
-            let text = outline::summarize(extension, &content);
-            if !text.is_empty()
-                && let Some(hash) = get_file_blob_hash(file).filter(|h| !h.is_empty())
-            {
-                cache.set_summary(&rel, &hash, &text, Some(file));
             }
-            summary = Some(text);
-        }
-        if let Some(text) = summary.filter(|t| !t.is_empty()) {
-            blocks.push(tags::file(&rel, &text, "", ""));
+        };
+        if !summary.is_empty() {
+            blocks.push(tags::file(&rel, &summary, "", ""));
         }
     }
     cache.save();

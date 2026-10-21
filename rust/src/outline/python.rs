@@ -4,7 +4,18 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use std::cell::RefCell;
+
 use tree_sitter::{Node, Parser};
+
+thread_local! {
+    // A parser is reused across files; building one per file showed up in large digests.
+    static PARSER: RefCell<Parser> = RefCell::new({
+        let mut parser = Parser::new();
+        parser.set_language(&tree_sitter_python::LANGUAGE.into()).expect("python grammar");
+        parser
+    });
+}
 
 use super::unparse::{Unparser, decode_escapes, split_literal};
 
@@ -40,6 +51,12 @@ pub struct Parsed {
 }
 
 pub fn parse(code: &str) -> Option<Parsed> {
+    parse_with(code, false)
+}
+
+/// `hashes` fills `Symbol::content_hash`, which only the semantic diff needs and which costs
+/// a walk over every definition's body.
+pub fn parse_with(code: &str, hashes: bool) -> Option<Parsed> {
     if code.is_empty() {
         return None;
     }
@@ -52,18 +69,15 @@ pub fn parse(code: &str) -> Option<Parsed> {
     } else {
         code
     };
-    let mut parser = Parser::new();
-    parser
-        .set_language(&tree_sitter_python::LANGUAGE.into())
-        .expect("python grammar");
-    let tree = parser.parse(code, None)?;
+    let tree = PARSER.with_borrow_mut(|parser| parser.parse(code, None))?;
     let root = tree.root_node();
-    if replacement_outside_strings(root, code.as_bytes()) {
+    if code.contains('\u{FFFD}') && replacement_outside_strings(root, code.as_bytes()) {
         return None;
     }
     let collector = Collector {
         src: code.as_bytes(),
         unparse: Unparser::new(code.as_bytes()),
+        hashes,
     };
     let mut symbols = Vec::new();
     collector.block(root, None, &mut symbols);
@@ -79,6 +93,7 @@ pub fn parse(code: &str) -> Option<Parsed> {
 struct Collector<'a> {
     src: &'a [u8],
     unparse: Unparser<'a>,
+    hashes: bool,
 }
 
 fn statements(node: Node<'_>) -> Vec<Node<'_>> {
@@ -281,6 +296,9 @@ impl Collector<'_> {
 
     /// A hash of the node's tokens without comments or layout, so reformatting is not a change.
     fn hash(&self, node: Node) -> u64 {
+        if !self.hashes {
+            return 0;
+        }
         let mut hasher = DefaultHasher::new();
         let mut cursor = node.walk();
         let mut stack = vec![node];
@@ -332,7 +350,11 @@ impl Kind {
 
 /// Symbol-level changes between two versions of a file, in name order.
 pub fn compare(old_code: &str, new_code: &str) -> Vec<SemanticChange> {
-    let symbols = |code: &str| parse(code).map(|p| p.symbols).unwrap_or_default();
+    let symbols = |code: &str| {
+        parse_with(code, true)
+            .map(|p| p.symbols)
+            .unwrap_or_default()
+    };
     let (old, new) = (symbols(old_code), symbols(new_code));
     let mut names: Vec<&String> = old.iter().chain(new.iter()).map(|s| &s.name).collect();
     names.sort();
@@ -520,13 +542,13 @@ mod tests {
 
     #[test]
     fn reformatting_keeps_the_hash() {
-        let a = parse("def f(x):\n    return x + 1  # one\n").unwrap();
-        let b = parse("def f(x):\n    return (x+1)\n").unwrap();
-        let c = parse("def f(x):\n    return x + 2\n").unwrap();
+        let a = parse_with("def f(x):\n    return x + 1  # one\n", true).unwrap();
+        let b = parse_with("def f(x):\n    return (x+1)\n", true).unwrap();
+        let c = parse_with("def f(x):\n    return x + 2\n", true).unwrap();
         let hash = |p: &Parsed| p.symbols[0].content_hash;
         assert_ne!(hash(&a), hash(&c));
         assert_eq!(
-            hash(&parse("def f(x):\n    return x + 1\n").unwrap()),
+            hash(&parse_with("def f(x):\n    return x + 1\n", true).unwrap()),
             hash(&a)
         );
         let _ = b;
