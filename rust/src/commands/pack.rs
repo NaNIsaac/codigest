@@ -239,9 +239,9 @@ pub fn excerpt(path: &Path, lines: &[usize], whole: &[(usize, usize)]) -> Option
 pub fn changed_paths(diff: &str, root: &Path) -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = Vec::new();
     for line in diff.lines() {
-        if line.starts_with("diff --git") {
-            let last = line.split_whitespace().last().unwrap_or("");
-            let p = pypath::resolve(&root.join(last.strip_prefix("b/").unwrap_or(last)));
+        // The header parser keeps names with spaces or quotes whole.
+        if let Some((_, new)) = crate::shadow::diff_header_paths(line) {
+            let p = pypath::resolve(&root.join(new));
             if p.is_file() && !paths.iter().any(|q| pypath::same(q, &p)) {
                 paths.push(p);
             }
@@ -722,6 +722,16 @@ mod tests {
         let diff = "diff --git a/x.py b/x.py\n--- a/x.py\n+++ b/x.py\n@@ -10,3 +12,4 @@\n a\n+b\n@@ -40 +43 @@\n-e\n+f\n";
         let spans = hunk_spans(diff, root);
         assert_eq!(spans.values().next().unwrap(), &vec![(12, 15), (43, 43)]);
+    }
+
+    #[test]
+    fn changed_paths_keeps_names_with_spaces() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("my dir")).unwrap();
+        std::fs::write(dir.path().join("my dir").join("c.md"), "").unwrap();
+        let found = changed_paths("diff --git a/my dir/c.md b/my dir/c.md\n", dir.path());
+        assert_eq!(found.len(), 1);
+        assert!(found[0].ends_with("my dir/c.md") || found[0].ends_with(r"my dir\c.md"));
     }
 
     #[test]

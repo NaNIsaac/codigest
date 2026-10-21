@@ -139,3 +139,10 @@ def test_naming_files_turns_automatic_sources_off_until_with_asks(tmp_path, monk
 
     bad = runner.invoke(app, ["pack", "--with", "everything"])
     assert bad.exit_code == 2 and "unknown source everything" in bad.output
+
+
+def test_changed_paths_keeps_names_with_spaces(tmp_path):
+    (tmp_path / "my dir").mkdir()
+    (tmp_path / "my dir" / "c.md").write_text("")
+    diff = "diff --git a/my dir/c.md b/my dir/c.md\n"
+    assert pack.changed_paths(diff, tmp_path) == [(tmp_path / "my dir" / "c.md").resolve()]

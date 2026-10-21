@@ -112,9 +112,9 @@ def excerpt(path: Path, lines: list[int], whole: list[tuple[int, int]] | None = 
 def changed_paths(diff: str, root: Path) -> list[Path]:
     paths = []
     for line in diff.splitlines():
-        if line.startswith("diff --git"):
-            p = line.split()[-1].removeprefix("b/")
-            if (path := (root / p).resolve()).is_file() and path not in paths:
+        # The header parser keeps names with spaces or quotes whole.
+        if names := shadow.diff_header_paths(line):
+            if (path := (root / names[1]).resolve()).is_file() and path not in paths:
                 paths.append(path)
     return paths
 
