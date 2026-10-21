@@ -186,7 +186,7 @@ def ingest(
         if file is None:
             data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
         else:
-            command, _, output = file.read_bytes().partition(b"\0")
+            command, _, output = _read_capture(file).partition(b"\0")
             # Locales with a decimal comma format $EPOCHREALTIME as 12,5.
             t0, t1 = (float(t.replace(",", ".")) for t in (start or "0", end or start or "0"))
             data = {
@@ -207,6 +207,23 @@ def ingest(
     finally:
         if file:
             file.unlink(missing_ok=True)
+
+
+# Raw bytes read from each end of a capture file. The bash hook writes everything a command
+# prints, so a server left running can leave a huge file; the store keeps 64 KB of it after
+# cleaning up, and this leaves that cleanup plenty to work with.
+RAW_KEEP = 1024 * 1024
+
+
+def _read_capture(file: Path) -> bytes:
+    size = file.stat().st_size
+    with file.open("rb") as f:
+        if size <= 4 * RAW_KEEP:
+            return f.read()
+        head = f.read(RAW_KEEP)
+        f.seek(-RAW_KEEP, 2)
+        marker = f"\n\n... [{size - 2 * RAW_KEEP} bytes elided by codigest] ...\n\n".encode()
+        return head + marker + f.read()
 
 
 def _ingest_log() -> Path:

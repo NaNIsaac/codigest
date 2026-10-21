@@ -36,6 +36,13 @@ __cdg_skip+='|^[[:space:]]*(herdr|zellij|k9s|lazydocker|gitui|tig|yazi|ranger|nn
 __cdg_skip+='|^[[:space:]]*(cdg|codigest)(\.exe)?[[:space:]]+(term|mcp)([[:space:]]|$)'
 __cdg_skip+='|^[[:space:]]*(python3?|py|ipython|node|pwsh|powershell|bash|zsh|sh|fish|cmd)(\.exe)?[[:space:]]*$'
 __cdg_skip+='|^[[:space:]]*git[[:space:]]+(rebase[[:space:]]+-i|add[[:space:]]+-[pi]|mergetool)'
+# Interactive prompts: a question that does not end its line stays invisible in the pipe
+# until the next newline, so the command looks stuck.
+__cdg_skip+='|^[[:space:]]*(docker|podman|kubectl)[[:space:]]+(run|exec|attach|start)([[:space:]].*)?[[:space:]](-[[:alnum:]]*[it][[:alnum:]]*|--interactive|--tty)([[:space:]]|$)'
+__cdg_skip+='|^[[:space:]]*(npm|pnpm|yarn|bun)[[:space:]]+(init|create)([[:space:]]|$)|^[[:space:]]*npx[[:space:]]+create-'
+__cdg_skip+='|^[[:space:]]*pip3?[[:space:]]+uninstall([[:space:]]|$)'
+__cdg_skip+='|^[[:space:]]*(gh[[:space:]]+auth[[:space:]]+login|az[[:space:]]+login|gcloud[[:space:]]+(auth[[:space:]]+login|init)|aws[[:space:]]+configure|ssh-keygen|ssh-copy-id|sudo|su|doas)([[:space:]]|$)'
+__cdg_skip+='|^[[:space:]]*(mysql|psql|sqlite3|redis-cli|mongosh|duckdb|julia|irb|ghci)([[:space:]]|$)|^[[:space:]]*ollama[[:space:]]+run([[:space:]]|$)'
 # A background job would hold the pipe open and the prompt would wait for it;
 # a heredoc body arrives as continuation lines.
 __cdg_skip+='|(^|[^&<>|])&($|[^&>])|(^|[^<])<<([^<]|$)'

@@ -69,8 +69,58 @@ fn from_json() -> anyhow::Result<Entry> {
     Ok(serde_json::from_value(value)?)
 }
 
+/// Raw bytes read from each end of a capture file. The bash hook writes everything a
+/// command prints, so a server left running can leave a huge file; the store keeps 64 KB of
+/// it after cleaning up, and this leaves that cleanup plenty to work with.
+pub const RAW_KEEP: u64 = 1024 * 1024;
+
+fn read_capture(file: &Path) -> std::io::Result<Vec<u8>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = fs::File::open(file)?;
+    let size = f.metadata()?.len();
+    if size <= 4 * RAW_KEEP {
+        let mut all = Vec::new();
+        f.read_to_end(&mut all)?;
+        return Ok(all);
+    }
+    let mut head = vec![0; RAW_KEEP as usize];
+    f.read_exact(&mut head)?;
+    f.seek(SeekFrom::End(-(RAW_KEEP as i64)))?;
+    let mut tail = Vec::new();
+    f.read_to_end(&mut tail)?;
+    head.extend_from_slice(
+        format!(
+            "\n\n... [{} bytes elided by codigest] ...\n\n",
+            size - 2 * RAW_KEEP
+        )
+        .as_bytes(),
+    );
+    head.extend(tail);
+    Ok(head)
+}
+
+#[cfg(test)]
+mod capture_limits {
+    use super::*;
+
+    #[test]
+    fn a_huge_capture_keeps_the_command_and_both_ends() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("capture");
+        let mut data = b"npm run dev\0first line\n".to_vec();
+        data.extend(std::iter::repeat_n(b'x', 5 * RAW_KEEP as usize));
+        data.extend(b"\nlast line\n");
+        fs::write(&file, &data).unwrap();
+        let read = read_capture(&file).unwrap();
+        assert!(read.starts_with(b"npm run dev\0first line\n"));
+        assert!(read.ends_with(b"\nlast line\n"));
+        assert!(String::from_utf8_lossy(&read).contains("bytes elided by codigest"));
+        assert!((read.len() as u64) < 3 * RAW_KEEP);
+    }
+}
+
 fn from_capture_file(file: &Path, args: &IngestArgs) -> anyhow::Result<Entry> {
-    let bytes = fs::read(file)?;
+    let bytes = read_capture(file)?;
     let (command, output) = match bytes.iter().position(|&b| b == 0) {
         Some(at) => (&bytes[..at], &bytes[at + 1..]),
         None => (&bytes[..], &bytes[..0]),
