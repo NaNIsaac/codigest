@@ -5,9 +5,103 @@ Modified to hide internal git repository from VS Code by renaming .git -> .shado
 lazy import shutil
 lazy from .common import hide_from_git, remove_tree
 lazy import subprocess
+import re
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from loguru import logger
+
+# Directories that belong to git, the anchor or Codigest and never to the project.
+_INTERNAL_DIRS = frozenset({".git", ".codigest", ".shadow_git"})
+_GIT_ESCAPES = {"a": 7, "b": 8, "f": 12, "n": 10, "r": 13, "t": 9, "v": 11, '"': 34, "\\": 92}
+_OCTAL = "01234567"
+
+
+def _quoted_end(text: str) -> int:
+    """Index of the quote that closes the quoted token `text` starts with, or -1."""
+    i = 1
+    while i < len(text):
+        if text[i] == "\\":
+            i += 2
+        elif text[i] == '"':
+            return i
+        else:
+            i += 1
+    return -1
+
+
+def _unquote(token: str) -> str:
+    """Undoes git's C-style quoting of a path: `"a/\\303\\245"` -> `a/å`."""
+    body, out, i = token[1:-1], bytearray(), 0
+    while i < len(body):
+        ch = body[i]
+        if ch != "\\" or i + 1 == len(body):
+            out += ch.encode("utf-8")
+            i += 1
+        elif body[i + 1] in _OCTAL:
+            j = i + 1
+            while j < len(body) and j < i + 4 and body[j] in _OCTAL:
+                j += 1
+            out.append(int(body[i + 1:j], 8) & 0xFF)
+            i = j
+        else:
+            escaped = body[i + 1]
+            if (code := _GIT_ESCAPES.get(escaped)) is not None:
+                out.append(code)
+            else:
+                out += escaped.encode("utf-8")
+            i += 2
+    return out.decode("utf-8", errors="replace")
+
+
+def diff_header_paths(line: str) -> tuple[str, str] | None:
+    """
+    The old and new path of a `diff --git` line, without git's `a/` and `b/` prefixes; None
+    if the line is not such a header.
+
+    A name with a space is written bare, so `a/my dir/c.md b/my dir/c.md` is split where both
+    halves read the same. A name with a quote, a tab or non-ASCII characters is written in
+    quotes with C-style escapes. If the two names differ and contain " b/" the split is a guess.
+    """
+    rest = line.removeprefix("diff --git ")
+    if rest == line or not rest:
+        return None
+
+    if rest.startswith('"'):
+        end = _quoted_end(rest)
+        if end == -1 or rest[end + 1:end + 2] != " ":
+            return None
+        old, raw = _unquote(rest[:end + 1]), rest[end + 2:]
+        new = _unquote(raw) if raw.startswith('"') else raw
+    elif (cut := rest.find(' "b/')) != -1:
+        old, new = rest[:cut], _unquote(rest[cut + 1:])
+    else:
+        old = new = None
+        half, odd = divmod(len(rest) - 5, 2)
+        if half > 0 and not odd:
+            left, right = rest[:2 + half], rest[3 + half:]
+            if rest[2 + half] == " " and left[2:] == right[2:] and left.startswith("a/") and right.startswith("b/"):
+                old, new = left, right
+        if old is None:
+            for found in re.finditer(" b/", rest):
+                if rest.startswith("a/"):
+                    old, new = rest[:found.start()], rest[found.start() + 1:]
+                    break
+            else:
+                return None
+
+    if not (old.startswith("a/") and new.startswith("b/")):
+        return None
+    return old[2:], new[2:]
+
+
+def _is_internal(header: str) -> bool:
+    """
+    Whether a `diff --git` section is about git's or the anchor's own files. Whole path
+    components, so `.gitignore`, `.github/` and `.gitattributes` are ordinary project files.
+    """
+    paths = diff_header_paths(header)
+    return paths is not None and any(_INTERNAL_DIRS & set(PurePosixPath(p).parts) for p in paths)
+
 
 class ContextAnchor:
     def __init__(self, root_path: Path):
@@ -203,7 +297,7 @@ class ContextAnchor:
             skip = False
             for line in diff_text.splitlines():
                 if line.startswith("diff --git"):
-                    skip = any(x in line for x in [".shadow_git", ".codigest", ".git"])
+                    skip = _is_internal(line)
                 if not skip:
                     clean_lines.append(line)
             return "\n".join(clean_lines)
@@ -214,18 +308,23 @@ class ContextAnchor:
                     remove_tree(d)
 
     def _prune_ignored_files(self, baseline_dir: Path, valid_rel_paths: set[Path]) -> None:
+        """
+        Drops baseline files that are still in the project but were not scanned (newly ignored,
+        or outside the filters), so they are not reported as deleted. A file that is gone from
+        disk stays and shows as deleted. Judged by the path inside the baseline: the absolute
+        one always runs through `.codigest`, which once made this skip every file.
+        """
         for file_path in baseline_dir.rglob("*"):
-            if file_path.is_file() and ".git" not in file_path.parts and ".codigest" not in file_path.parts and ".shadow_git" not in file_path.parts:
-                try:
-                    rel_path = file_path.relative_to(baseline_dir)
-                    if rel_path in valid_rel_paths:
-                        continue
-                    
-                    real_file = self.root / rel_path
-                    if real_file.exists():
-                        file_path.unlink()
-                except Exception:
+            if not file_path.is_file():
+                continue
+            try:
+                rel_path = file_path.relative_to(baseline_dir)
+                if _INTERNAL_DIRS & set(rel_path.parts) or rel_path in valid_rel_paths:
                     continue
+                if (self.root / rel_path).exists():
+                    file_path.unlink()
+            except Exception:
+                continue
 
     def get_last_update_time(self) -> str:
         if not self.git_dir.exists():
@@ -261,12 +360,6 @@ class ContextAnchor:
         raw_diff = self.get_changes(current_files)
         paths: set[Path] = set()
         for line in raw_diff.splitlines():
-            if line.startswith("diff --git"):
-                parts = line.split()
-                if len(parts) >= 4:
-                    p = parts[-1]
-                    if p.startswith(("b/", "a/")):
-                        p = p[2:]
-                    if not any(part in (".codigest", ".git", ".shadow_git") for part in Path(p).parts):
-                        paths.add(self.root / p)
+            if (header := diff_header_paths(line)) and not _is_internal(line):
+                paths.add(self.root / header[1])
         return sorted(paths)
