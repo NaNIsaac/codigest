@@ -2,9 +2,11 @@
 `cdg term` -- recall recent terminal commands (and their output) as LLM context.
 """
 
+import codecs
 import os
 import sys
 import traceback
+from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -319,27 +321,81 @@ def _targets(shell: str) -> list[Path]:
 
 
 def _strip_block(text: str) -> str:
-    start = text.find(_BEGIN)
-    end = text.find(_END)
-    if start == -1 or end == -1:
+    """Removes the block and the one line break that install put in front of it."""
+    start, end = text.find(_BEGIN), text.find(_END)
+    if start == -1 or end < start:
         return text
-    rest = (text[:start] + text[end + len(_END) :]).strip("\n")
-    return rest + "\n" if rest else ""
+    head, tail = text[:start], text[end + len(_END) :]
+    head = head.removesuffix("\r\n") if head.endswith("\r\n") else head.removesuffix("\n")
+    tail = tail.removeprefix("\r\n") if tail.startswith("\r\n") else tail.removeprefix("\n")
+    return head + tail
+
+
+def _with_block(text: str, line: str) -> str:
+    """Appends the block after the text as it is, so `_strip_block` gives the text back."""
+    rest = _strip_block(text)
+    nl = "\r\n" if "\r\n" in rest else "\n"
+    block = nl.join((_BEGIN, line, _END)) + nl
+    return f"{rest}{nl}{block}" if rest else block
+
+
+# What install found at each startup file (whether it existed, its BOM, folders it had
+# to create), so uninstall can put back exactly that.
+_STATE = "profiles.json"
+
+
+def _load_state(path: Path) -> dict[str, dict]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        return {}
+
+
+def _raw_capture_dirs() -> list[Path]:
+    """The private folders where the bash / zsh hook keeps output until ingest reads it."""
+    if os.name == "nt":
+        # Git Bash's TMPDIR is %TEMP%, and its uid is not the Windows one Python sees.
+        temp = os.environ.get("TEMP")
+        return sorted(Path(temp).glob("codigest-[0-9]*")) if temp else []
+    return [Path(os.environ.get("TMPDIR") or "/tmp") / f"codigest-{os.getuid()}"]
+
+
+def _remove_raw_captures(console: Console) -> None:
+    """
+    Deletes capture files a day old or more (raw output whose ingest never ran) and the
+    folder once it is empty. Newer files may belong to a command still running in a shell
+    that loaded the hook before uninstall.
+    """
+    day_ago = datetime.now().timestamp() - 86400
+    for folder in _raw_capture_dirs():
+        if not folder.is_dir() or folder.is_symlink():
+            continue
+        for file in folder.iterdir():
+            if file.is_file() and file.stat().st_mtime < day_ago:
+                file.unlink(missing_ok=True)
+        try:
+            folder.rmdir()
+        except OSError:
+            console.print(f"[yellow]Kept[/yellow] {folder} (a hooked shell may still write to it)")
 
 
 def _rewrite_profiles(add: bool, shell: str) -> None:
     console = Console()
     # Removing from a file that has no block is a no-op, so uninstall checks every shell.
-    if not (targets := _targets(shell if add or shell != "auto" else "all")):
+    everywhere = not add and shell in ("auto", "all")
+    if not (targets := _targets("all" if everywhere else shell)):
         console.print("[red][Error][/red] No supported shell found (PowerShell, bash, zsh).")
         raise typer.Exit(code=1)
 
+    data_dir = termstore.get_data_dir()
+    shell_dir = data_dir / "shell"
+    state_path = shell_dir / _STATE
+    state = _load_state(state_path)
     hook_ps1, hook_sh = HOOK_PATH, SH_HOOK_PATH
     if add:
         # Profiles load a copy, not the package itself: with an editable install the package
         # is a working tree, and whatever state it is in would run in every new shell.
         # `cdg term install` again refreshes the copy.
-        shell_dir = termstore.get_data_dir() / "shell"
         shell_dir.mkdir(parents=True, exist_ok=True)
         hook_ps1, hook_sh = shell_dir / HOOK_PATH.name, shell_dir / SH_HOOK_PATH.name
         shutil.copyfile(HOOK_PATH, hook_ps1)
@@ -347,30 +403,49 @@ def _rewrite_profiles(add: bool, shell: str) -> None:
     sh = _posix(hook_sh)
     for target in targets:
         is_ps = target.suffix == ".ps1"
-        text = ""
-        if target.exists():
-            try:
-                text = target.read_bytes().decode("utf-8-sig")
-            except UnicodeDecodeError:
-                # Rewriting a non-UTF-8 profile would corrupt it.
-                console.print(f"[yellow]Skipped[/yellow] {target} (not UTF-8; edit it by hand)")
-                continue
-        new = _strip_block(text)
+        raw = target.read_bytes() if target.is_file() else b""
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            # Rewriting a non-UTF-8 profile would corrupt it.
+            console.print(f"[yellow]Skipped[/yellow] {target} (not UTF-8; edit it by hand)")
+            continue
         if add:
             line = (
                 f"if (Test-Path '{hook_ps1}') {{ . '{hook_ps1}' }}"
                 if is_ps
                 else f"if [ -f '{sh}' ]; then . '{sh}'; fi"
             )
-            new = (new.rstrip("\n") + "\n\n" if new.strip() else "") + f"{_BEGIN}\n{line}\n{_END}\n"
-        elif new == text:
-            continue
+            new = _with_block(text, line)
+            state.setdefault(
+                str(target),
+                {
+                    "existed": target.is_file(),
+                    "bom": raw.startswith(codecs.BOM_UTF8),
+                    "dirs": [str(p) for p in target.parents if not p.exists()],
+                },
+            )
+            # BOM so Windows PowerShell 5.1 reads non-ASCII paths correctly; it would break bash.
+            bom = is_ps
+        else:
+            before = state.pop(str(target), None)
+            if (new := _strip_block(text)) == text:
+                continue
+            if before and not before["existed"] and not new:
+                target.unlink()
+                for folder in before["dirs"]:
+                    with suppress(OSError):
+                        Path(folder).rmdir()
+                console.print(f"[green]Removed[/green] {target}")
+                continue
+            # A block from an install that kept no record: leave the BOM as it is.
+            bom = before["bom"] if before else raw.startswith(codecs.BOM_UTF8)
         target.parent.mkdir(parents=True, exist_ok=True)
-        # BOM so Windows PowerShell 5.1 reads non-ASCII paths correctly; a BOM would break bash.
-        target.write_bytes(new.encode("utf-8-sig" if is_ps else "utf-8"))
+        target.write_bytes((codecs.BOM_UTF8 if bom else b"") + new.encode())
         console.print(f"[green]{'Installed' if add else 'Removed'}[/green] {target}")
 
     if add:
+        state_path.write_text(json.dumps(state, indent=1), encoding="utf-8")
         console.print("Active in new shell windows. Enable in this one now with:")
         if any(t.suffix == ".ps1" for t in targets):
             console.print(f"  PowerShell:  . '{hook_ps1}'", highlight=False)
@@ -379,6 +454,21 @@ def _rewrite_profiles(add: bool, shell: str) -> None:
         console.print(
             "[dim]Skip one command: start it with a space. Disable: set CODIGEST_NOCAP=1[/dim]"
         )
+    elif everywhere:
+        for name in (HOOK_PATH.name, SH_HOOK_PATH.name, _STATE):
+            (shell_dir / name).unlink(missing_ok=True)
+        for folder in (shell_dir, data_dir):
+            with suppress(OSError):
+                folder.rmdir()
+        _remove_raw_captures(console)
+        if termstore.get_history_path().exists():
+            console.print(
+                f"[dim]Captured commands are kept in {termstore.get_history_path()}; "
+                "`cdg term clear` deletes them.[/dim]",
+                highlight=False,
+            )
+    elif state_path.exists():
+        state_path.write_text(json.dumps(state, indent=1), encoding="utf-8")
 
 
 @app.command("install")

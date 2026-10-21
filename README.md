@@ -480,7 +480,10 @@ normally) and appear in your history as typed. Programs that need a real termina
 - Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'` (bash/zsh:
   `export CODIGEST_CAP_SKIP='^(myrepl|mytui)( |$)'`, an extended regex).
 - Disable for a session: `$env:CODIGEST_NOCAP = 1` (bash/zsh: `export CODIGEST_NOCAP=1`).
-- Remove the hooks: `cdg term uninstall`.
+- Remove the hooks: `cdg term uninstall`. Each startup file gets back the exact bytes it had
+  before install (line endings, BOM, final newline); one that install created is deleted with
+  any folder made for it, as are the hook copies in the data folder. Captured commands stay
+  until `cdg term clear`.
 
 The profile loads a copy of the hook that `cdg term install` puts in the data folder (`shell/` next to the captures), not the file inside the package. After updating codigest, run `cdg term install` again to refresh it.
 

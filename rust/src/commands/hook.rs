@@ -5,17 +5,19 @@
 //! to the data directory at install time with the lookup of the `cdg` executable pointed
 //! at this binary, because a profile has to source a file that exists on disk.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, SystemTime};
 
 use clap::Args;
+use serde::{Deserialize, Serialize};
 
 use crate::paths;
 use crate::runner::which;
 use crate::style::{dim, green, red, yellow};
-use crate::term::is_space;
 
 const BEGIN: &str = "# >>> codigest terminal capture >>>";
 const END: &str = "# <<< codigest terminal capture <<<";
@@ -134,38 +136,129 @@ fn is_powershell(target: &Path) -> bool {
     target.extension().is_some_and(|e| e == "ps1")
 }
 
-/// Removes the marked block, if both markers are there.
+/// Removes the block and the one line break that install put in front of it.
 pub fn strip_block(text: &str) -> String {
     let (Some(start), Some(end)) = (text.find(BEGIN), text.find(END)) else {
         return text.to_string();
     };
-    let rest = format!(
-        "{}{}",
-        &text[..start],
-        &text[(end + END.len()).min(text.len())..]
-    );
-    let rest = rest.trim_matches('\n');
+    if end < start {
+        return text.to_string();
+    }
+    let head = &text[..start];
+    let head = head
+        .strip_suffix("\r\n")
+        .or_else(|| head.strip_suffix('\n'))
+        .unwrap_or(head);
+    let tail = &text[end + END.len()..];
+    let tail = tail
+        .strip_prefix("\r\n")
+        .or_else(|| tail.strip_prefix('\n'))
+        .unwrap_or(tail);
+    format!("{head}{tail}")
+}
+
+/// Appends the block after the text as it is, so `strip_block` gives the text back.
+pub fn with_block(text: &str, line: &str) -> String {
+    let rest = strip_block(text);
+    let nl = if rest.contains("\r\n") { "\r\n" } else { "\n" };
+    let block = format!("{BEGIN}{nl}{line}{nl}{END}{nl}");
     if rest.is_empty() {
-        String::new()
+        block
     } else {
-        format!("{rest}\n")
+        format!("{rest}{nl}{block}")
     }
 }
 
-/// The profile text with the capture block added (replacing an older one).
-pub fn with_block(text: &str, line: &str) -> String {
-    let stripped = strip_block(text);
-    let lead = if stripped.trim_matches(is_space).is_empty() {
-        String::new()
-    } else {
-        format!("{}\n\n", stripped.trim_end_matches('\n'))
+const BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+
+/// What install found at each startup file (whether it existed, its BOM, folders it had
+/// to create), so uninstall can put back exactly that. The Python build reads it too.
+const STATE: &str = "profiles.json";
+
+#[derive(Serialize, Deserialize)]
+struct Before {
+    existed: bool,
+    bom: bool,
+    dirs: Vec<String>,
+}
+
+fn load_state(path: &Path) -> BTreeMap<String, Before> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// The private folders where the bash / zsh hook keeps output until ingest reads it.
+#[cfg(windows)]
+fn raw_capture_dirs() -> Vec<PathBuf> {
+    // Git Bash's TMPDIR is %TEMP%, and its uid is not one Windows knows.
+    let Some(temp) = env::var_os("TEMP").filter(|v| !v.is_empty()) else {
+        return Vec::new();
     };
-    format!("{lead}{BEGIN}\n{line}\n{END}\n")
+    let mut dirs: Vec<PathBuf> = fs::read_dir(temp)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .strip_prefix("codigest-")
+                .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()))
+        })
+        .map(|e| e.path())
+        .collect();
+    dirs.sort();
+    dirs
+}
+
+#[cfg(unix)]
+fn raw_capture_dirs() -> Vec<PathBuf> {
+    use std::os::unix::fs::MetadataExt;
+    // Without libc: Linux's /proc/self belongs to this process's uid, and elsewhere the
+    // home folder belongs to the user.
+    let Some(uid) = fs::metadata("/proc/self")
+        .or_else(|_| fs::metadata(paths::home()))
+        .ok()
+        .map(|m| m.uid())
+    else {
+        return Vec::new();
+    };
+    let base = env::var_os("TMPDIR")
+        .filter(|v| !v.is_empty())
+        .map_or_else(|| PathBuf::from("/tmp"), PathBuf::from);
+    vec![base.join(format!("codigest-{uid}"))]
+}
+
+/// Deletes capture files a day old or more (raw output whose ingest never ran) and the
+/// folder once it is empty. Newer files may belong to a command still running in a shell
+/// that loaded the hook before uninstall.
+fn remove_raw_captures() {
+    let day_ago = SystemTime::now() - Duration::from_secs(86400);
+    for folder in raw_capture_dirs() {
+        if !fs::symlink_metadata(&folder).is_ok_and(|m| m.is_dir()) {
+            continue;
+        }
+        for entry in fs::read_dir(&folder).into_iter().flatten().flatten() {
+            let Ok(meta) = entry.metadata() else { continue };
+            if meta.is_file() && meta.modified().is_ok_and(|t| t < day_ago) {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+        if fs::remove_dir(&folder).is_err() {
+            println!(
+                "{} {} (a hooked shell may still write to it)",
+                yellow("Kept"),
+                folder.display()
+            );
+        }
+    }
 }
 
 fn rewrite_profiles(add: bool, shell: &str) -> anyhow::Result<i32> {
     // Removing from a file that has no block is a no-op, so uninstall checks every shell.
-    let selected = targets(if add || shell != "auto" { shell } else { "all" });
+    let everywhere = !add && (shell == "auto" || shell == "all");
+    let selected = targets(if everywhere { "all" } else { shell });
     if selected.is_empty() {
         println!(
             "{} No supported shell found (PowerShell, bash, zsh).",
@@ -175,6 +268,8 @@ fn rewrite_profiles(add: bool, shell: &str) -> anyhow::Result<i32> {
     }
 
     let dir = hook_dir();
+    let state_path = dir.join(STATE);
+    let mut state = load_state(&state_path);
     let ps1_path = dir.join("hook.ps1");
     let sh_path = dir.join("hook.sh");
     if add {
@@ -188,50 +283,66 @@ fn rewrite_profiles(add: bool, shell: &str) -> anyhow::Result<i32> {
 
     for target in &selected {
         let ps = is_powershell(target);
-        let mut text = String::new();
-        if target.exists() {
-            let bytes = fs::read(target)?;
-            match std::str::from_utf8(&bytes) {
-                Ok(decoded) => {
-                    text = decoded
-                        .strip_prefix('\u{feff}')
-                        .unwrap_or(decoded)
-                        .to_string()
-                }
-                Err(_) => {
-                    // Rewriting a non-UTF-8 profile would corrupt it.
-                    println!(
-                        "{} {} (not UTF-8; edit it by hand)",
-                        yellow("Skipped"),
-                        target.display()
-                    );
-                    continue;
-                }
-            }
-        }
-        let new = if add {
+        let raw = if target.is_file() {
+            fs::read(target)?
+        } else {
+            Vec::new()
+        };
+        let Ok(decoded) = std::str::from_utf8(&raw) else {
+            // Rewriting a non-UTF-8 profile would corrupt it.
+            println!(
+                "{} {} (not UTF-8; edit it by hand)",
+                yellow("Skipped"),
+                target.display()
+            );
+            continue;
+        };
+        let text = decoded.strip_prefix('\u{feff}').unwrap_or(decoded);
+        let key = target.to_string_lossy().into_owned();
+        let (new, bom) = if add {
             let line = if ps {
                 format!("if (Test-Path {q}) {{ . {q} }}", q = ps_quote(&ps1))
             } else {
                 format!("if [ -f {q} ]; then . {q}; fi", q = sh_quote(&sh))
             };
-            with_block(&text, &line)
+            state.entry(key).or_insert_with(|| Before {
+                existed: target.is_file(),
+                bom: raw.starts_with(&BOM),
+                dirs: target
+                    .ancestors()
+                    .skip(1)
+                    .filter(|p| !p.as_os_str().is_empty() && !p.exists())
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .collect(),
+            });
+            // BOM so Windows PowerShell 5.1 reads non-ASCII paths correctly; it would break bash.
+            (with_block(text, &line), ps)
         } else {
-            let stripped = strip_block(&text);
+            let before = state.remove(&key);
+            let stripped = strip_block(text);
             if stripped == text {
                 continue;
             }
-            stripped
+            match before {
+                Some(before) if !before.existed && stripped.is_empty() => {
+                    fs::remove_file(target)?;
+                    for folder in &before.dirs {
+                        let _ = fs::remove_dir(folder);
+                    }
+                    println!("{} {}", green("Removed"), target.display());
+                    continue;
+                }
+                // A block from an install that kept no record: leave the BOM as it is.
+                before => {
+                    let bom = before.map_or_else(|| raw.starts_with(&BOM), |b| b.bom);
+                    (stripped, bom)
+                }
+            }
         };
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent)?;
         }
-        // BOM so Windows PowerShell 5.1 reads non-ASCII paths correctly; a BOM would break bash.
-        let mut bytes = if ps {
-            vec![0xEF, 0xBB, 0xBF]
-        } else {
-            Vec::new()
-        };
+        let mut bytes = if bom { BOM.to_vec() } else { Vec::new() };
         bytes.extend_from_slice(new.as_bytes());
         fs::write(target, bytes)?;
         println!(
@@ -242,6 +353,7 @@ fn rewrite_profiles(add: bool, shell: &str) -> anyhow::Result<i32> {
     }
 
     if add {
+        fs::write(&state_path, serde_json::to_string_pretty(&state)?)?;
         println!("Active in new shell windows. Enable in this one now with:");
         if selected.iter().any(|t| is_powershell(t)) {
             println!("  PowerShell:  . '{ps1}'");
@@ -253,6 +365,27 @@ fn rewrite_profiles(add: bool, shell: &str) -> anyhow::Result<i32> {
             "{}",
             dim("Skip one command: start it with a space. Disable: set CODIGEST_NOCAP=1")
         );
+    } else if everywhere {
+        for path in [&ps1_path, &sh_path, &state_path] {
+            let _ = fs::remove_file(path);
+        }
+        let _ = fs::remove_dir(&dir);
+        if let Some(data) = dir.parent() {
+            let _ = fs::remove_dir(data);
+        }
+        remove_raw_captures();
+        let history = crate::term::term_dir().join("history.jsonl");
+        if history.exists() {
+            println!(
+                "{}",
+                dim(&format!(
+                    "Captured commands are kept in {}; `cdg term clear` deletes them.",
+                    history.display()
+                ))
+            );
+        }
+    } else if state_path.exists() {
+        fs::write(&state_path, serde_json::to_string_pretty(&state)?)?;
     }
     Ok(0)
 }
@@ -278,6 +411,28 @@ mod tests {
         assert_eq!(strip_block(&once), "export A=1\n");
         assert_eq!(strip_block(&with_block("", line)), "");
         assert_eq!(strip_block("no markers"), "no markers");
+        for text in [
+            "a", "a
+
+
+", "
+", "a
+b", "a
+b
+",
+        ] {
+            assert_eq!(strip_block(&with_block(text, line)), text);
+        }
+        assert!(
+            with_block(
+                "a
+", line
+            )
+            .ends_with(&format!(
+                "{END}
+"
+            ))
+        );
     }
 
     #[test]
