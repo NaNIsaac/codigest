@@ -32,6 +32,7 @@ def test_ingest_stdin_json_still_works(tmp_path, monkeypatch):
 
 def test_install_uninstall_rc_files(tmp_path, monkeypatch):
     monkeypatch.setattr(term.Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("CODIGEST_HOME", str(tmp_path / "data"))
     monkeypatch.delenv("ZDOTDIR", raising=False)
     monkeypatch.setattr(term, "_powershell_profiles", lambda: [])
     monkeypatch.setattr(term.shutil, "which", lambda name: "/bin/bash" if name == "bash" else None)
@@ -43,7 +44,10 @@ def test_install_uninstall_rc_files(tmp_path, monkeypatch):
     assert runner.invoke(term.app, ["install"]).exit_code == 0  # idempotent
     text = bashrc.read_bytes().decode()
     assert text.startswith("alias g=git\n\n" + term._BEGIN) and text.count(term._BEGIN) == 1
-    assert f". '{term._posix(term.SH_HOOK_PATH)}'" in text and "\r" not in text
+    # The profile loads a copy in the data folder, not the package's own file.
+    copy = tmp_path / "data" / "shell" / "hook.sh"
+    assert copy.read_bytes() == term.SH_HOOK_PATH.read_bytes()
+    assert f". '{term._posix(copy)}'" in text and "\r" not in text
     assert not text.startswith("\ufeff") and not zshrc.exists()
 
     assert runner.invoke(term.app, ["install", "--shell", "zsh"]).exit_code == 0

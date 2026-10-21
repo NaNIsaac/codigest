@@ -318,7 +318,17 @@ def _rewrite_profiles(add: bool, shell: str) -> None:
         console.print("[red][Error][/red] No supported shell found (PowerShell, bash, zsh).")
         raise typer.Exit(code=1)
 
-    sh = _posix(SH_HOOK_PATH)
+    hook_ps1, hook_sh = HOOK_PATH, SH_HOOK_PATH
+    if add:
+        # Profiles load a copy, not the package itself: with an editable install the package
+        # is a working tree, and whatever state it is in would run in every new shell.
+        # `cdg term install` again refreshes the copy.
+        shell_dir = termstore.get_data_dir() / "shell"
+        shell_dir.mkdir(parents=True, exist_ok=True)
+        hook_ps1, hook_sh = shell_dir / HOOK_PATH.name, shell_dir / SH_HOOK_PATH.name
+        shutil.copyfile(HOOK_PATH, hook_ps1)
+        shutil.copyfile(SH_HOOK_PATH, hook_sh)
+    sh = _posix(hook_sh)
     for target in targets:
         is_ps = target.suffix == ".ps1"
         text = ""
@@ -332,7 +342,7 @@ def _rewrite_profiles(add: bool, shell: str) -> None:
         new = _strip_block(text)
         if add:
             line = (
-                f"if (Test-Path '{HOOK_PATH}') {{ . '{HOOK_PATH}' }}"
+                f"if (Test-Path '{hook_ps1}') {{ . '{hook_ps1}' }}"
                 if is_ps
                 else f"if [ -f '{sh}' ]; then . '{sh}'; fi"
             )
@@ -347,7 +357,7 @@ def _rewrite_profiles(add: bool, shell: str) -> None:
     if add:
         console.print("Active in new shell windows. Enable in this one now with:")
         if any(t.suffix == ".ps1" for t in targets):
-            console.print(f"  PowerShell:  . '{HOOK_PATH}'", highlight=False)
+            console.print(f"  PowerShell:  . '{hook_ps1}'", highlight=False)
         if any(t.suffix != ".ps1" for t in targets):
             console.print(f"  bash / zsh:  . '{sh}'", highlight=False)
         console.print("[dim]Skip one command: start it with a space. Disable: set CODIGEST_NOCAP=1[/dim]")
