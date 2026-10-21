@@ -1,13 +1,35 @@
 # Rust 포팅
 
-::: warning 상태: 저장소에서는 완료, 아직 배포 전
-Python 빌드의 모든 명령을 Rust로 옮겼습니다. 아직 릴리스는 없습니다. 배포된 바이너리도, 설치 프로그램도 없습니다. 지금 배포된 구현은 PyPI의 Python 패키지뿐이고, 이 사이트의 다른 페이지는 그것을 설명합니다.
+::: info 상태: 미리보기로 배포
+Python 빌드의 모든 명령을 Rust로 옮겼고, 빌드된 바이너리를 사전 릴리스(pre-release)로 표시한 GitHub 릴리스에 올려 두었습니다([설치](#설치) 참고). 주 배포판은 여전히 PyPI의 Python 패키지이고, 이 사이트의 다른 페이지는 그것을 설명합니다.
 :::
 
 포팅한 결과는 네이티브 바이너리 하나이며, 저장소의 Python 패키지 옆(`rust/`)에서 빌드합니다. 기준은 Python 빌드(`src/codigest`)입니다. 같은 입력에 대해 Rust 빌드는 같은 바이트를 stdout으로 출력하고 같은 종료 코드로 끝나야 합니다.
 
 지금은 바이너리 이름이 `cdg-rs`여서, Python `cdg` 옆에 두고 비교할 수 있습니다. 두 프로그램은 별개입니다. 둘은 같은 데이터를 읽고 씁니다. 터미널 기록 저장소, 프로젝트의 `.codigest/`(설정, 기준점, 캐시), 셸 훅이 그것입니다.
 
+## 설치
+
+`rust-v*` 태그의 GitHub 릴리스에 빌드된 바이너리가 있습니다. Windows x64, Linux x64와 ARM64(정적 링크, musl), macOS Intel과 Apple Silicon, Termux용 Android ARM64입니다. 압축 파일 안에는 타깃 이름의 폴더가 있고, 그 안에 `cdg-rs`(Windows는 `cdg-rs.exe`)와 라이선스가 들어 있습니다.
+
+Windows (PowerShell):
+
+```powershell
+$v = "0.12.0"; $t = "x86_64-pc-windows-msvc"
+Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/cdg-rs-$v-$t.zip" -OutFile cdg-rs.zip
+Expand-Archive cdg-rs.zip "$env:LOCALAPPDATA\Programs" -Force
+# 그다음 $env:LOCALAPPDATA\Programs\cdg-rs-$v-$t 를 PATH에 추가
+```
+
+Linux, macOS, Termux (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `aarch64-linux-android` 중 하나):
+
+```bash
+v=0.12.0; t=x86_64-unknown-linux-musl
+curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/cdg-rs-$v-$t.tar.gz" | tar xz
+install "cdg-rs-$v-$t/cdg-rs" ~/.local/bin/
+```
+
+GitHub CLI로는 `gh release download rust-v0.12.0 -R NaNIsaac/codigest -p '*windows*'`.
 ## 빌드
 
 Rust 툴체인이 필요합니다. 저장소를 내려받은 폴더에서 다음을 실행합니다.
