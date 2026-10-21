@@ -273,7 +273,9 @@ mod tests {
     #[test]
     fn resolves_project_modules_and_skips_the_standard_library() {
         let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
+        // CI temp folders are 8.3 short names on Windows and behind /var -> /private/var on
+        // macOS; found modules come back canonical, so the root must be too for the order.
+        let root = &canonical(dir.path());
         fs::create_dir_all(root.join("src/pkg")).unwrap();
         fs::write(root.join("src/pkg/__init__.py"), "from .core import f\n").unwrap();
         fs::write(root.join("src/pkg/core.py"), "import os\n").unwrap();
