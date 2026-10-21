@@ -7,7 +7,7 @@ from rich.markup import escape
 lazy from ..core import common, shadow, termstore
 lazy from . import pack
 
-console = Console()
+console = Console(soft_wrap=True)  # a path or command must stay on one line when piped
 
 
 def handle(
