@@ -47,6 +47,11 @@ HereOption = Annotated[
     typer.Option("--here", help="Only commands run in the current directory or below"),
 ]
 
+ContextOption = Annotated[
+    bool,
+    typer.Option("--context", help="Include captured PC hostname and shell in the copied output"),
+]
+
 HistoryOnlyOption = Annotated[
     bool,
     typer.Option(
@@ -77,6 +82,7 @@ def handle(
     failed: FailedOption = False,
     here: HereOption = False,
     history_only: HistoryOnlyOption = False,
+    context: ContextOption = False,
     copy: CopyOption = None,
     stdout: StdoutOption = False,
     output: OutputOption = None,
@@ -91,6 +97,7 @@ def handle(
         cdg term -n 3         # the last 3 commands
         cdg term -i 3         # only the command from 3 runs ago
         cdg term -f           # the last failed command
+        cdg term --context    # include host + shell when copying for AI
         cdg term --here -n 3  # the last 3 commands run in this project
     """
     if ctx.invoked_subcommand:
@@ -137,7 +144,7 @@ def handle(
     else:
         selected = entries[-count:]
 
-    content = termstore.render(selected)
+    content = termstore.render(selected, include_context=context)
     handler.handle_output(
         content,
         summary=lambda: _summarize(handler, selected),
