@@ -17,7 +17,11 @@ if ($env:CDG_VERSION) {
     $tag = 'rust-v' + ($env:CDG_VERSION -replace '^(rust-)?v', '')
     $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/tags/$tag"
 } else {
-    $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest"
+    # not releases/latest: a GitHub release for a Python v* tag would take that spot
+    $release = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases?per_page=30") |
+        Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -like 'rust-v*' } |
+        Select-Object -First 1
+    if (-not $release) { throw "No rust-v* release found in $repo." }
 }
 $asset = $release.assets | Where-Object { $_.name -like "codigest-*-$target.zip" } | Select-Object -First 1
 if (-not $asset) {
@@ -33,6 +37,13 @@ try {
     $zip = Join-Path $work $asset.name
     Write-Host "Downloading $($asset.name)"
     Invoke-WebRequest $asset.browser_download_url -OutFile $zip
+    # GitHub records each asset's SHA-256 as "sha256:<hex>"
+    if ("$($asset.digest)" -notmatch '^sha256:([0-9a-f]{64})$') {
+        throw "Release $($release.tag_name) has no SHA-256 digest for $($asset.name)."
+    }
+    $fs = [IO.File]::OpenRead($zip)
+    try { $got = -join ([Security.Cryptography.SHA256]::Create().ComputeHash($fs) | ForEach-Object { $_.ToString('x2') }) } finally { $fs.Dispose() }
+    if ($got -ne $Matches[1]) { throw "Checksum mismatch for $($asset.name): expected $($Matches[1]), got $got." }
     Expand-Archive $zip $work
     $exe = Get-ChildItem $work -Recurse -Filter cdg.exe | Select-Object -First 1
     New-Item -ItemType Directory -Force $dir | Out-Null
@@ -52,6 +63,11 @@ if (-not (($env:Path -split ';') -contains $dir)) {
 }
 
 Write-Host "Installed $(& (Join-Path $dir 'cdg.exe') --version) to $dir"
+# The Python package (uv tool, pipx) also provides cdg; whichever is first on PATH runs.
+$first = Get-Command cdg -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($first -and -not ((Split-Path $first.Source) -ieq $dir.TrimEnd('\'))) {
+    Write-Warning "cdg in new shells is $($first.Source) ($(& $first.Source --version)), not this install. Remove one (e.g. 'uv tool uninstall codigest') or put $dir earlier on PATH."
+}
 if ($custom -and -not $onPath) {
     Write-Host "Add $dir to PATH to run cdg from anywhere."
 }
