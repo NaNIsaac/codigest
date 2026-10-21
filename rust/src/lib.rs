@@ -4,6 +4,7 @@ pub mod commands;
 pub mod output;
 pub mod paths;
 pub mod redact;
+pub mod runner;
 pub mod shellhist;
 pub mod style;
 pub mod tags;
