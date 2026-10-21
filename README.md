@@ -302,9 +302,13 @@ Plain `cdg pack` fills its token budget (default 30,000) in this order:
    Once the same command passes again, that failure is no longer used. A file that is only named
    in the output, not changed by you, comes as an excerpt: ten lines around each place the output
    points at, marked with a `lines="40-60"` attribute. Short files come whole.
-2. Files you changed: uncommitted and untracked files in Git, or changes since `cdg mark`.
-3. Tests that import those files (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js`, ...).
-4. Project files they import: Python imports, and relative imports in JS/TS (`./x`, `./x.js` for
+2. The project functions and classes that the failing Python tests call, whole, with reason
+   `called from failing test ...`. A traceback that ends in an assertion names only the test; this
+   brings the code under test even when the bug is already committed and nothing shows in a diff.
+3. Files you changed: uncommitted and untracked files in Git, or changes since `cdg mark`. A long
+   changed file comes as the parts its diff hunks touch (the diff itself is in the pack already).
+4. Tests that import those files (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.js`, ...).
+5. Project files they import: Python imports, and relative imports in JS/TS (`./x`, `./x.js` for
    `x.ts`, `./dir` for `dir/index.ts`).
 
 When you name files, you get only those files. `--with` adds automatic sources back:
@@ -316,7 +320,9 @@ cdg pack --with changes                        # only your changes, no failure
 cdg pack --with failure,changes,tests,imports  # the same as plain `cdg pack`
 ```
 
-The failed command and the diff are always included when their source is on. Tokens are estimated
+The failed command and the diff are always included when their source is on. A long command
+output keeps its first 80 and last 40 lines (the first failures and the summary); `cdg term -f`
+shows all of it. Tokens are estimated
 at four characters each, so the budget is approximate.
 
 ### Making it smoother
