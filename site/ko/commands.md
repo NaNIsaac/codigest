@@ -260,17 +260,21 @@ SemDiff Generated! (~70 Tokens)
 명령을 평소처럼 실행하되, 그 출력을 `pack`과 `term`이 쓸 수 있게 남겨 둡니다.
 
 ```console
-cdg cap [--] COMMAND...
+cdg cap [출력 옵션] [--] COMMAND...
 ```
 
-`cap`에는 자체 옵션이 없습니다. `cap` 뒤에 오는 것은 모두 실행할 명령의 몫입니다. 명령의 플래그가 그대로 넘어가도록 명령 앞에 `--`를 붙이세요. 출력은 `cap` 없이 실행할 때와 똑같이 실시간으로 나오고, stdout과 stderr는 섞인 하나의 흐름으로 기록됩니다. `cap`은 실행한 명령의 종료 코드로 끝나므로 스크립트에서 명령 앞에 둘 수 있습니다.
+명령 뒤에 오는 것은 모두 그 명령의 몫입니다. 명령의 플래그가 그대로 넘어가도록 명령 앞에 `--`를 붙이세요. 출력은 `cap` 없이 실행할 때와 똑같이 실시간으로 나오고, stdout과 stderr는 섞인 하나의 흐름으로 기록됩니다. `cap`은 실행한 명령의 종료 코드로 끝나므로 스크립트에서 명령 앞에 둘 수 있습니다.
 
 셸 문자(`|`, `&`, `>`, `<`, `;`, `$`, `` ` ``, `*`, `?`, `(`, `)`)가 든 인자 하나는 셸을 거쳐 실행됩니다. 파이프라인은 이렇게 동작합니다: `cdg cap "npm run build | tail -20"`. 이때 쓰는 셸은 Windows에서는 PowerShell(설치되어 있으면), 그 밖에는 `$SHELL` 또는 bash입니다. 다른 셸을 쓰려면 `CODIGEST_SHELL`을 설정하세요.
+
+PowerShell에서는 스크립트 블록도 됩니다: `cdg cap { Get-ChildItem | Sort-Object Length }`. PowerShell은 `pwsh { ... }`에 넘길 때와 같은 방식으로 블록을 넘기고, `cap`은 이를 `pwsh -NoProfile`로 실행합니다. 그래서 지금 세션의 변수와 함수는 블록 안에서 쓸 수 없습니다. 종료 코드는 `pwsh -Command`를 따릅니다. `exit`에 준 숫자, 그렇지 않으면 마지막 문장이 실패했을 때 1, 아니면 0입니다.
+
+명령 앞에 출력 옵션을 쓰면 `cap`은 명령이 끝난 뒤 그 실행을 `cdg term`이 줄 것과 같은 블록으로 넘깁니다: `-c`/`--copy`, `--no-copy`, `-s`/`--stdout`, `-o`/`--output 파일`, `--format xml|markdown|json` ([출력 옵션](#output-options) 참고). 옵션이 없으면 기록만 합니다. 스크립트 블록 앞에서는 긴 형태 `--copy`, `--output`을 쓰세요. PowerShell이 `-c`와 `-o`를 자기 `-Command`, `-OutputFormat`으로 읽습니다.
 
 | 종료 코드 | 언제 |
 | --- | --- |
 | 명령 자신의 코드 | 명령이 실행되었을 때 |
-| 2 | 명령을 주지 않았을 때 |
+| 2 | 명령을 주지 않았거나 출력 옵션이 잘못되었을 때 |
 | 127 | 프로그램을 찾지 못했을 때 |
 
 기록은 프로젝트별이 아니라 컴퓨터 한 곳에 모읍니다. [터미널 기록](/ko/terminal-capture)을 참고하세요.
@@ -278,6 +282,8 @@ cdg cap [--] COMMAND...
 ```bash
 cdg cap -- pytest -q
 cdg cap "npm run build | tail -20"
+cdg cap --copy -- pytest -q          # 실행한 뒤 결과를 채팅용으로 복사
+cdg cap -s --format markdown { Get-ChildItem | Sort-Object Length -Descending | Select-Object -First 5 }
 ```
 
 ## `cdg pack`

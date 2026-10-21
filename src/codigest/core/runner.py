@@ -112,7 +112,11 @@ def run(args: list[str]) -> tuple[int, str, int]:
     still returned, since an interrupted run is often exactly what the user
     wants to hand to an LLM.
     """
-    argv = build_argv(args)
+    return run_argv(build_argv(args))
+
+
+def run_argv(argv: list[str]) -> tuple[int, str, int]:
+    """`run` for an argv that is already final, such as a PowerShell -EncodedCommand call."""
     chunks: list[bytes] = []
     started = time.monotonic()
 

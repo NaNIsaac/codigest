@@ -53,7 +53,8 @@ fn ingest(args: &IngestArgs) -> anyhow::Result<()> {
         None => from_json()?,
         Some(file) => from_capture_file(file, args)?,
     };
-    term::append_entry(entry, false)
+    term::append_entry(entry, false)?;
+    Ok(())
 }
 
 fn from_json() -> anyhow::Result<Entry> {

@@ -297,7 +297,11 @@ fn exit_code_of(status: std::process::ExitStatus) -> i32 {
 /// the child a few seconds to leave, and still returns the partial output, since an
 /// interrupted run is often exactly what the user wants to hand to an LLM.
 pub fn run(args: &[String]) -> Result<Captured, RunError> {
-    let argv = build_argv(args);
+    run_argv(&build_argv(args))
+}
+
+/// [`run`] for an argv that is already final, such as a PowerShell `-EncodedCommand` call.
+pub fn run_argv(argv: &[String]) -> Result<Captured, RunError> {
     let started = Instant::now();
 
     let (mut reader, writer) = io::pipe().map_err(RunError::Launch)?;

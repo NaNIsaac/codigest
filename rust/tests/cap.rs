@@ -298,3 +298,34 @@ fn parity_term_renders_what_either_build_stored() {
         normalise(&String::from_utf8_lossy(&from_py.stdout))
     );
 }
+
+#[test]
+fn options_before_the_command_hand_over_the_stored_entry() {
+    let home = tempfile::tempdir().unwrap();
+    let program = script(0);
+
+    let output = rust(home.path())
+        .args(["cap", "--stdout", "--format", "json", "--"])
+        .args(&program)
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(0));
+    let shown = stdout_of(&output);
+    // The live output first, then the entry as `cdg term --format json` would print it.
+    assert!(
+        shown.find("to-out").unwrap() < shown.find("\"exit_code\": 0").unwrap(),
+        "{shown}"
+    );
+    assert_eq!(history(home.path()).len(), 1);
+}
+
+#[test]
+#[ignore = "needs CODIGEST_PARITY=1 and the Python cdg"]
+fn parity_cap_hands_over_the_entry() {
+    require_parity();
+    let program = script(3);
+    let mut args = vec!["--stdout", "--"];
+    args.extend(program.iter().map(String::as_str));
+    compare_cap(&args);
+}

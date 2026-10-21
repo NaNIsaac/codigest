@@ -260,17 +260,21 @@ SemDiff Generated! (~70 Tokens)
 Run a command as usual and keep its output for `pack` and `term`.
 
 ```console
-cdg cap [--] COMMAND...
+cdg cap [OUTPUT OPTIONS] [--] COMMAND...
 ```
 
-`cap` has no options of its own: everything after it belongs to the wrapped command. Put `--` before the command so its flags are passed through. The output streams live, exactly as without `cap`, and stdout and stderr are recorded as one interleaved stream. `cap` exits with the wrapped command's exit code, so it can sit in front of a command in a script.
+Everything after the command belongs to it. Put `--` before the command so its flags are passed through. The output streams live, exactly as without `cap`, and stdout and stderr are recorded as one interleaved stream. `cap` exits with the wrapped command's exit code, so it can sit in front of a command in a script.
 
 A single argument containing shell characters (`|`, `&`, `>`, `<`, `;`, `$`, `` ` ``, `*`, `?`, `(`, `)`) runs through a shell, which is how pipelines work: `cdg cap "npm run build | tail -20"`. That shell is PowerShell on Windows when installed, otherwise `$SHELL` or bash. Set `CODIGEST_SHELL` to use another one.
+
+In PowerShell a script block works as well: `cdg cap { Get-ChildItem | Sort-Object Length }`. PowerShell hands the block over the way it does to `pwsh { ... }`, and `cap` runs it with `pwsh -NoProfile`, so variables and functions of your session are not available inside it. The exit code follows `pwsh -Command`: the number given to `exit`, otherwise 1 when the last statement failed and 0 when it did not.
+
+Output options written before the command make `cap` hand over the result once the command has finished, the same block `cdg term` would give for it: `-c`/`--copy`, `--no-copy`, `-s`/`--stdout`, `-o`/`--output FILE` and `--format xml|markdown|json` (see [output options](#output-options)). Without them `cap` only stores the run. Before a script block, use the long forms `--copy` and `--output`: PowerShell reads `-c` and `-o` as its own `-Command` and `-OutputFormat`.
 
 | Exit code | When |
 | --- | --- |
 | the command's own | The command ran. |
-| 2 | No command was given. |
+| 2 | No command was given, or an output option is wrong. |
 | 127 | The program was not found. |
 
 Captures are stored once per machine, not per project; see [Terminal Capture](/terminal-capture).
@@ -278,6 +282,8 @@ Captures are stored once per machine, not per project; see [Terminal Capture](/t
 ```bash
 cdg cap -- pytest -q
 cdg cap "npm run build | tail -20"
+cdg cap --copy -- pytest -q          # run, then copy the result for a chat
+cdg cap -s --format markdown { Get-ChildItem | Sort-Object Length -Descending | Select-Object -First 5 }
 ```
 
 ## `cdg pack`

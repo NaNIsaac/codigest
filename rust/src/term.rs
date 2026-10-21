@@ -363,11 +363,12 @@ fn json_line(entry: &Entry) -> anyhow::Result<String> {
 
 /// Normalizes, redacts, truncates and appends an entry to the store, then trims the ring
 /// buffer. Denied commands are stored without their output.
-pub fn append_entry(entry: Entry, allow_secrets: bool) -> anyhow::Result<()> {
+/// Returns the entry as stored: normalized, redacted and truncated.
+pub fn append_entry(entry: Entry, allow_secrets: bool) -> anyhow::Result<Entry> {
     append_entry_in(&term_dir(), entry, allow_secrets)
 }
 
-pub fn append_entry_in(dir: &Path, mut entry: Entry, allow_secrets: bool) -> anyhow::Result<()> {
+pub fn append_entry_in(dir: &Path, mut entry: Entry, allow_secrets: bool) -> anyhow::Result<Entry> {
     entry.output = normalize_output(&entry.output);
     // Recorded at capture time: exporting old records must not relabel output from
     // another machine as having run on the current host.
@@ -398,7 +399,7 @@ pub fn append_entry_in(dir: &Path, mut entry: Entry, allow_secrets: bool) -> any
 
     trim(&path)?;
     restrict_permissions(dir, &path);
-    Ok(())
+    Ok(entry)
 }
 
 /// Rewrites the log keeping only the most recent `MAX_ENTRIES` lines.
