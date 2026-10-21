@@ -60,6 +60,15 @@ The release binary is 4.6 MB and needs no Python.
 
 ## Differences from the Python build
 
+- `digest` also outlines Rust (`.rs`), JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`), TypeScript
+  (`.ts`, `.tsx`) and Go (`.go`) files, with tree-sitter grammars; the Python build only does
+  Python and MATLAB. Each definition is one numbered line with its signature as written on one
+  line and the first line of its doc comment under it (`///` and `#[doc]`, JSDoc, the `//`
+  block above in Go). Members of `impl`, `trait`, `mod`, classes, interfaces and Go types are
+  indented below them; in Rust, items under `#[cfg(test)]` are left out. JavaScript and
+  TypeScript list exported values (and any function or class value); the body of a top-level
+  immediately invoked function is read as top level. A syntax error in a signature can hide
+  the items after it; errors inside bodies and between items do not.
 - `term --raw` is new. With more than one entry selected it stops with exit code 2 instead of
   joining them, because the boundaries between outputs would be lost.
 - A Python file whose syntax is otherwise broken still gets an outline of what parses; the
