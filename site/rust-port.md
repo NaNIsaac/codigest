@@ -1,42 +1,59 @@
 # Rust Port
 
-::: info Status: released as a preview
-Every command of the Python build has been ported to Rust, and prebuilt binaries are attached to GitHub releases marked as pre-release (see [Install](#install)). The Python package on PyPI is still the main release, and the other pages on this site document it.
+::: info Status: the recommended install
+Every command of the Python build has been ported to Rust, and the prebuilt binary is the recommended way to install Codigest (see [Installation](/installation)). The Python package on PyPI stays available, and the rest of this site applies to both.
 :::
 
 The port is a single native binary, built next to the Python package in the repository (`rust/`). The Python build (`src/codigest`) stays the reference: for the same input the Rust build must print the same bytes to stdout and exit with the same code.
 
-For now the binary is called `cdg-rs`, so it can sit next to the Python `cdg` and be compared with it. They are separate programs. Both read and write the same data: the terminal capture store, `.codigest/` in a project (config, baseline, cache), and the shell hooks.
+Both builds install a command called `cdg`, so keep one of them on `PATH`. They are separate programs that read and write the same data: the terminal capture store, `.codigest/` in a project (config, baseline, cache), and the shell hooks.
 
 ## Install
 
-Prebuilt binaries are attached to the GitHub releases tagged `rust-v*`: Windows x64, Linux x64 and ARM64 (static, musl), macOS Intel and Apple Silicon, and Android ARM64 for Termux. Each archive holds a folder named after the target with `cdg-rs` (`cdg-rs.exe` on Windows) and the license.
+On Windows (PowerShell), the installer puts `cdg.exe` in `%LOCALAPPDATA%\Programs\codigest` and adds that folder to your user `PATH`:
+
+```powershell
+irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+```
+
+On Linux, macOS and Termux, it installs `cdg` to `~/.local/bin` (`$PREFIX/bin` in Termux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh
+```
+
+Run the line again to update. `CDG_VERSION=0.12.1` pins a version, and `CDG_INSTALL_DIR=...` picks the folder, in which case `PATH` is left alone.
+
+The binaries are attached to the GitHub releases tagged `rust-v*`: Windows x64, Linux x64 and ARM64 (static, musl), macOS Intel and Apple Silicon, and Android ARM64 for Termux. Each archive is named `codigest-X.Y.Z-<target>.zip` (Windows) or `.tar.gz` and holds a folder `codigest-X.Y.Z-<target>/` with `cdg` (`cdg.exe` on Windows) and the license.
+
+To install by hand instead, download an archive.
 
 Windows (PowerShell):
 
 ```powershell
-$v = "0.12.0"; $t = "x86_64-pc-windows-msvc"
-Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/cdg-rs-$v-$t.zip" -OutFile cdg-rs.zip
-Expand-Archive cdg-rs.zip "$env:LOCALAPPDATA\Programs" -Force
-# then add $env:LOCALAPPDATA\Programs\cdg-rs-$v-$t to PATH
+$v = "0.12.1"; $t = "x86_64-pc-windows-msvc"
+Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.zip" -OutFile codigest.zip
+Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
+# then add $env:LOCALAPPDATA\Programs\codigest-$v-$t to PATH
 ```
 
 Linux, macOS and Termux (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin` or `aarch64-linux-android`):
 
 ```bash
-v=0.12.0; t=x86_64-unknown-linux-musl
-curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/cdg-rs-$v-$t.tar.gz" | tar xz
-install "cdg-rs-$v-$t/cdg-rs" ~/.local/bin/
+v=0.12.1; t=x86_64-unknown-linux-musl
+curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.tar.gz" | tar xz
+install "codigest-$v-$t/cdg" ~/.local/bin/
 ```
 
-With the GitHub CLI: `gh release download rust-v0.12.0 -R NaNIsaac/codigest -p '*windows*'`.
+With the GitHub CLI: `gh release download rust-v0.12.1 -R NaNIsaac/codigest -p '*windows*'`.
+
 ## Build
 
 You need a Rust toolchain. From a checkout of the repository:
 
 ```bash
 cd rust
-cargo build --release        # target/release/cdg-rs
+cargo build --release        # target/release/cdg
 cargo test                   # unit and integration tests
 CODIGEST_PARITY=1 cargo test # also compare with the Python `cdg` on PATH
 ```
@@ -47,13 +64,13 @@ The release binary is 4.6 MB and needs no Python.
 
 Every command, with the same options: `scan`, `digest`, `tree`, `mark`, `diff`, `semdiff`, `cap`, `pack`, `term` (with `clear`, `path`, `install`, `uninstall` and the hooks' `ingest`), `mcp`, `status`, `init`, `clean` and `shell-help`.
 
-New in this build: `term --raw` prints the stored output of one command without tags. See the [note in the command reference](/commands#term-raw). The section below describes the one other thing only this build has. `--format markdown|json` of `scan` and `term` and `--preset NAME` work the same in both builds; they are in the [command reference](/commands#formats).
+Only in this build: `term --raw` prints the stored output of one command without tags. See the [note in the command reference](/commands#term-raw). The section below describes the one other thing only this build has. `--format markdown|json` of `scan` and `term` and `--preset NAME` work the same in both builds; they are in the [command reference](/commands#formats).
 
 ## Only in this build
 
 ### More languages in `digest`
 
-Besides Python and MATLAB, `digest` outlines Rust, JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`), TypeScript (`.ts`, `.tsx`) and Go: one numbered line per definition, members indented under their type or `impl`, and the first line of the doc comment underneath. Rust items under `#[cfg(test)]` are left out. Part of `cdg-rs digest rust/src/presets.rs` in this repository:
+Besides Python and MATLAB, `digest` outlines Rust, JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`), TypeScript (`.ts`, `.tsx`) and Go: one numbered line per definition, members indented under their type or `impl`, and the first line of the doc comment underneath. Rust items under `#[cfg(test)]` are left out. Part of `cdg digest rust/src/presets.rs` in this repository:
 
 ```text
  1: //! `--preset NAME`: option sets kept in TOML, expanded into the command line before it is
@@ -66,7 +83,7 @@ Besides Python and MATLAB, `digest` outlines Rust, JavaScript (`.js`, `.jsx`, `.
 
 ## How parity is checked
 
-- Integration tests run each command in a temporary project with both builds and compare stdout byte for byte and the exit code. `CODIGEST_PARITY=1 cargo test` turns these on; they need the Python `cdg` on `PATH`.
+- Integration tests run each command in a temporary project with both builds and compare stdout byte for byte and the exit code. `CODIGEST_PARITY=1 cargo test` turns these on; they compare `target/.../cdg` with the Python `cdg` on `PATH`, so the Python package must be the one your shell finds.
 - The Python outline used by `digest` reproduces `ast.unparse`. `scripts/outline_parity.py` compares the two builds file by file: 1,747 files across the 40 repositories checked out next to the project, with no differences.
 - Import resolution (`-r`, `pack`) was compared on five repositories, with no differences.
 
@@ -96,4 +113,4 @@ Wall time with [hyperfine](https://github.com/sharkdp/hyperfine) (`-N`, 2 warm-u
 - Status lines printed directly to the terminal (`init`, `clean`, `term clear`) end with `\n` on Windows, where Python writes `\r\n`. The command results themselves (stdout of `scan`, `pack`, ... and `-o` files) use the platform line ending, as Python does.
 - `cap` forwards Ctrl+C and gives the command 5 seconds before killing it.
 
-The rest of this site describes the Python `cdg`.
+Everything else on this site applies to both builds.
