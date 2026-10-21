@@ -60,7 +60,8 @@ def resolve_shell() -> list[str] | None:
         comspec = os.environ.get("COMSPEC")
         return [comspec, "/c"] if comspec else None
 
-    shell = os.environ.get("SHELL") or shutil.which("bash") or "/bin/sh"
+    # Termux has no /bin/sh; its sh lives under $PREFIX/bin.
+    shell = os.environ.get("SHELL") or shutil.which("bash") or shutil.which("sh") or "/bin/sh"
     return [shell, "-c"]
 
 

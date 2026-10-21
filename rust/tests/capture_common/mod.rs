@@ -73,6 +73,11 @@ pub fn normalise(text: &str) -> String {
     out
 }
 
+/// Shebang interpreter for stand-in scripts. Termux has no `/bin/sh`; its `sh` is under `$PREFIX`.
+pub fn posix_sh() -> PathBuf {
+    codigest::runner::which("sh").unwrap_or_else(|| "/bin/sh".into())
+}
+
 pub fn stdout_of(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }

@@ -1,0 +1,34 @@
+name: Termux
+# Runs the Rust build and the installer inside the Termux userland (bionic libc, $PREFIX
+# layout) on an ARM64 runner. termux-docker has no Android runtime, which cdg does not use.
+on:
+  push:
+    branches: [main]
+    paths: ["rust/**", "install.sh", ".github/workflows/termux.yml"]
+  pull_request:
+    paths: ["rust/**", "install.sh", ".github/workflows/termux.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  termux:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      # aarch64 termux-docker needs --privileged (or an unconfined seccomp profile).
+      - name: cargo test and install.sh in Termux
+        run: |
+          docker run --rm --privileged -v "$PWD:/src:ro" termux/termux-docker:aarch64 bash -euc '
+            yes | pkg upgrade -y >/dev/null
+            pkg install -y rust git >/dev/null
+            cp -r /src "$HOME/codigest"
+            cd "$HOME/codigest/rust"
+            cargo test --locked --no-fail-fast
+            cd "$HOME/codigest"
+            sh install.sh
+            export PATH="$PREFIX/bin:$PATH"
+            cdg --version
+            cdg tree -L 1
+            cdg scan -y src >/dev/null
+            cdg digest rust/src >/dev/null
+          '

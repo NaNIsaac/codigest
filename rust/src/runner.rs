@@ -202,6 +202,8 @@ pub fn resolve_shell() -> Option<Vec<String>> {
         .ok()
         .filter(|s| !s.is_empty())
         .or_else(|| which("bash").map(|p| p.to_string_lossy().into_owned()))
+        // Termux has no /bin/sh; its sh lives under $PREFIX/bin.
+        .or_else(|| which("sh").map(|p| p.to_string_lossy().into_owned()))
         .unwrap_or_else(|| "/bin/sh".to_string());
     Some(vec![shell, "-c".into()])
 }

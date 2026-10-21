@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 
-use common::{python, require_parity, rust, rust_exe};
+use common::{posix_sh, python, require_parity, rust, rust_exe};
 use regex::Regex;
 
 #[cfg(unix)]
@@ -53,9 +53,10 @@ impl Sandbox {
                 fs::write(
                     &script,
                     format!(
-                        "#!/bin/sh
+                        "#!{}
 echo '{}'
 ",
+                        posix_sh().display(),
                         profile.display()
                     ),
                 )
