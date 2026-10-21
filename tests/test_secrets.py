@@ -1,9 +1,10 @@
 import subprocess
 
+import pytest
 from typer.testing import CliRunner
 
 from codigest.core import termstore
-from codigest.core.redact import is_secret_file, redact, redact_code, redact_diff
+from codigest.core.redact import is_denied_command, is_secret_file, redact, redact_code, redact_diff
 from codigest.core.termstore import Entry
 from codigest.main import app
 
@@ -70,3 +71,124 @@ def test_scan_and_pack_never_print_secrets(tmp_path, monkeypatch):
 
     for out in (scan, pack):
         assert OPENAI_KEY not in out and "sk-proj-zzz" not in out and GH_TOKEN not in out
+
+
+AWS_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+
+@pytest.mark.parametrize(
+    ("line", "secret"),
+    [
+        ('{"password": "hunter2hunter2"}', "hunter2hunter2"),
+        ("pass: hunter2hunter2", "hunter2hunter2"),
+        ("pwd=hunter2hunter2", "hunter2hunter2"),
+        (f"AWS_SECRET_ACCESS_KEY={AWS_SECRET}", AWS_SECRET),
+        (f'"SecretAccessKey": "{AWS_SECRET}"', AWS_SECRET),
+        ("DB_PASS=hunter2hunter2", "hunter2hunter2"),
+        ("MY-TOKEN: hunter2hunter2", "hunter2hunter2"),
+        ("'api_key' = 'hunter2hunter2'", "hunter2hunter2"),
+        ("export GITHUB_TOKEN=hunter2hunter2", "hunter2hunter2"),
+    ],
+)
+def test_key_value_forms_with_quotes_and_prefixed_keys_are_masked_in_output(line, secret):
+    out = redact(line)
+    assert secret not in out and "[REDACTED]" in out
+    assert secret in redact_code(line)  # too ambiguous for source code
+
+
+def test_key_value_rule_keeps_the_key_and_the_quotes():
+    assert redact('{"password": "hunter2hunter2"}') == '{"password": "[REDACTED]"}'
+    assert redact("DB_PASS=hunter2hunter2") == "DB_PASS=[REDACTED]"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "bypass: xxxxxxxxxxxx",
+        "compass: northnorthnorth",
+        "passenger: yyyyyyyyyyyy",
+        "tokenizer = xxxxxxxxxxxx",
+        "password_hash: abcdefghijkl",
+        "token_count = 123456789",
+        "mypass = abcdefghijkl",
+        "pass: short",
+    ],
+)
+def test_words_that_merely_contain_a_secret_name_are_left_alone(line):
+    assert redact(line) == line
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "sk_" "live_51Habcdefghijklmnopqrstuv",
+        "sk_" "test_51Habcdefghijklmnopqrstuv",
+        "rk_" "live_51Habcdefghijklmnopqrstuv",
+        "hf_abcdefghijklmnopqrstuvwxyz0123",
+    ],
+)
+def test_vendor_tokens_are_masked_in_code_too(token):
+    for mask in (redact, redact_code):
+        out = mask(f"KEY={token}")
+        assert token not in out and "[REDACTED]" in out
+
+
+def test_vendor_prefixes_do_not_mask_ordinary_names():
+    text = "pk_live_publishable hf_model sk_other_thing task_live_x"
+    assert redact_code(text) == text
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "az account get-access-token",
+        "az account get-access-token --resource https://x",
+        "gcloud auth print-access-token",
+        "gcloud auth print-identity-token",
+        "gcloud auth application-default print-access-token",
+        "op read op://vault/item/field",
+        "op item get github --fields password",
+        "bw get password github",
+        "pass show work/github",
+        "vault read secret/app",
+        "vault kv get secret/app",
+        "kubectl config view --raw",
+        "kubectl config view --minify --raw",
+        "aws sts get-session-token",
+        "aws sts assume-role --role-arn x --role-session-name y",
+        "cat ~/.npmrc",
+        "type .pypirc",
+        "bat ~/.netrc",
+        "Get-Content ./server.pem",
+        "cat certs/private.key",
+        "cat ~/.ssh/id_rsa",
+        r"gc $HOME\.ssh\id_ed25519",
+        "cat ~/.aws/credentials",
+        "cat application_default_credentials.json",
+        "  GCLOUD AUTH PRINT-ACCESS-TOKEN",
+    ],
+)
+def test_credential_printing_commands_are_denied(command):
+    assert is_denied_command(command), command
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "az account show",
+        "gcloud auth list",
+        "op signin",
+        "bw status",
+        "pass",
+        "vault status",
+        "kubectl config view",
+        "kubectl config get-contexts",
+        "aws sts get-caller-identity",
+        "cat README.md",
+        "cat src/credentials.py",
+        "cat keys.py",
+        "python -m pytest",
+    ],
+)
+def test_nearby_commands_are_not_denied(command):
+    assert not is_denied_command(command), command
