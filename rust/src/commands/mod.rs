@@ -1,3 +1,4 @@
+pub mod cap;
 pub mod term;
 
 use clap::{Parser, Subcommand};
@@ -16,6 +17,9 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Run a command as usual and keep its output for `pack` and `term`.
+    #[command(next_help_heading = "Share a failing command")]
+    Cap(cap::CapArgs),
     /// Show recently captured commands and their output.
     #[command(next_help_heading = "Share a failing command")]
     Term(term::TermArgs),
@@ -24,6 +28,7 @@ pub enum Command {
 /// Runs the parsed command and returns the process exit code.
 pub fn run(cli: Cli) -> anyhow::Result<i32> {
     match cli.command {
+        Command::Cap(args) => cap::run(args),
         Command::Term(args) => term::run(args),
     }
 }
