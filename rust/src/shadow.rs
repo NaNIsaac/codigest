@@ -4,8 +4,7 @@
 //! storing and the diffing, through the `git` CLI, so an anchor made by the Python build
 //! is read by this one and the other way round.
 //!
-//! The behaviour is ported as it is, including a few quirks that decide what a diff
-//! contains (see the notes on `get_changes`).
+//! The behaviour follows the Python build, which decides what a diff contains.
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -18,6 +17,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::term::is_space;
 
 const SHADOW_DIR: &str = ".shadow_git";
+// Directories that belong to git, the anchor or Codigest and never to the project.
+const INTERNAL_DIRS: [&str; 3] = [".git", ".codigest", SHADOW_DIR];
 // 1 ms: file systems disagree about timestamp precision.
 const MTIME_TOLERANCE_NS: i128 = 1_000_000;
 
@@ -200,13 +201,8 @@ impl ContextAnchor {
     }
 
     /// The unified diff from the anchor to the working tree, or "" when nothing changed.
-    ///
-    /// Two behaviours are kept from the Python build because they decide what a diff
-    /// holds: any hunk whose `diff --git` line contains `.git`, `.codigest` or
-    /// `.shadow_git` is dropped (so `.gitignore`, `.github/...` and `.gitattributes`
-    /// never appear), and files that are in the anchor but outside the scan show up as
-    /// deleted, because the pruning step only looks at paths that contain no `.codigest`
-    /// and the scratch directories live inside `.codigest`.
+    /// Sections about git's or the anchor's own directories are left out, judged by whole
+    /// path components, so `.gitignore` and `.github/` are ordinary project files.
     pub fn get_changes(&self, current_files: &[PathBuf]) -> anyhow::Result<String> {
         if !self.git_dir.exists() || !self.has_changes(current_files) {
             return Ok(String::new());
@@ -286,9 +282,7 @@ impl ContextAnchor {
         let mut skip = false;
         for line in splitlines(&diff_text) {
             if line.starts_with("diff --git") {
-                skip = [SHADOW_DIR, ".codigest", ".git"]
-                    .iter()
-                    .any(|x| line.contains(x));
+                skip = is_internal(line);
             }
             if !skip {
                 clean.push(line);
@@ -297,16 +291,15 @@ impl ContextAnchor {
         clean.join("\n")
     }
 
-    /// Drops files from the baseline copy that exist in the project but were not scanned.
-    /// Ported literally: the path being tested is the absolute one, which always contains
-    /// `.codigest`, so in practice nothing is removed.
+    /// Drops baseline files that are still in the project but were not scanned (newly
+    /// ignored, or outside the filters), so they are not reported as deleted. A file that
+    /// is gone from disk stays and shows as deleted. Judged by the path inside the
+    /// baseline: the absolute one always runs through `.codigest`.
     fn prune_ignored_files(&self, baseline_dir: &Path, valid: &BTreeSet<PathBuf>) {
         for file in walk(baseline_dir) {
             if file.is_file()
-                && !has_component(&file, ".git")
-                && !has_component(&file, ".codigest")
-                && !has_component(&file, SHADOW_DIR)
                 && let Ok(rel) = file.strip_prefix(baseline_dir)
+                && !INTERNAL_DIRS.iter().any(|dir| has_component(rel, dir))
                 && !valid.contains(rel)
                 && self.root.join(rel).exists()
             {
@@ -356,29 +349,10 @@ impl ContextAnchor {
         let raw = self.get_changes(current_files)?;
         let mut paths: BTreeSet<PathBuf> = BTreeSet::new();
         for line in splitlines(&raw) {
-            if !line.starts_with("diff --git") {
-                continue;
-            }
-            let parts: Vec<&str> = line.split(is_space).filter(|p| !p.is_empty()).collect();
-            if parts.len() < 4 {
-                continue;
-            }
-            let last = parts[parts.len() - 1];
-            let p = last
-                .strip_prefix("b/")
-                .or_else(|| last.strip_prefix("a/"))
-                .unwrap_or(last);
-            let path = Path::new(p);
-            let excluded = path.components().any(|c| {
-                [
-                    OsStr::new(".codigest"),
-                    OsStr::new(".git"),
-                    OsStr::new(SHADOW_DIR),
-                ]
-                .contains(&c.as_os_str())
-            });
-            if !excluded {
-                paths.insert(self.root.join(p));
+            if let Some((_, new)) = diff_header_paths(line)
+                && !is_internal(line)
+            {
+                paths.insert(self.root.join(new));
             }
         }
         let mut sorted: Vec<PathBuf> = paths.into_iter().collect();
@@ -390,6 +364,119 @@ impl ContextAnchor {
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
+
+/// Index of the quote that closes the quoted token `text` starts with.
+fn quoted_end(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut i = 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 2,
+            b'"' => return Some(i),
+            _ => i += 1,
+        }
+    }
+    None
+}
+
+/// Undoes git's C-style quoting of a path: `"a/\303\245"` -> `a/å`.
+fn unquote(token: &str) -> String {
+    let body = &token.as_bytes()[1..token.len() - 1];
+    let mut out: Vec<u8> = Vec::with_capacity(body.len());
+    let mut i = 0;
+    while i < body.len() {
+        if body[i] != b'\\' || i + 1 == body.len() {
+            out.push(body[i]);
+            i += 1;
+        } else if (b'0'..=b'7').contains(&body[i + 1]) {
+            let mut j = i + 1;
+            let mut value = 0u32;
+            while j < body.len() && j < i + 4 && (b'0'..=b'7').contains(&body[j]) {
+                value = value * 8 + u32::from(body[j] - b'0');
+                j += 1;
+            }
+            out.push((value & 0xFF) as u8);
+            i = j;
+        } else {
+            out.push(match body[i + 1] {
+                b'a' => 7,
+                b'b' => 8,
+                b'f' => 12,
+                b'n' => 10,
+                b'r' => 13,
+                b't' => 9,
+                b'v' => 11,
+                other => other,
+            });
+            i += 2;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The old and new path of a `diff --git` line, without git's `a/` and `b/` prefixes;
+/// None if the line is not such a header.
+///
+/// A name with a space is written bare, so `a/my dir/c.md b/my dir/c.md` is split where
+/// both halves read the same. A name with a quote, a tab or non-ASCII characters is written
+/// in quotes with C-style escapes. If the two names differ and contain " b/" the split is
+/// a guess.
+pub fn diff_header_paths(line: &str) -> Option<(String, String)> {
+    let rest = line.strip_prefix("diff --git ").filter(|r| !r.is_empty())?;
+
+    let (old, new) = if rest.starts_with('"') {
+        let end = quoted_end(rest)?;
+        if rest.as_bytes().get(end + 1) != Some(&b' ') {
+            return None;
+        }
+        let raw = &rest[end + 2..];
+        let new = if raw.starts_with('"') {
+            unquote(raw)
+        } else {
+            raw.to_string()
+        };
+        (unquote(&rest[..=end]), new)
+    } else if let Some(cut) = rest.find(" \"b/") {
+        (rest[..cut].to_string(), unquote(&rest[cut + 1..]))
+    } else {
+        let same_name = rest
+            .len()
+            .checked_sub(5)
+            .filter(|n| n % 2 == 0)
+            .and_then(|n| {
+                let half = n / 2;
+                let (left, right) = (rest.get(..2 + half)?, rest.get(3 + half..)?);
+                let aligned = rest.as_bytes()[2 + half] == b' '
+                    && left.starts_with("a/")
+                    && right.starts_with("b/")
+                    && left[2..] == right[2..];
+                (half > 0 && aligned).then(|| (left.to_string(), right.to_string()))
+            });
+        match same_name {
+            Some(pair) => pair,
+            None if rest.starts_with("a/") => {
+                let at = rest.find(" b/")?;
+                (rest[..at].to_string(), rest[at + 1..].to_string())
+            }
+            None => return None,
+        }
+    };
+
+    Some((
+        old.strip_prefix("a/")?.to_string(),
+        new.strip_prefix("b/")?.to_string(),
+    ))
+}
+
+/// Whether a `diff --git` section is about git's or the anchor's own files, judged by whole
+/// path components.
+fn is_internal(header: &str) -> bool {
+    diff_header_paths(header).is_some_and(|(old, new)| {
+        [old, new]
+            .iter()
+            .any(|path| path.split('/').any(|part| INTERNAL_DIRS.contains(&part)))
+    })
+}
 
 /// `Path.resolve()`: absolute and symlink-free, for a path that need not exist yet. On
 /// Windows without the `\\?\` prefix that `canonicalize` adds.
@@ -650,5 +737,65 @@ mod tests {
             fs::read_to_string(target.join(".gitignore")).unwrap(),
             "mine\n"
         );
+    }
+
+    #[test]
+    fn diff_headers_are_parsed_like_git_writes_them() {
+        let pair = |a: &str, b: &str| Some((a.to_string(), b.to_string()));
+        let cases = [
+            ("diff --git a/a.py b/a.py", pair("a.py", "a.py")),
+            (
+                "diff --git a/my dir/c.md b/my dir/c.md",
+                pair("my dir/c.md", "my dir/c.md"),
+            ),
+            (
+                r#"diff --git "a/\355\225\234.txt" "b/\355\225\234.txt""#,
+                pair("한.txt", "한.txt"),
+            ),
+            (
+                r#"diff --git "a/tab\there" "b/tab\there""#,
+                pair("tab\there", "tab\there"),
+            ),
+            (
+                r#"diff --git "a/q\"uote" "b/q\"uote""#,
+                pair("q\"uote", "q\"uote"),
+            ),
+            (
+                r#"diff --git "a/back\\slash" "b/back\\slash""#,
+                pair("back\\slash", "back\\slash"),
+            ),
+            (
+                "diff --git a/old name.py b/new name.py",
+                pair("old name.py", "new name.py"),
+            ),
+            (
+                r#"diff --git a/plain.py "b/\355\225\234.py""#,
+                pair("plain.py", "한.py"),
+            ),
+            ("--- a/a.py", None),
+            ("diff --git a/only-one", None),
+        ];
+        for (line, expected) in cases {
+            assert_eq!(diff_header_paths(line), expected, "{line}");
+        }
+    }
+
+    #[test]
+    fn internal_sections_are_judged_by_path_component() {
+        for internal in [
+            "diff --git a/.git/config b/.git/config",
+            "diff --git a/sub/.shadow_git/HEAD b/sub/.shadow_git/HEAD",
+            "diff --git a/.codigest/x b/.codigest/x",
+        ] {
+            assert!(is_internal(internal), "{internal}");
+        }
+        for ordinary in [
+            "diff --git a/.gitignore b/.gitignore",
+            "diff --git a/.github/ci.yml b/.github/ci.yml",
+            "diff --git a/.gitattributes b/.gitattributes",
+            "diff --git a/my.git.md b/my.git.md",
+        ] {
+            assert!(!is_internal(ordinary), "{ordinary}");
+        }
     }
 }
