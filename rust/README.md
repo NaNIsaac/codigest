@@ -52,7 +52,7 @@ With the GitHub CLI: `gh release download rust-v0.12.2 -R NaNIsaac/codigest -p '
 cd rust
 cargo build --release        # target/release/cdg
 cargo test                   # unit and integration tests
-CODIGEST_PARITY=1 cargo test # also compare target/.../cdg with the Python `cdg` on PATH
+CODIGEST_PARITY=1 cargo test -- --include-ignored  # also compare with the Python `cdg` on PATH (same version)
 ```
 
 ## Status

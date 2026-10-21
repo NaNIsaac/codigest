@@ -36,10 +36,16 @@ pub fn parse(argv: Vec<OsString>) -> Cli {
 #[command(
     name = "cdg",
     version,
+    disable_version_flag = true,
     about = "Share the code context you choose with an AI: the project, a few files, what changed, or a failing command.",
     arg_required_else_help = true
 )]
 pub struct Cli {
+    /// Print version
+    // -v as well as -V, like the Python build
+    #[arg(id = "version", short = 'v', long = "version", visible_short_alias = 'V', action = clap::ArgAction::Version)]
+    _version: Option<bool>,
+
     #[command(subcommand)]
     pub command: Command,
 }

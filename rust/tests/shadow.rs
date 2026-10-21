@@ -242,7 +242,9 @@ import json, sys
 from pathlib import Path
 from codigest.core.shadow import ContextAnchor
 
-root = Path(sys.argv[1])
+# resolved like the CLI does (Path.cwd().resolve()), so an 8.3 short temp path such as
+# RUNNER~1 on a Windows runner names the same files as anchor.root
+root = Path(sys.argv[1]).resolve()
 files = sorted(
     p for p in root.rglob("*")
     if p.is_file() and not {".git", ".codigest"} & set(p.relative_to(root).parts)
