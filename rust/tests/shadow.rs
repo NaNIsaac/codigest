@@ -4,6 +4,7 @@
 #[path = "capture_common/mod.rs"]
 mod common;
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -113,26 +114,96 @@ fn edits_additions_and_deletions_show_as_a_diff() {
                 .replace('\\', "/")
         })
         .collect();
-    // "my dir/c.md" comes back as "dir/c.md": the last word of the `diff --git` line, as in Python.
-    assert_eq!(changed, ["a.py", "dir/c.md", "new.py"]);
+    assert_eq!(changed, ["a.py", "my dir/c.md", "new.py"]);
 }
 
 #[test]
-fn hunks_for_git_named_paths_are_left_out() {
+fn git_named_files_show_up_in_the_diff() {
     let dir = project();
+    let names = [
+        ".gitignore",
+        ".github/workflows/ci.yml",
+        ".gitattributes",
+        ".gitkeep",
+        "notes.github.md",
+    ];
+    for name in names {
+        write(dir.path(), name, b"one\n");
+    }
     let a = anchor(&dir);
     a.update(&files(&a.root)).unwrap();
 
-    write(&a.root, ".gitignore", b"*.log\n*.tmp\n");
+    for name in names {
+        write(&a.root, name, b"two\n");
+    }
+    // Git's own directory is not part of the project and stays out.
     write(
         &a.root,
-        ".github/workflows/ci.yml",
-        b"on: [push, pull_request]\n",
+        ".git/config",
+        b"[core]
+bare = false
+",
     );
-    write(&a.root, ".git/config", b"[core]\nbare = false\n");
 
     let diff = a.get_changes(&files(&a.root)).unwrap();
-    assert_eq!(diff, "", "only .git-named paths changed");
+    for name in names {
+        assert!(
+            diff.contains(&format!("diff --git a/{name} b/{name}")),
+            "{name} is missing from:
+{diff}"
+        );
+    }
+    assert!(!diff.contains(".git/config"));
+}
+
+#[test]
+fn changed_files_keep_spaces_and_non_ascii_names() {
+    let dir = project();
+    let a = anchor(&dir);
+    let names = [
+        "my dir/c.md",
+        "한글.txt",
+        "한글 파일.txt",
+        "a b.py",
+        ".github/ci.yml",
+    ];
+    for name in names {
+        write(dir.path(), name, b"one\n");
+    }
+    a.update(&files(&a.root)).unwrap();
+    for name in names {
+        write(&a.root, name, b"two\n");
+    }
+
+    let changed: BTreeSet<PathBuf> = a
+        .get_changed_files(&files(&a.root))
+        .unwrap()
+        .into_iter()
+        .collect();
+    let expected: BTreeSet<PathBuf> = names.iter().map(|n| a.root.join(n)).collect();
+    assert_eq!(changed, expected);
+}
+
+#[test]
+fn files_outside_the_scan_are_not_reported_as_deleted() {
+    let dir = project();
+    write(dir.path(), "extra.md", b"log\n");
+    let a = anchor(&dir);
+    a.update(&files(&a.root)).unwrap();
+    // extra.md is still on disk but no longer scanned (a new filter, say).
+    let scanned: Vec<PathBuf> = files(&a.root)
+        .into_iter()
+        .filter(|p| p.file_name() != Some(std::ffi::OsStr::new("extra.md")))
+        .collect();
+
+    assert_eq!(a.get_changes(&scanned).unwrap(), "");
+
+    fs::remove_file(a.root.join("extra.md")).unwrap();
+    let diff = a.get_changes(&scanned).unwrap();
+    assert!(
+        diff.contains("deleted file mode") && diff.contains("extra.md"),
+        "{diff}"
+    );
 }
 
 #[test]
