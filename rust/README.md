@@ -72,6 +72,7 @@ How parity is checked:
 - The Python outline used by `digest` reproduces `ast.unparse`; `scripts/outline_parity.py`
   compares the two builds file by file (1,747 files across the 40 repositories checked out next to this one: no differences).
 - Import resolution (`-r`, `pack`) was compared on five repositories: no differences.
+- `CODIGEST_PARITY=1 cargo test` covers every command that prints a result: `scan`, `digest`, `tree`, `init`, `clean`, `cap`, `term` (and its hook install, uninstall and ingest), `shell-help`, `mark` (the baseline files), and since `tests/parity_matrix.rs` also `pack`, `diff`, `semdiff` and `status` on a project with a baseline, edits, a deleted file and a stored failure. `mcp` is a long-running server and is not compared.
 
 ## Speed
 
