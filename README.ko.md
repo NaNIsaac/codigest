@@ -65,6 +65,18 @@ uv tool update-shell                              # 끝나면 터미널을 다�
 없습니다. 설치할 때 `lazy import` 부분에서 문법 오류가 나면 `uv self update`를 한 뒤 다시
 설치하세요.
 
+PowerShell의 `help codigest`는 `codigest --help`와 달리 PowerShell의 `Get-Help`를
+호출합니다. 터미널 자동 기록 기능을 켜지 않고도 다음처럼 별도로 연결할 수 있습니다.
+
+```powershell
+cdg shell-help install       # PowerShell 프로필에 도움말 등록
+# PowerShell 새 창 열기
+help codigest               # 또는 Get-Help codigest
+cdg shell-help uninstall     # 등록 취소
+```
+
+다른 PowerShell 명령의 `help` 동작은 바꾸지 않고, Codigest CLI를 연결하는 함수만 추가합니다.
+
 터미널에서 실행하면 아래 명령은 모두 결과를 클립보드에 복사합니다. `-s`를 붙이면 화면에도
 출력하고, `-o 파일`을 붙이면 파일로도 저장하며, `--no-copy`를 붙이면 클립보드를 건드리지
 않습니다. `-m "..."`로 질문이나 요청을 함께 넣을 수 있습니다. 출력이 파이프나 파일로 갈 때는
