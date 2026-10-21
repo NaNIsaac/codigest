@@ -50,8 +50,30 @@ Codigest는 AI 모델을 호출하지 않습니다. 모델에게 보낼 자료�
 
 ## 설치
 
-[uv](https://docs.astral.sh/uv/)로 설치합니다. uv가 필요한 Python(3.15)까지 알아서 받아 두므로,
-내 프로젝트의 Python 환경과 섞이지 않습니다.
+빌드된 바이너리를 설치합니다. Python이 필요 없습니다. Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+```
+
+Linux, macOS, Termux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh
+```
+
+`cdg`는 Windows에서는 `%LOCALAPPDATA%\Programs\codigest`(사용자 `PATH`에 추가), Linux와 macOS에서는
+`~/.local/bin`, Termux에서는 `$PREFIX/bin`에 설치됩니다. 같은 줄을 다시 실행하면 업데이트됩니다.
+`CDG_VERSION=0.12.1`로 버전을 고정하고, `CDG_INSTALL_DIR=...`로 폴더를 정합니다(이때는 `PATH`를
+건드리지 않습니다). 지원 환경은 Windows x64, Linux x64와 ARM64, macOS Intel과 Apple Silicon,
+Android ARM64(Termux)입니다. 직접 받는 압축 파일은
+[릴리스 페이지](https://github.com/NaNIsaac/codigest/releases)에 있습니다. 프로젝트마다 따로 설정할
+것은 없습니다.
+
+### Python 패키지
+
+같은 명령을 PyPI에 `codigest`라는 이름으로도 올려 두었습니다. [uv](https://docs.astral.sh/uv/)로
+설치하면 필요한 Python(3.15)까지 알아서 받아 두므로, 내 프로젝트의 Python 환경과 섞이지 않습니다.
 
 ```bash
 winget install --id astral-sh.uv                  # Windows (uv가 이미 있으면 건너뛰기)
@@ -61,9 +83,13 @@ uv tool install codigest
 uv tool update-shell                              # 끝나면 터미널을 다시 열기
 ```
 
-명령 이름은 `codigest`이고, 줄여서 `cdg`로도 쓸 수 있습니다. 프로젝트마다 따로 설정할 것은
-없습니다. 설치할 때 `lazy import` 부분에서 문법 오류가 나면 `uv self update`를 한 뒤 다시
-설치하세요.
+명령 이름은 `codigest`이고, 줄여서 `cdg`로도 쓸 수 있습니다. 두 방식 모두 `cdg`라는 명령을
+설치하므로 `PATH`에는 하나만 두세요. 설치할 때 `lazy import` 부분에서 문법 오류가 나면
+`uv self update`를 한 뒤 다시 설치하세요.
+
+다음으로 `cdg term install`을 실행하면 셸에 훅이 설치되어 모든 명령의 출력이 `cdg pack`과
+`cdg term`을 위해 보관됩니다. 직접 실행하기 전에는 꺼져 있습니다. [터미널 기록](#터미널-기록)을
+참고하세요.
 
 PowerShell의 `help codigest`는 `codigest --help`와 달리 PowerShell의 `Get-Help`를
 호출합니다. 터미널 자동 기록 기능을 켜지 않고도 다음처럼 별도로 연결할 수 있습니다.

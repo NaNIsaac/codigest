@@ -29,16 +29,16 @@ CI는 `main`에 push할 때와 풀 리퀘스트마다 Ubuntu에서 테스트를,
 
 ## Rust 빌드
 
-Rust 포팅은 `rust/`에 있고, 별도의 바이너리 `cdg-rs`를 빌드합니다. 상태는 [Rust 포팅](/ko/rust-port)을 참고하세요.
+Rust 포팅은 `rust/`에 있고, 설치 스크립트가 배포하는 `cdg` 바이너리를 빌드합니다. [Rust 포팅](/ko/rust-port)을 참고하세요.
 
 ```bash
 cd rust
-cargo build --release        # target/release/cdg-rs
+cargo build --release        # target/release/cdg
 cargo test                   # 단위 테스트와 통합 테스트
 CODIGEST_PARITY=1 cargo test # PATH의 Python `cdg`와도 비교
 ```
 
-`CODIGEST_PARITY=1`을 주면 통합 테스트가 명령마다 두 빌드를 실행해 stdout과 종료 코드를 비교하므로, `PATH`에 Python `cdg`가 있어야 합니다.
+`CODIGEST_PARITY=1`을 주면 통합 테스트가 명령마다 두 빌드를 실행해 stdout과 종료 코드를 비교하므로, `PATH`에 Python `cdg`가 있어야 합니다. `target/.../cdg`를 그 `cdg`와 비교하므로, 셸이 먼저 찾는 `cdg`는 설치한 바이너리가 아니라 Python 패키지여야 합니다.
 
 ## 이 문서 사이트
 

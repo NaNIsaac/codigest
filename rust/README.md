@@ -4,39 +4,55 @@ A port of Codigest to a single native binary, built next to the Python package i
 repository. The Python build (`src/codigest`) stays the reference: for the same input the
 Rust build must print the same bytes to stdout and exit with the same code.
 
-While the port is in progress the binary is called `cdg-rs`, so it can be installed next to
-the Python `cdg` and compared with it. Both read and write the same data: the terminal
-capture store, `.codigest/` in a project (config, baseline, cache), and the shell hooks.
+Both builds install a command called `cdg`, so keep one of them on `PATH`. They are separate
+programs that read and write the same data: the terminal capture store, `.codigest/` in a project
+(config, baseline, cache), and the shell hooks.
 
 ## Install
 
-Prebuilt binaries are attached to the GitHub releases tagged `rust-v*`: Windows x64, Linux x64 and ARM64 (static, musl), macOS Intel and Apple Silicon, and Android ARM64 for Termux. Each archive holds a folder named after the target with `cdg-rs` (`cdg-rs.exe` on Windows) and the license.
-
-Windows (PowerShell):
+Windows (PowerShell), to `%LOCALAPPDATA%\Programs\codigest` and your user `PATH`:
 
 ```powershell
-$v = "0.12.0"; $t = "x86_64-pc-windows-msvc"
-Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/cdg-rs-$v-$t.zip" -OutFile cdg-rs.zip
-Expand-Archive cdg-rs.zip "$env:LOCALAPPDATA\Programs" -Force
-# then add $env:LOCALAPPDATA\Programs\cdg-rs-$v-$t to PATH
+irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+```
+
+Linux, macOS and Termux, to `~/.local/bin` (`$PREFIX/bin` in Termux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh
+```
+
+Run the line again to update. `CDG_VERSION=0.12.1` pins a version, and `CDG_INSTALL_DIR=...` picks
+the folder, in which case `PATH` is left alone.
+
+Binaries are attached to the GitHub releases tagged `rust-v*`: Windows x64, Linux x64 and ARM64 (static, musl), macOS Intel and Apple Silicon, and Android ARM64 for Termux. Each archive is named `codigest-X.Y.Z-<target>.zip` (Windows) or `.tar.gz` and holds a folder `codigest-X.Y.Z-<target>/` with `cdg` (`cdg.exe` on Windows) and the license.
+
+To install by hand, Windows (PowerShell):
+
+```powershell
+$v = "0.12.1"; $t = "x86_64-pc-windows-msvc"
+Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.zip" -OutFile codigest.zip
+Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
+# then add $env:LOCALAPPDATA\Programs\codigest-$v-$t to PATH
 ```
 
 Linux, macOS and Termux (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin` or `aarch64-linux-android`):
 
 ```bash
-v=0.12.0; t=x86_64-unknown-linux-musl
-curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/cdg-rs-$v-$t.tar.gz" | tar xz
-install "cdg-rs-$v-$t/cdg-rs" ~/.local/bin/
+v=0.12.1; t=x86_64-unknown-linux-musl
+curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.tar.gz" | tar xz
+install "codigest-$v-$t/cdg" ~/.local/bin/
 ```
 
-With the GitHub CLI: `gh release download rust-v0.12.0 -R NaNIsaac/codigest -p '*windows*'`.
+With the GitHub CLI: `gh release download rust-v0.12.1 -R NaNIsaac/codigest -p '*windows*'`.
+
 ## Build
 
 ```bash
 cd rust
-cargo build --release        # target/release/cdg-rs
+cargo build --release        # target/release/cdg
 cargo test                   # unit and integration tests
-CODIGEST_PARITY=1 cargo test # also compare with the Python `cdg` on PATH
+CODIGEST_PARITY=1 cargo test # also compare target/.../cdg with the Python `cdg` on PATH
 ```
 
 ## Status

@@ -348,9 +348,9 @@ cdg term -i 2         # only the command from 2 runs ago
 cdg term --context    # add hostname and shell
 ```
 
-#### `--raw`, only in cdg-rs {#term-raw}
+#### `--raw`, only in the binary {#term-raw}
 
-The Rust build, `cdg-rs`, has one more option here: `term --raw` prints the stored output of one command without tags. `cdg` does not have it yet, and this reference documents `cdg`. See [Rust Port](/rust-port).
+The prebuilt binary (the Rust build) has one more option here: `term --raw` prints the stored output of one command without tags. The Python package does not have it. See [Rust Port](/rust-port).
 
 ### `cdg term install`
 
