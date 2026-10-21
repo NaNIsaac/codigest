@@ -38,6 +38,12 @@ function global:__cdg {
     # Advanced function so a failed command can surface as `$? -eq $false` for prompt themes.
     [CmdletBinding()]
     param([scriptblock]$__cdgBlock)
+    # A wrapped line run again from inside a captured one (history recall, `hf` from
+    # hanfix): the outer call already records it, and a second one would clear its buffers.
+    if ($null -ne $global:__cdgHead) {
+        . $__cdgBlock
+        return
+    }
     # Dot-sourced: these locals live in the caller's scope, hence the prefix and cleanup.
     $__cdgLine = $global:__cdgLine
     # Left as is so the line can read it; a native command stores a new boxed int,
