@@ -9,6 +9,7 @@ use regex::Regex;
 
 use crate::cache::{ContentCache, get_file_blob_hash};
 use crate::common::{ProjectContext, confirm, stdin_is_terminal};
+use crate::format::{self, Format};
 use crate::output::{Output, OutputArgs};
 use crate::par;
 use crate::pystr::{filesize, thousands};
@@ -37,6 +38,9 @@ pub struct ScanArgs {
     /// Recursively resolve imports
     #[arg(short, long)]
     pub resolve: bool,
+    /// Output format
+    #[arg(long, value_enum, default_value_t = Format::Xml)]
+    pub format: Format,
 }
 
 const TOKEN_THRESHOLD: usize = 30_000;
@@ -170,8 +174,56 @@ pub fn run(args: ScanArgs) -> anyhow::Result<i32> {
     }
 
     let tree = structure::generate_ascii_tree(&files, &root, None);
-    let mut cache = ContentCache::new(&root);
     let line_numbers = args.line_numbers;
+    if args.format != Format::Xml {
+        // The block cache holds XML blocks, so other formats read the files afresh.
+        let read = par::map(&files, |file| -> anyhow::Result<Vec<Shared>> {
+            let path = pypath::rel_posix(file, &root)
+                .unwrap_or_else(|| format!("[EXTERNAL]/{}", pypath::name(file)));
+            match targets.ranges.get(&pypath::norm(file)) {
+                Some(spans) => spans
+                    .iter()
+                    .map(|&(lo, hi)| {
+                        let (content, lines) = processor::read_line_range(file, lo, hi)?;
+                        Ok(Shared {
+                            path: path.clone(),
+                            lines,
+                            content,
+                        })
+                    })
+                    .collect(),
+                None => Ok(vec![Shared {
+                    content: processor::read_file_content(file, line_numbers),
+                    path,
+                    lines: String::new(),
+                }]),
+            }
+        });
+        let mut shared = Vec::new();
+        for result in read {
+            shared.extend(result?);
+        }
+        let project = pypath::name(&root);
+        let snapshot = match args.format {
+            Format::Markdown => markdown(&project, &args.message, &tree, &shared),
+            _ => serde_json::to_string_pretty(&serde_json::json!({
+                "project": project,
+                "instruction": args.message,
+                "structure": tree,
+                "files": shared,
+            }))?,
+        };
+        out.deliver(&snapshot, "snapshot", |out| {
+            let tokens = snapshot.chars().count().div_ceil(4);
+            out.log(&format!(
+                "{} {total_files} files, ~{} tokens",
+                bold("Snapshot"),
+                thousands(tokens as u64)
+            ));
+        })?;
+        return Ok(0);
+    }
+    let mut cache = ContentCache::new(&root);
     let persists = cache.persists();
     // Cache lookups in order, the reading of the misses in parallel, then the blocks back
     // in file order.
@@ -261,9 +313,61 @@ pub fn run(args: ScanArgs) -> anyhow::Result<i32> {
     Ok(0)
 }
 
+/// One file, or one line range of it, as shared in Markdown or JSON.
+#[derive(serde::Serialize)]
+struct Shared {
+    path: String,
+    /// The range shown, `40-60`; empty for the whole file.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    lines: String,
+    content: String,
+}
+
+fn markdown(project: &str, instruction: &str, tree: &str, files: &[Shared]) -> String {
+    let mut parts = vec![format!("# {project}")];
+    if !instruction.is_empty() {
+        parts.push(instruction.to_string());
+    }
+    parts.push(format!("## Structure\n\n{}", format::fenced(tree, "")));
+    for file in files {
+        let heading = if file.lines.is_empty() {
+            format!("## {}", file.path)
+        } else {
+            format!("## {} (lines {})", file.path, file.lines)
+        };
+        parts.push(format!(
+            "{heading}\n\n{}",
+            format::fenced(&file.content, &file.path)
+        ));
+    }
+    parts.join("\n\n") + "\n"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn markdown_has_a_heading_and_a_fenced_block_per_file() {
+        let files = [
+            Shared {
+                path: "a.py".into(),
+                lines: String::new(),
+                content: "x = 1\n".into(),
+            },
+            Shared {
+                path: "b.md".into(),
+                lines: "2-3".into(),
+                content: "```\nq\n```".into(),
+            },
+        ];
+        assert_eq!(
+            markdown("proj", "fix it", "└── a.py", &files),
+            "# proj\n\nfix it\n\n## Structure\n\n```\n└── a.py\n```\n\n\
+             ## a.py\n\n```python\nx = 1\n```\n\n\
+             ## b.md (lines 2-3)\n\n````markdown\n```\nq\n```\n````\n"
+        );
+    }
 
     #[test]
     fn a_range_needs_an_existing_file() {

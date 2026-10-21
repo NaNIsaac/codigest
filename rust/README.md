@@ -83,6 +83,14 @@ The release binary is 4.6 MB and needs no Python.
 - `term --format markdown|json` is new. Markdown gives each command a heading, its details
   as a list, and the command with its output in one `console` block; the fence grows past
   any backticks in the output. JSON is an array with `index` counting back from the latest.
+- `scan --format markdown|json` is new. Markdown gives the instruction, the structure and a
+  heading plus a fenced block per file, tagged with the language of its extension, for chats
+  that render Markdown. JSON has `project`, `instruction`, `structure` and `files` (`path`,
+  `lines` for a range, `content`). Neither uses the block cache, which holds XML.
+
+  ```console
+  $ cdg-rs scan src/app.py:40-60 --format markdown -m "Why does this loop twice?"
+  ```
 - `--preset NAME` is new and works on every command: it inserts the options stored under
   `[presets.<command>.<NAME>]` right after the command name, so anything typed on the
   command line wins. Presets are read from the user configuration file
