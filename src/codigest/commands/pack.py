@@ -113,9 +113,9 @@ def changed_paths(diff: str, root: Path) -> list[Path]:
     paths = []
     for line in diff.splitlines():
         # The header parser keeps names with spaces or quotes whole.
-        if names := shadow.diff_header_paths(line):
-            if (path := (root / names[1]).resolve()).is_file() and path not in paths:
-                paths.append(path)
+        names = shadow.diff_header_paths(line)
+        if names and (path := (root / names[1]).resolve()).is_file() and path not in paths:
+            paths.append(path)
     return paths
 
 
