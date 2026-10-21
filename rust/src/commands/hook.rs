@@ -92,7 +92,7 @@ fn hook_dir() -> PathBuf {
 }
 
 /// Asks each installed PowerShell for its CurrentUserCurrentHost profile path.
-fn powershell_profiles() -> Vec<PathBuf> {
+pub fn powershell_profiles() -> Vec<PathBuf> {
     let mut profiles = Vec::new();
     for exe in ["pwsh", "powershell"] {
         let Some(found) = which(exe) else { continue };

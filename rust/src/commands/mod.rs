@@ -8,6 +8,7 @@ pub mod init;
 pub mod mcp;
 pub mod pack;
 pub mod scan;
+pub mod shell_help;
 pub mod status;
 pub mod term;
 pub mod tree;
@@ -55,6 +56,9 @@ pub enum Command {
     Init(init::InitArgs),
     /// Delete .codigest/: the config, the baseline and the cache.
     Clean(clean::CleanArgs),
+    /// Let PowerShell Get-Help find codigest without enabling capture.
+    #[command(name = "shell-help", subcommand_required = true)]
+    ShellHelp(shell_help::ShellHelpArgs),
 }
 
 /// Runs the parsed command and returns the process exit code.
@@ -73,5 +77,6 @@ pub fn run(cli: Cli) -> anyhow::Result<i32> {
         Command::Status(args) => status::run(args),
         Command::Init(args) => init::run(args),
         Command::Clean(args) => clean::run(args),
+        Command::ShellHelp(args) => shell_help::run(args),
     }
 }
