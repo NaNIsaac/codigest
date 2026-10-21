@@ -425,7 +425,7 @@ fn insert(out: &mut Vec<Symbol>, symbol: Symbol) {
     }
 }
 
-fn shorten(text: &str) -> String {
+pub(super) fn shorten(text: &str) -> String {
     if text.chars().count() <= VALUE_WIDTH {
         text.to_string()
     } else {
