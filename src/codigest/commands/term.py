@@ -12,7 +12,8 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 
-from ..options import CopyOption, OutputOption, StdoutOption
+from ..core.formats import Format
+from ..options import CopyOption, FormatOption, OutputOption, StdoutOption
 
 lazy import json
 lazy import shutil
@@ -83,6 +84,7 @@ def handle(
     here: HereOption = False,
     history_only: HistoryOnlyOption = False,
     context: ContextOption = False,
+    format: FormatOption = Format.XML,
     copy: CopyOption = None,
     stdout: StdoutOption = False,
     output: OutputOption = None,
@@ -99,6 +101,7 @@ def handle(
         cdg term -f           # the last failed command
         cdg term --context    # include host + shell when copying for AI
         cdg term --here -n 3  # the last 3 commands run in this project
+        cdg term --format json  # for scripts; markdown for a chat
     """
     if ctx.invoked_subcommand:
         return
@@ -144,7 +147,12 @@ def handle(
     else:
         selected = entries[-count:]
 
-    content = termstore.render(selected, include_context=context)
+    render = {
+        Format.XML: termstore.render,
+        Format.MARKDOWN: termstore.render_markdown,
+        Format.JSON: termstore.render_json,
+    }[format]
+    content = render(selected, include_context=context)
     handler.handle_output(
         content,
         summary=lambda: _summarize(handler, selected),

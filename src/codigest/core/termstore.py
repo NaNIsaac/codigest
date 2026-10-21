@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Self
 
 from . import tags
+from .formats import fence
 from .redact import redact, is_denied_command
 
 MAX_ENTRIES = 200
@@ -291,6 +292,62 @@ def render(entries: list[Entry], *, include_context: bool = False) -> str:
         blocks.append(header + "\n" + "\n".join(body) + "\n</command>")
 
     return "<terminal_history>\n" + "\n".join(blocks) + "\n</terminal_history>"
+
+
+def render_markdown(entries: list[Entry], *, include_context: bool = False) -> str:
+    """A heading per command, its details as a list, and the command with its output in
+    one console block, the way it looked in the terminal."""
+    blocks = []
+    total = len(entries)
+    for offset, entry in enumerate(entries):
+        status = f" (exit {entry.exit_code})" if entry.exit_code is not None else ""
+        details = [("cwd", entry.cwd)]
+        if include_context:
+            details += [("hostname", entry.hostname), ("shell", entry.shell)]
+        if entry.duration_ms:
+            details.append(("duration", _fmt_duration(entry.duration_ms)))
+        details.append(("at", entry.started_at))
+        if entry.truncated:
+            details.append(("truncated", "middle of the output left out"))
+        if not entry.captured:
+            details.append(("output", "not stored (read from shell history)"))
+        details.append(("note", entry.note))
+        lines = [f"## Command {total - offset}{status}", ""]
+        lines += [f"- {name}: {value}" for name, value in details if value]
+        if len(lines) > 2:
+            lines.append("")
+        console = f"$ {entry.command}"
+        if entry.output:
+            console += "\n" + entry.output
+        mark = fence(console)
+        lines.append(f"{mark}console\n{console}\n{mark}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def render_json(entries: list[Entry], *, include_context: bool = False) -> str:
+    """A JSON array, newest last, each item with its `index` counting back from the latest."""
+    total = len(entries)
+    items = []
+    for offset, entry in enumerate(entries):
+        item = {
+            "index": total - offset,
+            "command": entry.command,
+            "exit_code": entry.exit_code,
+            "cwd": entry.cwd,
+            "started_at": entry.started_at,
+            "duration_ms": entry.duration_ms,
+            "output": entry.output,
+            "output_available": entry.captured,
+            "truncated": entry.truncated,
+        }
+        if include_context:
+            item["hostname"] = entry.hostname
+            item["shell"] = entry.shell
+        if entry.note:
+            item["note"] = entry.note
+        items.append(item)
+    return json.dumps(items, indent=2, ensure_ascii=False)
 
 
 def now_iso() -> str:

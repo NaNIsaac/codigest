@@ -4,9 +4,11 @@ from pathlib import Path
 
 import typer
 
-from ..options import CopyOption, StdoutOption, ResolveOption, MessageOption, AllOption, OutputOption
+from ..core.formats import Format, fenced
+from ..options import CopyOption, FormatOption, StdoutOption, ResolveOption, MessageOption, AllOption, OutputOption
 
 lazy from rich.filesize import decimal
+lazy import json
 lazy from ..core import structure, tags, prompts, processor, tokenizer, common, cache
 lazy from ..core.output import OutputHandler, spinner
 
@@ -52,6 +54,7 @@ def handle(
     line_numbers: bool = typer.Option(False, "--lines", "-l", help="Add line numbers to code blocks"),
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation prompt"),
     resolve: ResolveOption = False,
+    format: FormatOption = Format.XML,
 ) -> None:
     """
     Bundle the whole project, or only the given paths, as one block.
@@ -110,6 +113,16 @@ def handle(
         if not typer.confirm("Continue anyway?"):
             log_console.print(f"Nothing shared. {hint}")
             raise typer.Exit()
+
+    if format != Format.XML:
+        with spinner(log_console, "[bold blue]Generating Snapshot...[/bold blue]"):
+            tree_str = structure.generate_ascii_tree(files, root_path)
+            # The block cache holds XML blocks, so other formats read the files afresh.
+            shared = _shared_files(files, ranges, root_path, line_numbers)
+            render = _markdown if format == Format.MARKDOWN else _json
+            snapshot_content = render(root_path.name, message, tree_str, shared)
+        _deliver(handler, snapshot_content, total_files)
+        return
 
     # [4] Execution
     with spinner(log_console, "[bold blue]Generating Snapshot...[/bold blue]"):
@@ -171,7 +184,56 @@ def handle(
             log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
             raise typer.Exit(1) from e
 
-    def _summary():
-        log_console.print(f"[bold]Snapshot[/bold] {total_files} files, ~{tokenizer.estimate_tokens(snapshot_content):,} tokens")
+    _deliver(handler, snapshot_content, total_files)
 
-    handler.handle_output(snapshot_content, summary=_summary, item_name="snapshot")
+
+def _deliver(handler, snapshot: str, total_files: int) -> None:
+    def summary():
+        tokens = tokenizer.estimate_tokens(snapshot)
+        handler.log_console.print(f"[bold]Snapshot[/bold] {total_files} files, ~{tokens:,} tokens")
+
+    handler.handle_output(snapshot, summary=summary, item_name="snapshot")
+
+
+def _shared_files(files, ranges, root: Path, line_numbers: bool) -> list[dict[str, str]]:
+    """One entry per file, or per line range of it, for the Markdown and JSON formats."""
+    shared = []
+    for file_path in files:
+        try:
+            rel_path = file_path.relative_to(root).as_posix()
+        except ValueError:
+            rel_path = f"[EXTERNAL]/{file_path.name}"
+        if spans := ranges.get(file_path):
+            for lo, hi in spans:
+                content, shown = processor.read_line_range(file_path, lo, hi)
+                shared.append({"path": rel_path, "lines": shown, "content": content})
+        else:
+            content = processor.read_file_content(file_path, add_line_numbers=line_numbers)
+            shared.append({"path": rel_path, "lines": "", "content": content})
+    return shared
+
+
+def _markdown(project: str, instruction: str, tree: str, files: list[dict[str, str]]) -> str:
+    parts = [f"# {project}"]
+    if instruction:
+        parts.append(instruction)
+    parts.append(f"## Structure\n\n{fenced(tree)}")
+    for file in files:
+        heading = f"## {file['path']}"
+        if file["lines"]:
+            heading += f" (lines {file['lines']})"
+        parts.append(f"{heading}\n\n{fenced(file['content'], file['path'])}")
+    return "\n\n".join(parts) + "\n"
+
+
+def _json(project: str, instruction: str, tree: str, files: list[dict[str, str]]) -> str:
+    return json.dumps(
+        {
+            "project": project,
+            "instruction": instruction,
+            "structure": tree,
+            "files": [{k: v for k, v in file.items() if v or k != "lines"} for file in files],
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
