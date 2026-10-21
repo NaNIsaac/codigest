@@ -121,9 +121,9 @@ def test_words_that_merely_contain_a_secret_name_are_left_alone(line):
 @pytest.mark.parametrize(
     "token",
     [
-        "sk_" "live_51Habcdefghijklmnopqrstuv",
-        "sk_" "test_51Habcdefghijklmnopqrstuv",
-        "rk_" "live_51Habcdefghijklmnopqrstuv",
+        "sk_" + "live_51Habcdefghijklmnopqrstuv",
+        "sk_" + "test_51Habcdefghijklmnopqrstuv",
+        "rk_" + "live_51Habcdefghijklmnopqrstuv",
         "hf_abcdefghijklmnopqrstuvwxyz0123",
     ],
 )
