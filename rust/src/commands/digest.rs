@@ -1,4 +1,4 @@
-//! `digest`: numbered signatures and docstrings of Python and MATLAB files, no bodies.
+//! `digest`: numbered signatures and doc comments of Python, MATLAB, Rust, JavaScript, TypeScript and Go files, no bodies.
 
 use std::fs;
 use std::path::PathBuf;

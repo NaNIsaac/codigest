@@ -49,7 +49,7 @@ pub struct Cli {
 pub enum Command {
     /// Bundle the whole project, or only the given paths, as one block.
     Scan(scan::ScanArgs),
-    /// Outline Python and MATLAB files: numbered signatures and docstrings, no bodies.
+    /// Outline source files: numbered signatures and doc comments, no bodies.
     Digest(digest::DigestArgs),
     /// Print the project file tree.
     Tree(tree::TreeArgs),

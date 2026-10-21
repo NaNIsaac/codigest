@@ -1,0 +1,6 @@
+ 3: type Props = { title: string }
+ 6: export function Title({ title }: Props)
+        Renders a title.
+10: export const Card = ({ title }: Props): JSX.Element =>
+12: export class Panel extends React.Component<Props>
+13:   render()

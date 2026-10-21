@@ -1,0 +1,29 @@
+ 1: //! Stack utilities.
+ 8: pub const MAX_DEPTH: usize = 64
+        Largest depth allowed.
+ 9: static NAMES: [&str; 3] = ["alpha", "beta", "gamma-with-a-name-long-enough-to-be-cu...
+13: pub struct Stack<T: Clone>
+        A growable stack.
+17: pub struct Pair(pub i32, pub i32)
+20: pub enum Direction
+        Which way to go.
+25: pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>
+28: pub trait Named
+        Things that can be named.
+30:   fn name(&self) -> String
+          The name.
+31:   type Id
+32:   fn id(&self) -> Self::Id
+37: impl<T> Stack<T> where T: Clone + Debug
+42:   pub fn new() -> Self
+          Makes an empty stack.
+46:   pub fn push_all<I>(&mut self, items: I, limit: Option<usize>) -> Result<usize> where I: IntoIterator<Item = T>
+60: impl Named for Pair
+61:   fn name(&self) -> String
+66: pub mod util
+68:   pub async fn double(x: i32) -> i32
+          Doubles.
+79: macro_rules! square
+85: fn broken()
+92: pub fn recovered(a: u8) -> u8
+        After the error.
