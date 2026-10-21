@@ -1,6 +1,7 @@
 //! Codigest: share the code context you choose with an AI.
 
 pub mod commands;
+pub mod outline;
 pub mod output;
 pub mod paths;
 pub mod redact;
