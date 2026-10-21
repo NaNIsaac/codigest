@@ -1,0 +1,78 @@
+name: Installers
+
+# Runs install.sh / install.ps1 against the published rust-v* releases, so a change to
+# either script is tested before a tag instead of after it.
+on:
+  pull_request:
+    paths: ["install.sh", "install.ps1", ".github/workflows/installers.yml"]
+
+jobs:
+  sh:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Linux'
+        run: shellcheck install.sh
+      - name: Latest and pinned
+        run: |
+          CDG_INSTALL_DIR="$RUNNER_TEMP/latest" sh install.sh
+          "$RUNNER_TEMP/latest/cdg" --version | grep -q '^cdg 0\.'
+          CDG_VERSION=0.12.1 CDG_INSTALL_DIR="$RUNNER_TEMP/pinned" sh install.sh
+          test "$("$RUNNER_TEMP/pinned/cdg" --version)" = "cdg 0.12.1"
+      - name: Leaves a Python cdg alone unless forced
+        run: |
+          dir="$RUNNER_TEMP/python"
+          mkdir -p "$dir"
+          printf '#!/bin/sh\necho codigest 0.11.0\n' > "$dir/cdg"
+          chmod 755 "$dir/cdg"
+          if CDG_INSTALL_DIR="$dir" sh install.sh; then echo "replaced the Python cdg"; exit 1; fi
+          test "$("$dir/cdg" --version)" = "codigest 0.11.0"
+          CDG_FORCE=1 CDG_INSTALL_DIR="$dir" sh install.sh
+          "$dir/cdg" --version | grep -q '^cdg 0\.'
+      - name: Refuses a corrupted download
+        run: |
+          # a curl that appends a byte to every downloaded archive
+          mkdir -p "$RUNNER_TEMP/fake"
+          printf '%s\n' '#!/bin/sh' "$(command -v curl) \"\$@\" || exit \$?" \
+            'prev=; for a; do [ "$prev" = -o ] && case $a in *.tar.gz) printf x >> "$a" ;; esac; prev=$a; done' \
+            > "$RUNNER_TEMP/fake/curl"
+          chmod 755 "$RUNNER_TEMP/fake/curl"
+          dir="$RUNNER_TEMP/corrupt"
+          if PATH="$RUNNER_TEMP/fake:$PATH" CDG_INSTALL_DIR="$dir" sh install.sh 2> err.txt; then echo "installed a corrupted archive"; exit 1; fi
+          grep -q 'Checksum mismatch' err.txt
+          test ! -e "$dir/cdg"
+
+  ps1:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Latest, pinned and corrupted (PowerShell 7 and Windows PowerShell 5.1)
+        shell: pwsh
+        run: |
+          $test = {
+              $ErrorActionPreference = 'Stop'
+              $env:CDG_INSTALL_DIR = "$env:RUNNER_TEMP\latest-$($PSVersionTable.PSVersion.Major)"
+              & ./install.ps1
+              if ((& "$env:CDG_INSTALL_DIR\cdg.exe" --version) -notmatch '^cdg 0\.') { throw 'latest install' }
+              $env:CDG_INSTALL_DIR = "$env:RUNNER_TEMP\pinned-$($PSVersionTable.PSVersion.Major)"
+              $env:CDG_VERSION = '0.12.1'
+              & ./install.ps1
+              if ((& "$env:CDG_INSTALL_DIR\cdg.exe" --version) -ne 'cdg 0.12.1') { throw 'pinned install' }
+              # wrong digests from the API must stop the install before anything is copied
+              $real = Get-Command Invoke-RestMethod -CommandType Cmdlet
+              function Invoke-RestMethod { $r = & $real @args; foreach ($x in @($r)) { foreach ($a in $x.assets) { $a.digest = 'sha256:' + ('0' * 64) } }; $r }
+              $env:CDG_INSTALL_DIR = "$env:RUNNER_TEMP\corrupt-$($PSVersionTable.PSVersion.Major)"
+              $failed = $false
+              try { & ./install.ps1 } catch { $failed = "$_" -match 'Checksum mismatch' }
+              if (-not $failed -or (Test-Path "$env:CDG_INSTALL_DIR\cdg.exe")) { throw 'corrupted install' }
+          }
+          pwsh -NoProfile -Command $test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -Command $test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
