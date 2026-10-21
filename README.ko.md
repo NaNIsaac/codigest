@@ -459,7 +459,8 @@ exclude_patterns = [
   `aws configure`처럼 인증 정보를 출력하는 명령은 출력을 아예 저장하지 않습니다.
 - 이 규칙들은 흔한 형태를 잡아내는 것이고, 모든 비밀정보를 잡을 수는 없습니다.
 - **내 프로젝트.** 어떤 명령도 소스 파일을 수정하지 않습니다. `.codigest/` 폴더는 `mark`와
-  `init`만 만들며, `init`이 이 폴더를 `.gitignore`에 추가합니다.
+  `init`만 만들며, 폴더 안의 `.gitignore`(`*`) 덕분에 `git status`에 나타나지 않습니다.
+  `init`은 프로젝트의 `.gitignore`에도 이 폴더를 추가합니다.
 - **기록 파일 위치.** `cdg term path`로 확인할 수 있습니다. macOS와 Linux에서는 본인만 읽을 수 있게
   저장하고, `cdg term clear`로 지울 수 있습니다.
 - **외부로 보내지 않습니다.** Codigest는 네트워크를 쓰지 않습니다. 결과는 내가 붙여 넣은 곳이나

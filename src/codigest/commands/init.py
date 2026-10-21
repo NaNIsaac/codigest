@@ -3,6 +3,8 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+lazy from ..core.common import hide_from_git
+
 app = typer.Typer()
 console = Console()
 
@@ -55,7 +57,7 @@ def handle(
 
     console.print(f"Setting up Codigest in {root_path}", highlight=False)
 
-    config_dir.mkdir(exist_ok=True)
+    hide_from_git(config_dir)
     if not config_file.exists() or force:
         config_file.write_text(DEFAULT_CONFIG, encoding="utf-8")
         console.print("  [green]Created[/green] .codigest/config.toml")

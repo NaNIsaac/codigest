@@ -3,7 +3,7 @@ Context Anchor Engine.
 Modified to hide internal git repository from VS Code by renaming .git -> .shadow_git
 """
 lazy import shutil
-lazy from .common import remove_tree
+lazy from .common import hide_from_git, remove_tree
 lazy import subprocess
 import time
 from pathlib import Path
@@ -76,6 +76,7 @@ class ContextAnchor:
 
     def update(self, source_files: list[Path]) -> None:
         self.anchor_dir.mkdir(parents=True, exist_ok=True)
+        hide_from_git(self.root / ".codigest")
         (self.anchor_dir / ".gitignore").write_text(".shadow_git\n", encoding="utf-8")
         if not self.has_history():
             if self.git_dir.exists():

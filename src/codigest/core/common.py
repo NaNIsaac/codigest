@@ -132,3 +132,12 @@ def remove_tree(path: Path) -> None:
         func(target)
 
     shutil.rmtree(path, onexc=make_writable_and_retry)
+
+
+def hide_from_git(directory: Path) -> None:
+    """Make Git ignore everything in `directory` (the way pytest and ruff caches do), so a
+    project that never listed `.codigest/` in its .gitignore does not see it in `git status`."""
+    directory.mkdir(parents=True, exist_ok=True)
+    marker = directory / ".gitignore"
+    if not marker.exists():
+        marker.write_text("*\n", encoding="utf-8")

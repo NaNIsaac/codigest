@@ -482,7 +482,8 @@ skipped.
   commands (`env`, `printenv`, `gh auth token`, `aws configure`, ...) is never stored.
 - These rules catch common formats, not every possible secret.
 - **Your project.** No command changes your source files. Only `mark` and `init` create
-  `.codigest/`, which `init` adds to `.gitignore`.
+  `.codigest/`, which holds its own `.gitignore` (`*`) so it never shows in `git status`; `init`
+  also adds it to the project's `.gitignore`.
 - **Where captures live.** `cdg term path` shows the file. On macOS and Linux it is readable only
   by you. `cdg term clear` deletes it.
 - **Nothing leaves your machine.** Codigest makes no network requests. Context goes where you
