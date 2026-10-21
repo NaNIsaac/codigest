@@ -54,8 +54,29 @@ your machine.
 
 ## Install
 
-Install it with [uv](https://docs.astral.sh/uv/), which also fetches the Python version Codigest
-needs (3.15) and keeps it apart from your projects:
+Prebuilt binary, no Python needed. Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+```
+
+Linux, macOS and Termux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh
+```
+
+This installs `cdg` to `%LOCALAPPDATA%\Programs\codigest` (added to your user `PATH`) on Windows,
+`~/.local/bin` on Linux and macOS, and `$PREFIX/bin` in Termux. Run the same line again to update.
+`CDG_VERSION=0.12.1` pins a version and `CDG_INSTALL_DIR=...` picks the folder (then `PATH` is left
+alone). Supported: Windows x64, Linux x64 and ARM64, macOS Intel and Apple Silicon, Android ARM64
+(Termux). Archives for download by hand are on the
+[releases page](https://github.com/NaNIsaac/codigest/releases). No setup is needed in your projects.
+
+### Python package
+
+The same commands are on PyPI as `codigest`. Install it with [uv](https://docs.astral.sh/uv/), which
+also fetches the Python version it needs (3.15) and keeps it apart from your projects:
 
 ```bash
 winget install --id astral-sh.uv                  # Windows (skip if you have uv)
@@ -65,7 +86,12 @@ uv tool install codigest
 uv tool update-shell                              # then restart your terminal
 ```
 
-The command is `codigest`, or `cdg` for short. No setup is needed in your projects.
+The command is `codigest`, or `cdg` for short. Both installs provide a command called `cdg`, so keep
+only one of them on `PATH`. If the install fails with a syntax error on `lazy import`, run
+`uv self update` and try again.
+
+Next, `cdg term install` hooks your shell so the output of every command is kept for `cdg pack` and
+`cdg term`. It is off until you run it; see [Terminal capture](#terminal-capture).
 
 On Windows, PowerShell's `help codigest` is a separate command from `codigest --help`.
 For optional native `Get-Help` integration **without automatic command capture**:
@@ -78,8 +104,7 @@ cdg shell-help uninstall     # remove it when no longer needed
 ```
 
 This adds a small forwarding function to your PowerShell profile; other `help` commands are
-unchanged. The CLI's own full command reference is still available via `codigest --help`.
-If the install fails with a syntax error on `lazy import`, run `uv self update` and try again.
+unchanged. The CLI's own full command reference is still available via `cdg --help`.
 
 In a terminal, every command below copies its result to the clipboard. Add `-s` to also print it,
 `-o FILE` to also write it to a file, `--no-copy` to leave the clipboard alone, and `-m "..."` to

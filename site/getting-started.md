@@ -4,7 +4,7 @@ Codigest is a command-line tool for the moment you ask ChatGPT, Claude or a codi
 
 A model only knows what you show it. Copying files by hand is slow, it is easy to miss the one file that matters, and it is just as easy to paste far more than the question needs. Codigest lets you decide what to share and then collects it for you: the whole project, a file and the files it imports, what changed since a point you marked, or a failing test with the code it points at.
 
-[Install it](/installation) first. The command is `codigest`, or `cdg` for short, and no setup is needed in your projects.
+[Install it](/installation) first. The command is `cdg`, and no setup is needed in your projects.
 
 In a terminal, every command copies its result to the clipboard. Add `-s` to also print it, `-o FILE` to also write it to a file, `--no-copy` to leave the clipboard alone, and `-m "..."` to put your question or instruction in it. When the output goes to a pipe or a file instead (`cdg scan > ctx.xml`, `cdg digest | less`, a script, a coding agent's shell), it is printed and the clipboard is left alone; add `--copy` to copy it anyway.
 
