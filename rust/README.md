@@ -30,7 +30,7 @@ Binaries are attached to the GitHub releases tagged `rust-v*`: Windows x64, Linu
 To install by hand, Windows (PowerShell):
 
 ```powershell
-$v = "0.12.1"; $t = "x86_64-pc-windows-msvc"
+$v = "0.12.2"; $t = "x86_64-pc-windows-msvc"
 Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.zip" -OutFile codigest.zip
 Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
 # then add $env:LOCALAPPDATA\Programs\codigest-$v-$t to PATH
@@ -39,12 +39,12 @@ Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
 Linux, macOS and Termux (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin` or `aarch64-linux-android`):
 
 ```bash
-v=0.12.1; t=x86_64-unknown-linux-musl
+v=0.12.2; t=x86_64-unknown-linux-musl
 curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.tar.gz" | tar xz
 install "codigest-$v-$t/cdg" ~/.local/bin/
 ```
 
-With the GitHub CLI: `gh release download rust-v0.12.1 -R NaNIsaac/codigest -p '*windows*'`.
+With the GitHub CLI: `gh release download rust-v0.12.2 -R NaNIsaac/codigest -p '*windows*'`.
 
 ## Build
 
