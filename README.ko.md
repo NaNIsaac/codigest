@@ -384,7 +384,10 @@ cdg cap -- pytest -q && cdg pack   # 테스트 실행, 실패하면 pack에 고�
 때는 복사 안 함)을 바꾸며, `-o 파일`은 파일로도 저장하고, `-m` / `--message`는 요청 문구를 덧붙입니다.
 `scan -l`은 줄 번호를 붙이고, `scan -a`는 설정 필터를 무시하며, `scan -y`는 확인 없이
 진행합니다(CI용). `scan`, `diff`, `semdiff`, `digest`에 `-r` / `--resolve`를 붙이면 대상 파일이
-import하는 프로젝트 파일도 함께 넣습니다. `cdg <명령> --help`로 모든 옵션을 볼 수 있습니다.
+import하는 프로젝트 파일도 함께 넣습니다. `scan`과 `term`은 `--format markdown|json`을 받습니다(기본은 XML).
+Markdown은 이를 렌더링하는 채팅용, JSON은 스크립트용입니다. 어떤 명령에든 `--preset 이름`을 붙이면
+`.codigest/config.toml`이나 사용자 설정의 `[presets.<명령>.이름]`에 저장해 둔 옵션이 채워지고, 그 뒤에 직접
+쓴 옵션이 우선합니다. `cdg <명령> --help`로 모든 옵션을 볼 수 있습니다.
 
 ### 터미널 기록
 
@@ -402,6 +405,7 @@ cdg term -f           # 마지막으로 실패한 명령
 cdg term --context   # 복사 내용에 실행 PC 이름과 셸 정보 추가
 cdg term --here -n 3  # 이 프로젝트에서 실행한 최근 3개
 cdg term -i 2         # 두 번 전에 실행한 명령 하나만
+cdg term -n 3 --format json  # 최근 3개를 JSON으로 (markdown도 가능)
 cdg term path         # 기록 파일 위치 (CODIGEST_HOME으로 바꿀 수 있음)
 cdg term clear        # 기록 모두 지우기
 ```

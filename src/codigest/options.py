@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Annotated
 import typer
 
+from .core.formats import Format
+
 # Plain aliases, not PEP 695 `type X = ...`: Typer can't unwrap TypeAliasType.
 CopyOption = Annotated[
     bool | None,
@@ -38,4 +40,9 @@ AllOption = Annotated[
 OutputOption = Annotated[
     Path | None,
     typer.Option("-o", "--output", help="Also write the result to this file", dir_okay=False),
+]
+
+FormatOption = Annotated[
+    Format,
+    typer.Option("--format", help="Output format"),
 ]

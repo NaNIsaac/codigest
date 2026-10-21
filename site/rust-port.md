@@ -25,7 +25,7 @@ The release binary is 4.6 MB and needs no Python.
 
 Every command, with the same options: `scan`, `digest`, `tree`, `mark`, `diff`, `semdiff`, `cap`, `pack`, `term` (with `clear`, `path`, `install`, `uninstall` and the hooks' `ingest`), `mcp`, `status`, `init`, `clean` and `shell-help`.
 
-New in this build: `term --raw` prints the stored output of one command without tags. See the [note in the command reference](/commands#term-raw). The sections below describe the other options only this build has.
+New in this build: `term --raw` prints the stored output of one command without tags. See the [note in the command reference](/commands#term-raw). The section below describes the one other thing only this build has. `--format markdown|json` of `scan` and `term` and `--preset NAME` work the same in both builds; they are in the [command reference](/commands#formats).
 
 ## Only in this build
 
@@ -41,37 +41,6 @@ Besides Python and MATLAB, `digest` outlines Rust, JavaScript (`.js`, `.jsx`, `.
         The nearest `.codigest/config.toml` from `start` upwards, stopping at a Git root.
 93: pub fn expand(argv: Vec<OsString>) -> Result<Vec<OsString>>
 ```
-
-### `--format markdown|json` for `scan` and `term`
-
-XML stays the default. Markdown is for chats that render it: `scan` gives the instruction, the structure, and a heading and a fenced block per file with the language of its extension; `term` gives a heading per command, its details as a list, and the command with its output in one `console` block. The fence grows past any backticks inside. JSON is for scripts.
-
-```console
-$ cdg-rs scan src/format.rs:17-31 --format markdown -m "Review these"
-$ cdg-rs term -n 3 --failed --format json
-```
-
-`scan --format json` has `project`, `instruction`, `structure` and `files` (`path`, `lines` for a range, `content`). `term --format json` is an array with `index` counting back from the latest, `command`, `exit_code`, `cwd`, `started_at`, `duration_ms`, `output`, `output_available` and `truncated`.
-
-### `--preset NAME`
-
-A preset is a set of options saved under a name. `--preset NAME` puts them right after the command name, so anything typed on the command line wins.
-
-```toml
-# %APPDATA%\codigest\config.toml on Windows, ~/.config/codigest/config.toml elsewhere,
-# or .codigest/config.toml in the project (replaces a user preset of the same name)
-[presets.term.debug]
-format = "markdown"
-count = 3
-failed = true
-```
-
-```console
-$ cdg-rs term --preset debug          # last 3 failed commands as Markdown
-$ cdg-rs term --preset debug -n 1     # the same, only the last one
-```
-
-Keys are option names with `_` for `-` (`no_copy = true` is `--no-copy`). `true` adds a flag, `false` leaves it out, and lists are joined with commas. An unknown preset stops with exit code 2 and names the file to define it in.
 
 ## How parity is checked
 

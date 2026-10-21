@@ -6,9 +6,11 @@ import sys
 import typer
 from loguru import logger
 from rich.console import Console
+from rich.markup import escape
 
 lazy from importlib.metadata import PackageNotFoundError, version
 
+from .core import presets
 from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp, pack, mark, shell_help
 
 console = Console()
@@ -71,9 +73,18 @@ def common(
 ) -> None:
     pass
 
+def cli() -> None:
+    """The `cdg` command: `app` with `--preset NAME` expanded first."""
+    try:
+        argv = presets.expand(sys.argv[1:])
+    except presets.PresetError as e:
+        Console(stderr=True).print(f"[red]Error:[/red] {escape(str(e))}", highlight=False, soft_wrap=True)
+        sys.exit(2)
+    app(args=argv)
+
 def main() -> None:
     try:
-        app()
+        cli()
     except typer.Exit:
         raise
     except Exception as e:
