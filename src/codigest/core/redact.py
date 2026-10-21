@@ -53,6 +53,15 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
         ),
         f"-----BEGIN PRIVATE KEY-----{MASK}-----END PRIVATE KEY-----",
     ),
+    # A key cut by a capture limit keeps only one marker: mask the key lines next to it.
+    (
+        re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:[ \t]*\r?\n[A-Za-z0-9+/=]+)+"),
+        f"-----BEGIN PRIVATE KEY-----{MASK}",
+    ),
+    (
+        re.compile(r"(?m)(?:^[A-Za-z0-9+/=]+[ \t]*\r?\n)+-----END [A-Z ]*PRIVATE KEY-----"),
+        f"{MASK}-----END PRIVATE KEY-----",
+    ),
     # JWTs
     (
         re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
@@ -79,18 +88,30 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
 _CAPTURE_RULES: list[tuple[re.Pattern[str], str]] = [
     # Authorization headers
     (
-        re.compile(r"(?i)\b(authorization\s*:\s*)(bearer|basic|token)\s+\S+"),
+        re.compile(r"(?i)\b(authorization\s*:\s*)(bearer|basic|token)\s+[^\s\"']+"),
         rf"\1\2 {MASK}",
     ),
     # key=value / key: value forms. The key may be quoted and may start with words joined
     # by _ or - (AWS_SECRET_ACCESS_KEY, DB_PASS); `bypass` or `tokenizer` do not count.
+    # A value a rule above already masked is left as it is.
     (
         re.compile(
             r"(?im)((?:^|[^A-Za-z0-9])[\"']?(?:[A-Za-z0-9]+[_-])*"
             r"(?:api[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|secret|"
-            r"access[_-]?token|auth[_-]?token|token|password|passwd|passphrase|pass|pwd|"
+            r"access[_-]?token|auth[_-]?token|token|auth|password|passwd|passphrase|pass|pwd|"
             r"client[_-]?secret|private[_-]?key)"
-            r"[\"']?\s*[:=]\s*[\"']?)([^\s\"',;]{6,})"
+            r"[\"']?\s*[:=]\s*[\"']?)([^\s\"',;\[][^\s\"',;]{5,})"
+        ),
+        rf"\1{MASK}",
+    ),
+    # The same keys in camelCase or PascalCase (SessionToken, AccountKey). Case-sensitive,
+    # so `maxtokens` or `passkey` stay as they are.
+    (
+        re.compile(
+            r"((?:^|[^A-Za-z0-9])[\"']?(?:[A-Za-z][a-z0-9]*)*?"
+            r"(?:Token|Secret|Password|Passwd|Passphrase|ApiKey|AccessKey|AccountKey|SecretKey|"
+            r"PrivateKey|SharedAccessKey)"
+            r"[\"']?\s*[:=]\s*[\"']?)([^\s\"',;\[][^\s\"',;]{5,})"
         ),
         rf"\1{MASK}",
     ),
