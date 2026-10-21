@@ -19,6 +19,7 @@
 - 터미널에서는 블록이 클립보드에 복사되고, 복사했다는 안내가 나옵니다.
 - 출력이 파이프나 파일로 갈 때는 (`cdg scan > ctx.xml`, `cdg digest | less`, 스크립트, 코딩 에이전트의 셸) 블록을 그대로 출력하고, 클립보드는 건드리지 않으며, 안내 메시지는 stderr로 나갑니다. 그래도 복사하려면 `--copy`를 붙입니다.
 - `-s`를 붙이면 터미널에서도 블록을 출력합니다. `-o 파일`은 파일로도 저장합니다.
+- SSH 접속 중이면 (`SSH_CONNECTION`, `SSH_CLIENT`, `SSH_TTY` 중 하나가 있으면) 원격 머신의 클립보드 대신 OSC 52 이스케이프 시퀀스로 지금 키보드를 쓰는 머신의 클립보드에 넣습니다. 터미널이 OSC 52를 받아야 하고, tmux 안이라면 `set -g set-clipboard on`을 추가합니다. `CODIGEST_CLIPBOARD=osc52`로 강제하고 (예: `docker exec`) `CODIGEST_CLIPBOARD=system`으로 끕니다.
 
 | 옵션 | 뜻 |
 | --- | --- |

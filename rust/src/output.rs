@@ -78,9 +78,18 @@ impl Output {
         // guarantees no unambiguous token leaves.
         let content = redact_code(content);
         if self.copy {
-            match copy_to_clipboard(&content) {
-                Ok(()) => self.log(&format!("Copied {item} to clipboard")),
-                Err(_) => self.log("Clipboard unavailable; use -s to print instead"),
+            if use_osc52() {
+                match send_osc52(&content) {
+                    Ok(()) => self.log(&format!("Sent {item} to the terminal clipboard (OSC 52)")),
+                    Err(_) => {
+                        self.log("No terminal to send the clipboard to; use -s to print instead")
+                    }
+                }
+            } else {
+                match copy_to_clipboard(&content) {
+                    Ok(()) => self.log(&format!("Copied {item} to clipboard")),
+                    Err(_) => self.log("Clipboard unavailable; use -s to print instead"),
+                }
             }
         }
         if let Some(path) = &self.file {
@@ -105,6 +114,52 @@ pub fn text_mode(text: &str) -> String {
     } else {
         text.to_string()
     }
+}
+
+/// Over SSH the system clipboard is the remote machine's, not the one of the person typing.
+/// `CODIGEST_CLIPBOARD=osc52` or `=system` overrides the guess, e.g. inside a container
+/// reached through `docker exec`, where no SSH variable is set.
+fn use_osc52() -> bool {
+    match std::env::var("CODIGEST_CLIPBOARD").as_deref() {
+        Ok("osc52") => true,
+        Ok("system") => false,
+        _ => ["SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"]
+            .iter()
+            .any(|name| std::env::var_os(name).is_some()),
+    }
+}
+
+/// The sequence that asks the terminal to put `text` on its own clipboard.
+pub fn osc52(text: &str) -> String {
+    format!("\x1b]52;c;{}\x07", base64(text.as_bytes()))
+}
+
+/// Writes to the terminal itself, so the sequence reaches it even when stdout is a pipe.
+fn send_osc52(text: &str) -> anyhow::Result<()> {
+    let tty = if cfg!(windows) { "CONOUT$" } else { "/dev/tty" };
+    let mut out = fs::OpenOptions::new().write(true).open(tty)?;
+    out.write_all(osc52(text).as_bytes())?;
+    out.flush()?;
+    Ok(())
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &b)| n | u32::from(b) << (16 - 8 * i));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(TABLE[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
 }
 
 // Termux has no window system for arboard; its own helper owns the Android clipboard.
@@ -141,4 +196,18 @@ fn pipe_to(program: &str, args: &[&str], text: &str) -> anyhow::Result<()> {
         .write_all(text.as_bytes())?;
     anyhow::ensure!(child.wait()?.success(), "{program} failed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn osc52_carries_the_text_in_base64() {
+        assert_eq!(base64(b""), "");
+        assert_eq!(base64(b"f"), "Zg==");
+        assert_eq!(base64(b"fo"), "Zm8=");
+        assert_eq!(base64(b"foo"), "Zm9v");
+        assert_eq!(osc52("한글 ok\n"), "\x1b]52;c;7ZWc6riAIG9rCg==\x07");
+    }
 }

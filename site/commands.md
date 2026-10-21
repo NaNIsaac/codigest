@@ -19,6 +19,7 @@ Most commands produce one block of text and share the same options for where it 
 - In a terminal the block is copied to the clipboard. A status line says so.
 - When the output goes to a pipe or a file (`cdg scan > ctx.xml`, `cdg digest | less`, a script, a coding agent's shell), it is printed, the clipboard is left alone, and status messages go to stderr. Add `--copy` to copy anyway.
 - `-s` prints the block in a terminal as well. `-o FILE` also writes it to a file.
+- Over SSH (`SSH_CONNECTION`, `SSH_CLIENT` or `SSH_TTY` is set) the block goes to the clipboard of the machine you type on, through the OSC 52 escape sequence, instead of the remote machine's clipboard. Your terminal has to accept OSC 52; inside tmux, add `set -g set-clipboard on`. `CODIGEST_CLIPBOARD=osc52` forces this (for example in `docker exec`) and `CODIGEST_CLIPBOARD=system` turns it off.
 
 | Option | Meaning |
 | --- | --- |

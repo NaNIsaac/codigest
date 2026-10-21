@@ -113,7 +113,8 @@ In a terminal, every command below copies its result to the clipboard. Add `-s` 
 `-o FILE` to also write it to a file, `--no-copy` to leave the clipboard alone, and `-m "..."` to
 put your question or instruction in it. When the output goes to a pipe or a file instead
 (`cdg scan > ctx.xml`, `cdg digest | less`, a script, a coding agent's shell), it is printed and
-the clipboard is left alone; add `--copy` to copy it anyway.
+the clipboard is left alone; add `--copy` to copy it anyway. Over SSH the copy goes to the clipboard of the machine you
+type on (OSC 52), not the remote one; see [output options](https://nanisaac.github.io/codigest/commands#output-options).
 
 ## 1. Share your project with an AI chat
 

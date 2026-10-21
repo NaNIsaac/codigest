@@ -2,7 +2,9 @@
 Unified Output Handler for CLI commands.
 Manages stderr log console, clipboard copying, and file vs stdout output.
 """
+import base64
 import contextlib
+import os
 import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -28,6 +30,29 @@ def spinner(log: Console, text: str) -> Iterator[None]:
     with Progress(SpinnerColumn(), TextColumn(text), transient=True, console=log) as progress:
         progress.add_task(text, total=None)
         yield
+
+
+def use_osc52() -> bool:
+    """Over SSH the system clipboard is the remote machine's, not the one of the person typing.
+    `CODIGEST_CLIPBOARD=osc52` or `=system` overrides the guess."""
+    match os.environ.get("CODIGEST_CLIPBOARD"):
+        case "osc52":
+            return True
+        case "system":
+            return False
+    return any(name in os.environ for name in ("SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"))
+
+
+def osc52(text: str) -> str:
+    """The sequence that asks the terminal to put `text` on its own clipboard."""
+    return f"\x1b]52;c;{base64.b64encode(text.encode()).decode()}\x07"
+
+
+def send_osc52(text: str) -> None:
+    # Written to the terminal itself, so it arrives even when stdout is a pipe.
+    with open("CONOUT$" if os.name == "nt" else "/dev/tty", "w", encoding="ascii") as tty:
+        tty.write(osc52(text))
+
 
 @dataclass(slots=True)
 class OutputHandler:
@@ -57,6 +82,15 @@ class OutputHandler:
     def copy_to_clipboard(self, content: str, item_name: str = "output") -> None:
         """Copies content to clipboard safely."""
         if not self.copy:
+            return
+        if use_osc52():
+            try:
+                send_osc52(content)
+                self.log_console.print(f"[dim]Sent {item_name} to the terminal clipboard (OSC 52)[/dim]")
+            except OSError:
+                self.log_console.print(
+                    "[yellow]No terminal to send the clipboard to; use -s to print instead[/yellow]"
+                )
             return
         try:
             pyperclip.copy(content)

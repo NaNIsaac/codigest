@@ -2,7 +2,7 @@
 import pyperclip
 from typer.testing import CliRunner
 
-from codigest.core import outline, tags
+from codigest.core import outline, output, tags
 from codigest.main import app
 
 
@@ -28,12 +28,32 @@ def test_a_pipe_gets_the_output_and_the_clipboard_is_left_alone(tmp_path, monkey
 
 def test_copy_can_still_be_asked_for_on_a_pipe(tmp_path, monkeypatch):
     project(tmp_path, monkeypatch, {"a.py": "x = 1\n"})
+    monkeypatch.setenv("CODIGEST_CLIPBOARD", "system")
     copied = []
     monkeypatch.setattr(pyperclip, "copy", copied.append)
 
     CliRunner().invoke(app, ["scan", "--copy"])
 
     assert len(copied) == 1
+
+
+def test_over_ssh_the_copy_goes_to_the_terminal_of_the_person_typing(tmp_path, monkeypatch):
+    project(tmp_path, monkeypatch, {"a.py": "x = 1\n"})
+    monkeypatch.delenv("CODIGEST_CLIPBOARD", raising=False)
+    monkeypatch.setenv("SSH_CONNECTION", "10.0.0.2 50000 10.0.0.1 22")
+    copied, sent = [], []
+    monkeypatch.setattr(pyperclip, "copy", copied.append)
+    monkeypatch.setattr(output, "send_osc52", sent.append)
+
+    result = CliRunner().invoke(app, ["scan", "--copy"])
+
+    assert copied == []
+    assert len(sent) == 1 and '<file path="a.py">' in sent[0]
+    assert "OSC 52" in result.stderr
+
+
+def test_osc52_carries_the_text_in_base64():
+    assert output.osc52("한글 ok\n") == "\x1b]52;c;7ZWc6riAIG9rCg==\x07"
 
 
 def test_code_is_shared_exactly_as_written(tmp_path, monkeypatch):

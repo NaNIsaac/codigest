@@ -107,7 +107,8 @@ cdg shell-help uninstall     # 등록 취소
 출력하고, `-o 파일`을 붙이면 파일로도 저장하며, `--no-copy`를 붙이면 클립보드를 건드리지
 않습니다. `-m "..."`로 질문이나 요청을 함께 넣을 수 있습니다. 출력이 파이프나 파일로 갈 때는
 (`cdg scan > ctx.xml`, `cdg digest | less`, 스크립트, 코딩 에이전트의 셸) 결과를 그대로 출력하고
-클립보드는 건드리지 않습니다. 그래도 복사하려면 `--copy`를 붙입니다.
+클립보드는 건드리지 않습니다. 그래도 복사하려면 `--copy`를 붙입니다. SSH 접속 중에는 원격 머신이 아니라
+지금 키보드를 쓰는 머신의 클립보드에 넣습니다(OSC 52, [출력 옵션](https://nanisaac.github.io/codigest/ko/commands#output-options) 참고).
 
 ## 1. 프로젝트를 AI 채팅에 보여 주기
 
