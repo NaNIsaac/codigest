@@ -21,8 +21,7 @@ CODIGEST_PARITY=1 cargo test # also compare with the Python `cdg` on PATH
 
 Every command of the Python build is ported, with the same options:
 `scan`, `digest`, `tree`, `mark`, `diff`, `semdiff`, `cap`, `pack`, `term` (with `clear`,
-`path`, `install`, `uninstall` and the hooks' `ingest`), `mcp`, `status`, `init` and `clean`.
-`shell-help` (PowerShell's `help codigest`) is in progress.
+`path`, `install`, `uninstall` and the hooks' `ingest`), `mcp`, `status`, `init`, `clean` and `shell-help`.
 
 New in this build: `term --raw` prints the stored output of one command without tags.
 
