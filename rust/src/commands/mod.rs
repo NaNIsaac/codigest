@@ -1,3 +1,4 @@
+pub mod mcp;
 pub mod term;
 
 use clap::{Parser, Subcommand};
@@ -19,11 +20,15 @@ pub enum Command {
     /// Show recently captured commands and their output.
     #[command(next_help_heading = "Share a failing command")]
     Term(term::TermArgs),
+    /// Serve these tools to AI agents over MCP (stdio).
+    #[command(next_help_heading = "Agents")]
+    Mcp,
 }
 
 /// Runs the parsed command and returns the process exit code.
 pub fn run(cli: Cli) -> anyhow::Result<i32> {
     match cli.command {
         Command::Term(args) => term::run(args),
+        Command::Mcp => mcp::run(),
     }
 }
