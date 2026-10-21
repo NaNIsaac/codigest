@@ -48,9 +48,39 @@ pub fn escape_attr(value: &str) -> String {
     out
 }
 
+/// A `<file>` block with the content verbatim. `lines` ("40-60") marks a block that holds
+/// only those lines. The path goes in unescaped, as `tags.file` writes it.
+pub fn file(path: &str, content: &str, status: &str, lines: &str) -> String {
+    // A file's own trailing newline would otherwise show up as a blank line before </file>.
+    let body = escape_value(content);
+    let body = body.trim_end_matches('\n');
+    let lines_attr = if lines.is_empty() {
+        String::new()
+    } else {
+        format!(" lines=\"{lines}\"")
+    };
+    format!("<file path=\"{path}{status}\"{lines_attr}>\n{body}\n</file>")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_blocks_drop_trailing_newlines_and_mark_ranges() {
+        assert_eq!(
+            file("a.py", "x = 1\n\n", "", ""),
+            "<file path=\"a.py\">\nx = 1\n</file>"
+        );
+        assert_eq!(
+            file("a.py", "1: x", " (new)", "1-3"),
+            "<file path=\"a.py (new)\" lines=\"1-3\">\n1: x\n</file>"
+        );
+        assert_eq!(
+            file("a", "</file>", "", ""),
+            "<file path=\"a\">\n&lt;/file>\n</file>"
+        );
+    }
 
     #[test]
     fn only_closing_wrapper_tags_change() {
