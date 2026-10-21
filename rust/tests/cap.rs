@@ -114,7 +114,7 @@ fn one_argument_with_metacharacters_runs_through_a_shell() {
 }
 
 #[test]
-fn powershell_aliases_and_cmdlets_run_on_windows() {
+fn powershell_cmdlets_run_on_windows() {
     if !cfg!(windows) || !has_pipeline_shell() {
         return;
     }
@@ -131,8 +131,9 @@ fn powershell_aliases_and_cmdlets_run_on_windows() {
     assert_eq!(lines, ["a b", "it's"]);
     assert_eq!(history(home.path()).len(), 1);
 
+    // A cmdlet, not `ls`: CI runners have Git's ls.exe on PATH, and an executable wins.
     let listing = rust(home.path())
-        .args(["cap", "ls", "-Name"])
+        .args(["cap", "Get-ChildItem", "-Name"])
         .output()
         .unwrap();
     assert!(listing.status.success());

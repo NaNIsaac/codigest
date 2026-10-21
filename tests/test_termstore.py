@@ -119,7 +119,7 @@ def test_cap_resolves_cmd_shims_and_relative_paths_on_windows(tmp_path, monkeypa
     assert runner.run(["tool"])[0] == 3
 
 
-def test_cap_runs_powershell_aliases_and_cmdlets_on_windows():
+def test_cap_runs_powershell_cmdlets_on_windows():
     import shutil
     import sys
 
@@ -131,6 +131,7 @@ def test_cap_runs_powershell_aliases_and_cmdlets_on_windows():
     code, output, _ = runner.run(["Write-Output", "a b", "it's"])
     assert code == 0
     assert [line.strip() for line in output.splitlines()] == ["a b", "it's"]
-    assert runner.run(["ls", "-Name"])[0] == 0
+    # A cmdlet, not `ls`: CI runners have Git's ls.exe on PATH, and an executable wins.
+    assert runner.run(["Get-ChildItem", "-Name"])[0] == 0
     with pytest.raises(FileNotFoundError):
         runner.run(["codigest-no-such-program-xyz"])
