@@ -1,0 +1,11 @@
+name: readme
+on:
+  push:
+    branches: [main]
+    paths: ["README.md", "README.ko.md", "install.sh", "install.ps1", ".github/workflows/readme.yml"]
+  pull_request:
+    paths: ["README.md", "README.ko.md", "install.sh", "install.ps1", ".github/workflows/readme.yml"]
+  workflow_dispatch:
+jobs:
+  readme:
+    uses: NaNIsaac/.github/.github/workflows/readme.yml@main

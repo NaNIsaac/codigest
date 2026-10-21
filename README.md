@@ -56,12 +56,14 @@ your machine.
 
 Prebuilt binary, no Python needed. Windows (PowerShell):
 
+<!-- test windows -->
 ```powershell
 irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
 ```
 
 Linux, macOS and Termux:
 
+<!-- test unix -->
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh
 ```

@@ -52,12 +52,14 @@ Codigest는 AI 모델을 호출하지 않습니다. 모델에게 보낼 자료�
 
 빌드된 바이너리를 설치합니다. Python이 필요 없습니다. Windows (PowerShell):
 
+<!-- test windows -->
 ```powershell
 irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
 ```
 
 Linux, macOS, Termux:
 
+<!-- test unix -->
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh
 ```
