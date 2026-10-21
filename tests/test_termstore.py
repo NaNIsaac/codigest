@@ -26,7 +26,7 @@ def test_terminal_context_opt_in_and_escapes_host_and_shell():
     assert 'hostname="LAB-PC &amp; &quot;&lt;node&gt;&quot;"' in with_context
     assert 'shell="pwsh &lt;7&gt;"' in with_context
     assert 'command="Get-Process"' in with_context
-    assert '<output>\\nerror output\\n</output>' in with_context
+    assert '<output>\nerror output\n</output>' in with_context
 
 
 def test_terminal_host_is_recorded_on_append_and_old_entries_remain_compatible(tmp_path, monkeypatch):
