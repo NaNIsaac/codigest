@@ -32,6 +32,17 @@ static DENY_COMMANDS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^\s*(echo|write-output)\s+.*\$env:",
         r"(?i)^\s*security\s+find-generic-password\b",
         r"(?i)^\s*kubectl\s+get\s+secret",
+        r"(?i)^\s*kubectl\s+config\s+view\b.*--raw\b",
+        r"(?i)^\s*az\s+account\s+get-access-token\b",
+        r"(?i)^\s*gcloud\s+auth\s+(print-access-token|print-identity-token|application-default\s+print-access-token)\b",
+        r"(?i)^\s*op\s+(read|item\s+get)\b",
+        r"(?i)^\s*bw\s+get\b",
+        r"(?i)^\s*pass\s+show\b",
+        r"(?i)^\s*vault\s+(read|kv\s+get)\b",
+        r"(?i)^\s*aws\s+sts\s+(get-session-token|assume-role)\b",
+        r"(?i)^\s*(cat|type|bat|get-content|gc)\s+.*(\.npmrc|\.pypirc|\.netrc|\.pgpass|\.pem|\.key|id_(rsa|dsa|ecdsa|ed25519))",
+        r#"(?i)^\s*(cat|type|bat|get-content|gc)\s+.*(^|[\\/\s"'])credentials(\.json)?["']?(\s|$)"#,
+        r"(?i)^\s*(cat|type|bat|get-content|gc)\s+.*credentials\.json\b",
     ])
 });
 
@@ -55,6 +66,8 @@ static RULES: LazyLock<Vec<(Regex, String)>> = LazyLock::new(|| {
         token(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),
         token(r"\bglpat-[A-Za-z0-9_-]{16,}"),
         token(r"\bnpm_[A-Za-z0-9]{30,}"),
+        token(r"\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}"),
+        token(r"\bhf_[A-Za-z0-9]{30,}"),
         (
             Regex::new(r"(?i)\b([a-z][a-z0-9+.-]*://[^:/\s]+:)[^@\s]+@").expect("valid pattern"),
             format!("${{1}}{MASK}@"),
@@ -73,9 +86,11 @@ static CAPTURE_RULES: LazyLock<Vec<(Regex, String)>> = LazyLock::new(|| {
         ),
         (
             Regex::new(concat!(
-                r"(?i)\b((?:api[_-]?key|secret|access[_-]?token|auth[_-]?token|token|",
-                r"password|passwd|client[_-]?secret|private[_-]?key)",
-                r#"\s*[:=]\s*)["']?([^\s"',;]{6,})"#,
+                r#"(?im)((?:^|[^A-Za-z0-9])["']?(?:[A-Za-z0-9]+[_-])*"#,
+                r"(?:api[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|secret|",
+                r"access[_-]?token|auth[_-]?token|token|password|passwd|passphrase|pass|pwd|",
+                r"client[_-]?secret|private[_-]?key)",
+                r#"["']?\s*[:=]\s*["']?)([^\s"',;]{6,})"#,
             ))
             .expect("valid pattern"),
             format!("${{1}}{MASK}"),
@@ -186,6 +201,137 @@ mod tests {
             redact_code(pem),
             "-----BEGIN PRIVATE KEY-----[REDACTED]-----END PRIVATE KEY-----"
         );
+    }
+
+    const AWS_SECRET: &str = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+
+    #[test]
+    fn key_value_forms_with_quotes_and_prefixed_keys_are_masked_in_output() {
+        let aws = format!("AWS_SECRET_ACCESS_KEY={AWS_SECRET}");
+        let json = format!(r#""SecretAccessKey": "{AWS_SECRET}""#);
+        let lines = [
+            (r#"{"password": "hunter2hunter2"}"#, "hunter2hunter2"),
+            ("pass: hunter2hunter2", "hunter2hunter2"),
+            ("pwd=hunter2hunter2", "hunter2hunter2"),
+            (aws.as_str(), AWS_SECRET),
+            (json.as_str(), AWS_SECRET),
+            ("DB_PASS=hunter2hunter2", "hunter2hunter2"),
+            ("MY-TOKEN: hunter2hunter2", "hunter2hunter2"),
+            ("'api_key' = 'hunter2hunter2'", "hunter2hunter2"),
+            ("export GITHUB_TOKEN=hunter2hunter2", "hunter2hunter2"),
+        ];
+        for (line, secret) in lines {
+            let out = redact(line);
+            assert!(
+                !out.contains(secret) && out.contains(MASK),
+                "{line} -> {out}"
+            );
+            assert!(
+                redact_code(line).contains(secret),
+                "{line} is too ambiguous for code"
+            );
+        }
+    }
+
+    #[test]
+    fn the_key_value_rule_keeps_the_key_and_the_quotes() {
+        assert_eq!(
+            redact(r#"{"password": "hunter2hunter2"}"#),
+            r#"{"password": "[REDACTED]"}"#
+        );
+        assert_eq!(redact("DB_PASS=hunter2hunter2"), "DB_PASS=[REDACTED]");
+    }
+
+    #[test]
+    fn words_that_merely_contain_a_secret_name_are_left_alone() {
+        for line in [
+            "bypass: xxxxxxxxxxxx",
+            "compass: northnorthnorth",
+            "passenger: yyyyyyyyyyyy",
+            "tokenizer = xxxxxxxxxxxx",
+            "password_hash: abcdefghijkl",
+            "token_count = 123456789",
+            "mypass = abcdefghijkl",
+            "pass: short",
+        ] {
+            assert_eq!(redact(line), line);
+        }
+    }
+
+    #[test]
+    fn vendor_tokens_are_masked_in_code_too() {
+        for token in [
+            concat!("sk_", "live_51Habcdefghijklmnopqrstuv"),
+            concat!("sk_", "test_51Habcdefghijklmnopqrstuv"),
+            concat!("rk_", "live_51Habcdefghijklmnopqrstuv"),
+            "hf_abcdefghijklmnopqrstuvwxyz0123",
+        ] {
+            for out in [
+                redact(&format!("KEY={token}")),
+                redact_code(&format!("KEY={token}")),
+            ] {
+                assert!(
+                    !out.contains(token) && out.contains(MASK),
+                    "{token} -> {out}"
+                );
+            }
+        }
+        let text = "pk_live_publishable hf_model sk_other_thing task_live_x";
+        assert_eq!(redact_code(text), text);
+    }
+
+    #[test]
+    fn credential_printing_commands_are_denied() {
+        for command in [
+            "az account get-access-token",
+            "az account get-access-token --resource https://x",
+            "gcloud auth print-access-token",
+            "gcloud auth print-identity-token",
+            "gcloud auth application-default print-access-token",
+            "op read op://vault/item/field",
+            "op item get github --fields password",
+            "bw get password github",
+            "pass show work/github",
+            "vault read secret/app",
+            "vault kv get secret/app",
+            "kubectl config view --raw",
+            "kubectl config view --minify --raw",
+            "aws sts get-session-token",
+            "aws sts assume-role --role-arn x --role-session-name y",
+            "cat ~/.npmrc",
+            "type .pypirc",
+            "bat ~/.netrc",
+            "Get-Content ./server.pem",
+            "cat certs/private.key",
+            "cat ~/.ssh/id_rsa",
+            r"gc $HOME\.ssh\id_ed25519",
+            "cat ~/.aws/credentials",
+            "cat application_default_credentials.json",
+            "  GCLOUD AUTH PRINT-ACCESS-TOKEN",
+        ] {
+            assert!(is_denied_command(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn nearby_commands_are_not_denied() {
+        for command in [
+            "az account show",
+            "gcloud auth list",
+            "op signin",
+            "bw status",
+            "pass",
+            "vault status",
+            "kubectl config view",
+            "kubectl config get-contexts",
+            "aws sts get-caller-identity",
+            "cat README.md",
+            "cat src/credentials.py",
+            "cat keys.py",
+            "python -m pytest",
+        ] {
+            assert!(!is_denied_command(command), "{command}");
+        }
     }
 
     #[test]

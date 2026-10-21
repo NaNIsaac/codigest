@@ -26,6 +26,17 @@ DENY_COMMANDS: list[re.Pattern[str]] = [
         r"^\s*(echo|write-output)\s+.*\$env:",
         r"^\s*security\s+find-generic-password\b",
         r"^\s*kubectl\s+get\s+secret",
+        r"^\s*kubectl\s+config\s+view\b.*--raw\b",
+        r"^\s*az\s+account\s+get-access-token\b",
+        r"^\s*gcloud\s+auth\s+(print-access-token|print-identity-token|application-default\s+print-access-token)\b",
+        r"^\s*op\s+(read|item\s+get)\b",
+        r"^\s*bw\s+get\b",
+        r"^\s*pass\s+show\b",
+        r"^\s*vault\s+(read|kv\s+get)\b",
+        r"^\s*aws\s+sts\s+(get-session-token|assume-role)\b",
+        r"^\s*(cat|type|bat|get-content|gc)\s+.*(\.npmrc|\.pypirc|\.netrc|\.pgpass|\.pem|\.key|id_(rsa|dsa|ecdsa|ed25519))",
+        r"^\s*(cat|type|bat|get-content|gc)\s+.*(^|[\\/\s\"'])credentials(\.json)?[\"']?(\s|$)",
+        r"^\s*(cat|type|bat|get-content|gc)\s+.*credentials\.json\b",
     )
 ]
 
@@ -55,6 +66,8 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), MASK),
     (re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}"), MASK),
     (re.compile(r"\bnpm_[A-Za-z0-9]{30,}"), MASK),
+    (re.compile(r"\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}"), MASK),
+    (re.compile(r"\bhf_[A-Za-z0-9]{30,}"), MASK),
     # URL userinfo: scheme://user:password@host
     (re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://[^:/\s]+:)[^@\s]+@"), rf"\1{MASK}@"),
 ]
@@ -67,12 +80,15 @@ _CAPTURE_RULES: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"(?i)\b(authorization\s*:\s*)(bearer|basic|token)\s+\S+"),
         rf"\1\2 {MASK}",
     ),
-    # key=value / key: value forms
+    # key=value / key: value forms. The key may be quoted and may start with words joined
+    # by _ or - (AWS_SECRET_ACCESS_KEY, DB_PASS); `bypass` or `tokenizer` do not count.
     (
         re.compile(
-            r"(?i)\b((?:api[_-]?key|secret|access[_-]?token|auth[_-]?token|token|"
-            r"password|passwd|client[_-]?secret|private[_-]?key)"
-            r"\s*[:=]\s*)[\"']?([^\s\"',;]{6,})"
+            r"(?im)((?:^|[^A-Za-z0-9])[\"']?(?:[A-Za-z0-9]+[_-])*"
+            r"(?:api[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|secret|"
+            r"access[_-]?token|auth[_-]?token|token|password|passwd|passphrase|pass|pwd|"
+            r"client[_-]?secret|private[_-]?key)"
+            r"[\"']?\s*[:=]\s*[\"']?)([^\s\"',;]{6,})"
         ),
         rf"\1{MASK}",
     ),
