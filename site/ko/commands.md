@@ -348,9 +348,9 @@ cdg term -i 2         # 두 번 전에 실행한 명령 하나만
 cdg term --context    # PC 이름과 셸 정보 추가
 ```
 
-#### `--raw`, cdg-rs에만 있음 {#term-raw}
+#### `--raw`, 바이너리에만 있음 {#term-raw}
 
-Rust 빌드인 `cdg-rs`에는 여기에 옵션이 하나 더 있습니다. `term --raw`는 명령 하나의 저장된 출력을 태그 없이 출력합니다. `cdg`에는 아직 없고, 이 레퍼런스는 `cdg`를 설명합니다. [Rust 포팅](/ko/rust-port)을 참고하세요.
+빌드된 바이너리(Rust 빌드)에는 여기에 옵션이 하나 더 있습니다. `term --raw`는 명령 하나의 저장된 출력을 태그 없이 출력합니다. Python 패키지에는 없습니다. [Rust 포팅](/ko/rust-port)을 참고하세요.
 
 ### `cdg term install`
 

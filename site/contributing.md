@@ -29,16 +29,16 @@ CI runs the tests on Ubuntu, a PowerShell check on Windows (`Get-Help` forwardin
 
 ## The Rust build
 
-The Rust port is in `rust/` and builds a separate binary, `cdg-rs`. See [Rust Port](/rust-port) for its status.
+The Rust port is in `rust/` and builds the `cdg` binary that the installers ship. See [Rust Port](/rust-port).
 
 ```bash
 cd rust
-cargo build --release        # target/release/cdg-rs
+cargo build --release        # target/release/cdg
 cargo test                   # unit and integration tests
 CODIGEST_PARITY=1 cargo test # also compare with the Python `cdg` on PATH
 ```
 
-With `CODIGEST_PARITY=1` the integration tests run each command with both builds and compare stdout and the exit code, so the Python `cdg` must be on `PATH`.
+With `CODIGEST_PARITY=1` the integration tests run each command with both builds and compare stdout and the exit code, so the Python `cdg` must be on `PATH`. They compare `target/.../cdg` with that one, so the Python package should be the `cdg` your shell finds first, not the installed binary.
 
 ## This documentation site
 
