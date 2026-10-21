@@ -26,6 +26,31 @@ pub fn history_path() -> PathBuf {
     data_dir().join("term").join("history.jsonl")
 }
 
+/// The order of Python's `sorted()` on `Path` objects: component by component, and on
+/// Windows without regard to case. Comparing whole strings would put `a-b/x` before `a/x`.
+pub fn cmp_paths(a: &std::path::Path, b: &std::path::Path) -> std::cmp::Ordering {
+    let key = |p: &std::path::Path| -> Vec<String> {
+        p.components()
+            .map(|c| {
+                let s = c.as_os_str().to_string_lossy().into_owned();
+                if cfg!(windows) { s.to_lowercase() } else { s }
+            })
+            .collect()
+    };
+    key(a).cmp(&key(b))
+}
+
+/// Drops the `\\?\` prefix `canonicalize` adds on Windows, which Python never shows.
+pub fn strip_verbatim(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\UNC\") {
+        Some(rest) => PathBuf::from(format!(r"\\{rest}")),
+        None => text
+            .strip_prefix(r"\\?\")
+            .map_or_else(|| path.clone(), PathBuf::from),
+    }
+}
+
 fn non_empty(name: &str) -> Option<String> {
     env::var(name).ok().filter(|v| !v.is_empty())
 }
