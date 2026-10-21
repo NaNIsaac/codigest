@@ -400,7 +400,10 @@ local files imported by the targets. `cdg <command> --help` lists everything.
 ### Terminal capture
 
 `cdg cap` streams the command's output live and records the command line, combined
-stdout/stderr, exit code and working directory. Captures from all projects share one store on
+stdout/stderr, exit code and working directory. `cdg term --context` also includes the
+hostname at capture time and the shell name. The PC name is opt-in because it may be
+sensitive; older captures have no hostname, and `cdg term` still copies without it.
+Captures from all projects share one store on
 your machine, so `cap` and `term` work in any directory.
 
 ```bash
@@ -408,6 +411,7 @@ cdg cap "npm run build | tail -20"  # quote pipelines
 cdg term              # last command and its output
 cdg term -n 3         # last 3
 cdg term -f           # last failed one
+cdg term --context   # add the PC hostname and shell to the copied context (opt-in)
 cdg term --here -n 3  # last 3 run in this project
 cdg term -i 2         # only the command from 2 runs ago
 cdg term path         # where captures are stored (override with CODIGEST_HOME)

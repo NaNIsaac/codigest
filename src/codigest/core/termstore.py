@@ -16,6 +16,7 @@ lazy import html
 lazy import json
 import os
 import re
+import socket
 import sys
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
@@ -79,6 +80,7 @@ class Entry:
     exit_code: int | None = None
     cwd: str = ""
     shell: str = ""
+    hostname: str = ""
     started_at: str = ""
     duration_ms: int = 0
     truncated: bool = False
@@ -171,6 +173,10 @@ def append_entry(entry: Entry, allow_secrets: bool = False) -> None:
     buffer. Denied commands are stored without their output.
     """
     entry.output = normalize_output(entry.output)
+    # Record this at capture time: exporting old records must not relabel
+    # output from another machine as having run on the current host.
+    if entry.captured and not entry.hostname:
+        entry.hostname = socket.gethostname()
 
     if not allow_secrets:
         if is_denied_command(entry.command):
@@ -238,7 +244,7 @@ def _fmt_duration(ms: int) -> str:
     return f"{ms / 1000:.1f}s"
 
 
-def render(entries: list[Entry]) -> str:
+def render(entries: list[Entry], *, include_context: bool = False) -> str:
     """
     Renders entries as an XML block. `index` is 1-based counting backwards:
     index="1" is the most recent command, index="3" is three commands ago.
@@ -258,6 +264,11 @@ def render(entries: list[Entry]) -> str:
             attrs.append(f'exit_code="{entry.exit_code}"')
         if entry.cwd:
             attrs.append(f'cwd="{html.escape(entry.cwd)}"')
+        # Hostname and shell are opt-in: names can expose organization details.
+        if include_context and entry.hostname:
+            attrs.append(f'hostname="{html.escape(entry.hostname, quote=True)}"')
+        if include_context and entry.shell:
+            attrs.append(f'shell="{html.escape(entry.shell, quote=True)}"')
         if entry.duration_ms:
             attrs.append(f'duration="{_fmt_duration(entry.duration_ms)}"')
         if entry.started_at:
