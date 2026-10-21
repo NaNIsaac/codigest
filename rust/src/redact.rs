@@ -117,6 +117,39 @@ pub fn redact_code(text: &str) -> String {
     apply(text, &RULES)
 }
 
+/// Drops the hunks of secret files and masks tokens in the rest of a unified diff.
+pub fn redact_diff(diff: &str) -> String {
+    if diff.is_empty() {
+        return String::new();
+    }
+    let mut starts: Vec<usize> = diff
+        .match_indices("diff --git ")
+        .map(|(i, _)| i)
+        .filter(|&i| i == 0 || diff.as_bytes()[i - 1] == b'\n')
+        .collect();
+    starts.push(diff.len());
+    let mut out = String::from(&diff[..starts[0]]);
+    for pair in starts.windows(2) {
+        let section = &diff[pair[0]..pair[1]];
+        let header = section.split('\n').next().unwrap_or("");
+        let name = header
+            .split_whitespace()
+            .last()
+            .unwrap_or("")
+            .rsplit('/')
+            .next()
+            .unwrap_or("");
+        if is_secret_file(name) {
+            out.push_str(&format!(
+                "{header}\n(contents withheld: {name} may contain secrets)\n"
+            ));
+        } else {
+            out.push_str(section);
+        }
+    }
+    redact_code(&out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

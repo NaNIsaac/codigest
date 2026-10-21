@@ -1,8 +1,14 @@
+pub mod cap;
+pub mod changes;
 pub mod clean;
 pub mod digest;
+pub mod hook;
+pub mod ingest;
 pub mod init;
 pub mod mcp;
+pub mod pack;
 pub mod scan;
+pub mod status;
 pub mod term;
 pub mod tree;
 
@@ -20,29 +26,35 @@ pub struct Cli {
     pub command: Command,
 }
 
+// Listed in the order `cdg --help` shows them in the Python build.
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Bundle the whole project, or only the given paths, as one block.
-    #[command(next_help_heading = "Share code")]
     Scan(scan::ScanArgs),
     /// Outline Python and MATLAB files: numbered signatures and docstrings, no bodies.
-    #[command(next_help_heading = "Share code")]
     Digest(digest::DigestArgs),
     /// Print the project file tree.
-    #[command(next_help_heading = "Share code")]
     Tree(tree::TreeArgs),
-    /// Create .codigest/config.toml (file filters). `cdg mark` sets a baseline.
-    #[command(next_help_heading = "Setup")]
-    Init(init::InitArgs),
-    /// Delete .codigest/: the config, the baseline and the cache.
-    #[command(next_help_heading = "Setup")]
-    Clean(clean::CleanArgs),
+    /// Set the baseline that `diff`, `semdiff` and `pack` compare against.
+    Mark(changes::MarkArgs),
+    /// Show the text diff since the baseline (`cdg mark`).
+    Diff(changes::DiffArgs),
+    /// Show which Python functions and classes changed since the baseline.
+    Semdiff(changes::SemdiffArgs),
+    /// Run a command as usual and keep its output for `pack` and `term`.
+    Cap(cap::CapArgs),
+    /// Bundle the last failure, the files it points at and your changes.
+    Pack(pack::PackArgs),
     /// Show recently captured commands and their output.
-    #[command(next_help_heading = "Share a failing command")]
     Term(term::TermArgs),
     /// Serve these tools to AI agents over MCP (stdio).
-    #[command(next_help_heading = "Agents")]
     Mcp,
+    /// Show what `pack` would use here: the last failure, your changes and the baseline.
+    Status(status::StatusArgs),
+    /// Create .codigest/config.toml (file filters). `cdg mark` sets a baseline.
+    Init(init::InitArgs),
+    /// Delete .codigest/: the config, the baseline and the cache.
+    Clean(clean::CleanArgs),
 }
 
 /// Runs the parsed command and returns the process exit code.
@@ -51,9 +63,15 @@ pub fn run(cli: Cli) -> anyhow::Result<i32> {
         Command::Scan(args) => scan::run(args),
         Command::Digest(args) => digest::run(args),
         Command::Tree(args) => tree::run(args),
-        Command::Init(args) => init::run(args),
-        Command::Clean(args) => clean::run(args),
+        Command::Mark(args) => changes::mark(args),
+        Command::Diff(args) => changes::diff(args),
+        Command::Semdiff(args) => changes::semdiff(args),
+        Command::Cap(args) => cap::run(args),
+        Command::Pack(args) => pack::run(args),
         Command::Term(args) => term::run(args),
         Command::Mcp => mcp::run(),
+        Command::Status(args) => status::run(args),
+        Command::Init(args) => init::run(args),
+        Command::Clean(args) => clean::run(args),
     }
 }

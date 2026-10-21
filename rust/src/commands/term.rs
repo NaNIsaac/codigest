@@ -6,6 +6,7 @@ use std::path::Path;
 
 use clap::{Args, Subcommand};
 
+use super::{hook, ingest};
 use crate::output::{Output, OutputArgs};
 use crate::style::{dim, green, red, yellow};
 use crate::{paths, shellhist, term};
@@ -46,6 +47,13 @@ pub enum TermAction {
     Clear,
     /// Show where terminal captures are stored.
     Path,
+    /// Hook your shells so every command's output is captured automatically.
+    Install(hook::HookArgs),
+    /// Remove the capture hook from your shell startup files.
+    Uninstall(hook::HookArgs),
+    /// Store one entry (called by the shell hook).
+    #[command(hide = true)]
+    Ingest(ingest::IngestArgs),
 }
 
 pub fn run(args: TermArgs) -> anyhow::Result<i32> {
@@ -55,6 +63,9 @@ pub fn run(args: TermArgs) -> anyhow::Result<i32> {
             println!("{}", paths::history_path().display());
             return Ok(0);
         }
+        Some(TermAction::Install(args)) => return hook::install(args),
+        Some(TermAction::Uninstall(args)) => return hook::uninstall(args),
+        Some(TermAction::Ingest(args)) => return ingest::run(args),
         None => {}
     }
 
