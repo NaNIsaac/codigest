@@ -100,7 +100,10 @@ impl Fixture {
 }
 
 pub struct Run {
+    /// Stdout with `\r\n` turned into `\n`, for assertions that are about content.
     pub stdout: String,
+    /// Stdout exactly as written, for comparing the two builds byte for byte.
+    pub raw_stdout: String,
     pub stderr: String,
     pub code: i32,
 }
@@ -134,8 +137,10 @@ pub fn run_in(cwd: &Path, home: &Path, program: &str, args: &[&str], stdin: Opti
         stdout,
         stderr,
     } = child.wait_with_output().unwrap();
+    let raw_stdout = String::from_utf8_lossy(&stdout).into_owned();
     Run {
-        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stdout: lf(&raw_stdout),
+        raw_stdout,
         stderr: String::from_utf8_lossy(&stderr).into_owned(),
         code: status.code().unwrap_or(-1),
     }
@@ -150,7 +155,7 @@ pub fn parity_enabled() -> bool {
     on
 }
 
-/// Python writes the platform's line ending where Rust writes `\n`.
+/// Both builds write the platform's line ending; content assertions compare with `\n`.
 pub fn lf(text: &str) -> String {
     text.replace("\r\n", "\n")
 }
@@ -161,11 +166,9 @@ pub fn assert_parity(fx: &Fixture, args: &[&str]) -> (Run, Run) {
     let python = fx.python(args);
     let rust = fx.rust(args);
     assert_eq!(
-        lf(&python.stdout),
-        rust.stdout,
+        python.raw_stdout, rust.raw_stdout,
         "stdout differs for {args:?}\npython stderr: {}\nrust stderr: {}",
-        python.stderr,
-        rust.stderr
+        python.stderr, rust.stderr
     );
     assert_eq!(python.code, rust.code, "exit code differs for {args:?}");
     (python, rust)

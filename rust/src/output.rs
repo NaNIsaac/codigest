@@ -84,16 +84,26 @@ impl Output {
             }
         }
         if let Some(path) = &self.file {
-            fs::write(path, format!("{content}\n"))?;
+            fs::write(path, text_mode(&format!("{content}\n")))?;
             self.log(&format!("Wrote {item} to {}", path.display()));
         }
         if self.stdout {
             let mut out = io::stdout().lock();
-            writeln!(out, "{content}")?;
+            out.write_all(text_mode(&format!("{content}\n")).as_bytes())?;
         } else {
             summary(self);
         }
         Ok(())
+    }
+}
+
+/// What Python's text-mode stdout and `write_text` produce: on Windows every `\n` becomes
+/// `\r\n` (a `\r\n` already in the content becomes `\r\r\n`, as it does there).
+pub fn text_mode(text: &str) -> String {
+    if cfg!(windows) {
+        text.replace('\n', "\r\n")
+    } else {
+        text.to_string()
     }
 }
 

@@ -179,7 +179,7 @@ fn output_file_gets_the_snapshot() {
     assert_eq!(run.code, 0);
     let text = fx.read("out.txt");
     assert!(text.starts_with("<project_snapshot"));
-    assert_eq!(text, run.stdout);
+    assert_eq!(text, run.raw_stdout);
 }
 
 #[test]
