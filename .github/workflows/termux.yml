@@ -23,7 +23,7 @@ jobs:
             pkg install -y rust git >/dev/null
             cp -r /src "$HOME/codigest"
             cd "$HOME/codigest/rust"
-            cargo test --locked
+            cargo test --locked --no-fail-fast
             cd "$HOME/codigest"
             sh install.sh
             export PATH="$PREFIX/bin:$PATH"

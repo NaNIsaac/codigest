@@ -8,7 +8,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Output;
 
-use common::{python, require_parity, rust};
+use common::{posix_sh, python, require_parity, rust};
 use regex::Regex;
 
 struct Sandbox {
@@ -42,7 +42,7 @@ impl Sandbox {
                 let script = bin.join("pwsh");
                 fs::write(
                     &script,
-                    format!("#!/bin/sh\necho '{}'\n", profile.display()),
+                    format!("#!{}\necho '{}'\n", posix_sh().display(), profile.display()),
                 )
                 .unwrap();
                 #[cfg(unix)]
