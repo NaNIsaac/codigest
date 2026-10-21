@@ -74,7 +74,7 @@ Most commands follow the same path:
 | macOS, Linux | `$XDG_DATA_HOME/codigest`, or `~/.local/share/codigest` |
 | any | `$CODIGEST_HOME`, when set |
 
-Captures are in `term/history.jsonl` inside it, with `term/ingest-errors.log` next to it if a hook ever failed. `cdg term path` prints the exact file.
+Captures are in `term/history.jsonl` inside it, with `term/ingest-errors.log` next to it if a hook ever failed. `cdg term path` prints the exact file. `cdg term install` also copies the shell hooks to `shell/` in the same folder, and the startup files load those copies.
 
 ## The anchor
 

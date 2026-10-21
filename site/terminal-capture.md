@@ -34,7 +34,7 @@ The hostname and shell name are left out by default because a PC name may be sen
 
 `cdg term install` edits your PowerShell profile, `~/.bashrc` and `~/.zshrc` for whichever of these shells is installed. Choose with `--shell powershell|bash|zsh|all`. On Windows, Git Bash counts as bash. `cdg term uninstall` removes the hook.
 
-Commands still run in your current session: `cd`, variables and functions work normally, and the command appears in your history as typed. Editors, pagers, REPLs, `ssh` and full-screen programs such as `tmux`, `zellij` or `herdr` are skipped; they need a real terminal.
+Commands still run in your current session: `cd`, variables and functions work normally, and the command appears in your history as typed. Programs that need a real terminal are skipped; see [What is skipped](#what-is-skipped).
 
 ```bash
 cdg term install                 # every shell found
@@ -43,6 +43,31 @@ cdg term uninstall
 ```
 
 The change is a marked block in each startup file, between `# >>> codigest terminal capture >>>` and `# <<< codigest terminal capture <<<`. It is active in new shell windows. The install message prints the line that enables it in the current one.
+
+The block loads a copy of the hook that `install` puts in the `shell/` folder of the [data directory](/architecture#where-things-are-stored), not the file inside the installed package. After updating codigest, run `cdg term install` again to refresh the copy.
+
+### What is skipped
+
+A line that starts with one of these is run as typed, with no capture:
+
+- **Editors, pagers and terminals:** `vim`, `nvim`, `nano`, `emacs`, `less`, `more`, `man`, `ssh`, `htop`, `btop`, `top`, `fzf`, `lazygit`, `tmux`, `screen`, `claude`, `codex`, `wsl`, `exit`; in bash and zsh also `exec`, `fg` and `bg`.
+- **Full-screen tools:** `herdr`, `zellij`, `k9s`, `lazydocker`, `gitui`, `tig`, `yazi`, `ranger`, `nnn`, `mc`, `vifm`, `broot`, `hx`, `helix`, `micro`, `ncdu`, `btm`, `glances`, `nvtop`. Through the capture pipe they get no terminal and hang.
+- **Interactive prompts:**
+  - `docker`, `podman` or `kubectl` with `run`, `exec`, `attach` or `start` and an `-i`, `-t`, `--interactive` or `--tty` flag
+  - `npm`, `pnpm`, `yarn` or `bun` with `init` or `create`, and `npx create-...`
+  - `pip uninstall` (PowerShell captures it when you pass `-y` or `--yes`)
+  - `gh auth login`, `az login`, `gcloud auth login`, `gcloud init`, `aws configure`, `ssh-keygen`, `ssh-copy-id`
+  - `sudo`, and `runas` in PowerShell or `su` and `doas` in bash and zsh
+  - database shells and REPLs: `mysql`, `psql`, `sqlite3`, `redis-cli`, `mongosh`, `duckdb`, `julia`, `irb`, `ghci`, `ollama run`
+- **Bare interpreters and shells** (`python`, `node`, `bash`, `pwsh`, ... with no arguments), `cdg term` and `cdg mcp`, and `git commit` without a message, `git rebase -i`, `git add -p`, `git mergetool`.
+
+Interactive prompts are skipped because a prompt that does not end its line stays invisible in the capture pipe until the next newline, so the command would look stuck.
+
+### Long output and exit status
+
+- **Long output.** The PowerShell hook keeps the first 2,000 and the last 2,000 lines of a command's output and notes how many lines it dropped. In bash and zsh, a capture file larger than 4 MB is read 1 MB from each end. Either way the [store](#what-is-stored) then keeps at most 64 KB. A server left running for hours therefore does not fill memory.
+- **Exit status.** In PowerShell, a native command's exit code is used when one ran. Otherwise the command counts as failed when an error reached the screen, or a terminating error was thrown. An error you silenced with `-ErrorAction` is not a failure.
+- **Where the PowerShell hook steps aside.** It does not wrap lines in a remote session, in a nested prompt or in the debugger, where the line is for another runspace or is a debugger command such as `c`, `s` or `v`.
 
 ### Controls
 

@@ -34,7 +34,7 @@ PC 이름은 민감할 수 있어서 기본으로는 넣지 않습니다. `--con
 
 `cdg term install`은 설치되어 있는 셸에 맞춰 PowerShell 프로필, `~/.bashrc`, `~/.zshrc`에 훅을 추가합니다. `--shell powershell|bash|zsh|all`로 고를 수 있고, Windows의 Git Bash는 bash로 칩니다. `cdg term uninstall`로 훅을 제거합니다.
 
-명령은 원래 세션에서 그대로 실행되므로 `cd`, 변수, 함수가 모두 평소처럼 동작하고, 히스토리에도 입력한 그대로 남습니다. 편집기, 페이저, REPL, `ssh`와 `tmux`, `zellij`, `herdr` 같은 전체 화면 프로그램은 실제 터미널이 필요해서 기록하지 않습니다.
+명령은 원래 세션에서 그대로 실행되므로 `cd`, 변수, 함수가 모두 평소처럼 동작하고, 히스토리에도 입력한 그대로 남습니다. 실제 터미널이 필요한 프로그램은 기록하지 않습니다. [기록하지 않는 것](#what-is-skipped)을 참고하세요.
 
 ```bash
 cdg term install                 # 찾은 셸 전부
@@ -43,6 +43,31 @@ cdg term uninstall
 ```
 
 바뀌는 것은 각 시작 파일에 들어가는 표시된 블록 하나이며, `# >>> codigest terminal capture >>>`와 `# <<< codigest terminal capture <<<` 사이에 있습니다. 새로 연 셸 창부터 적용됩니다. 지금 창에서 켜는 줄은 설치할 때 출력해 줍니다.
+
+이 블록은 설치된 패키지 안의 파일이 아니라, `install`이 [데이터 폴더](/ko/architecture#where-things-are-stored)의 `shell/` 폴더에 둔 훅 사본을 불러옵니다. codigest를 업데이트한 뒤에는 `cdg term install`을 다시 실행해 사본을 갱신하세요.
+
+### 기록하지 않는 것 {#what-is-skipped}
+
+줄이 아래 중 하나로 시작하면 기록 없이 입력한 그대로 실행합니다.
+
+- **편집기, 페이저, 터미널:** `vim`, `nvim`, `nano`, `emacs`, `less`, `more`, `man`, `ssh`, `htop`, `btop`, `top`, `fzf`, `lazygit`, `tmux`, `screen`, `claude`, `codex`, `wsl`, `exit`. bash와 zsh에서는 `exec`, `fg`, `bg`도 해당합니다.
+- **전체 화면 도구:** `herdr`, `zellij`, `k9s`, `lazydocker`, `gitui`, `tig`, `yazi`, `ranger`, `nnn`, `mc`, `vifm`, `broot`, `hx`, `helix`, `micro`, `ncdu`, `btm`, `glances`, `nvtop`. 기록용 파이프를 거치면 터미널이 없어서 멈춰 버립니다.
+- **입력을 기다리는 프롬프트:**
+  - `docker`, `podman`, `kubectl`의 `run`, `exec`, `attach`, `start`에 `-i`, `-t`, `--interactive`, `--tty` 플래그가 붙은 경우
+  - `npm`, `pnpm`, `yarn`, `bun`의 `init`, `create`와 `npx create-...`
+  - `pip uninstall` (PowerShell에서는 `-y`나 `--yes`를 주면 기록합니다)
+  - `gh auth login`, `az login`, `gcloud auth login`, `gcloud init`, `aws configure`, `ssh-keygen`, `ssh-copy-id`
+  - `sudo`, 그리고 PowerShell의 `runas`, bash와 zsh의 `su`, `doas`
+  - 데이터베이스 셸과 REPL: `mysql`, `psql`, `sqlite3`, `redis-cli`, `mongosh`, `duckdb`, `julia`, `irb`, `ghci`, `ollama run`
+- **인자 없는 인터프리터와 셸**(`python`, `node`, `bash`, `pwsh` 등), `cdg term`, `cdg mcp`, 그리고 메시지 없는 `git commit`, `git rebase -i`, `git add -p`, `git mergetool`.
+
+입력을 기다리는 프롬프트를 기록하지 않는 이유는, 줄바꿈으로 끝나지 않는 질문은 기록용 파이프 안에서 다음 줄바꿈이 올 때까지 화면에 나타나지 않아 명령이 멈춘 것처럼 보이기 때문입니다.
+
+### 긴 출력과 종료 상태
+
+- **긴 출력.** PowerShell 훅은 명령 출력의 앞 2,000줄과 뒤 2,000줄만 보관하고, 버린 줄 수를 표시해 둡니다. bash와 zsh에서는 기록 파일이 4 MB보다 크면 앞과 뒤에서 1 MB씩 읽습니다. 어느 쪽이든 [저장소](#what-is-stored)는 그다음 최대 64 KB만 남깁니다. 그래서 몇 시간 켜 둔 서버가 메모리를 채우지 않습니다.
+- **종료 상태.** PowerShell에서는 네이티브 명령이 실행되었으면 그 종료 코드를 씁니다. 그렇지 않으면 오류가 화면에 나왔거나 종료를 일으키는 오류가 발생했을 때 실패로 칩니다. `-ErrorAction`으로 감춘 오류는 실패가 아닙니다.
+- **PowerShell 훅이 물러나는 곳.** 원격 세션, 중첩 프롬프트, 디버거에서는 줄을 감싸지 않습니다. 그곳의 줄은 다른 runspace에 보내는 것이거나 `c`, `s`, `v` 같은 디버거 명령이기 때문입니다.
 
 ### 조절하기
 
@@ -67,7 +92,7 @@ cdg term uninstall
 - bash(4 이상)와 zsh에서는 여러 줄에 걸친 명령(여러 줄로 입력한 반복문, heredoc), 백그라운드 작업(`cmd &`), `!` 히스토리 확장을 쓴 줄은 기록하지 않고 그냥 실행합니다. bash에서는 서브셸 `( ... )`로 시작하는 줄도 마찬가지입니다.
 - bash 훅은 DEBUG 트랩을 씁니다. 첫 프롬프트 전에 설정된 트랩(starship, bash-preexec)은 그대로 두지만, 그 뒤에 새로 설정한 DEBUG 트랩은 훅을 덮어씁니다.
 
-## 저장되는 내용
+## 저장되는 내용 {#what-is-stored}
 
 기록 하나에는 명령, 출력, 종료 코드, 작업 폴더, 셸, 호스트 이름, 시작 시각, 걸린 시간이 들어 있습니다.
 

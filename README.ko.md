@@ -414,13 +414,15 @@ cdg term clear        # 기록 모두 지우기
 `cdg term install`은 설치되어 있는 셸에 맞춰 PowerShell 프로필, `~/.bashrc`, `~/.zshrc`에 훅을
 추가합니다. `--shell powershell|bash|zsh|all`로 고를 수 있고, Windows의 Git Bash는 bash로 칩니다.
 명령은 원래 세션에서 그대로 실행되므로 `cd`, 변수, 함수가 모두 평소처럼 동작하고, 히스토리에도
-입력한 그대로 남습니다. 편집기, 페이저, REPL, `ssh`와 `tmux`, `zellij`, `herdr` 같은 전체 화면 프로그램은 실제 터미널이 필요해서 기록하지 않습니다.
+입력한 그대로 남습니다. 실제 터미널이 필요한 프로그램은 기록하지 않습니다. 편집기, 페이저, `ssh`, 전체 화면 도구(`tmux`, `zellij`, `herdr`, `k9s`, `yazi` 등), `-it`가 붙은 `docker`/`podman`/`kubectl`, `npm`/`pnpm`/`yarn`/`bun`의 `init`·`create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login`·`gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, 데이터베이스 셸(`psql`, `mysql`, `sqlite3` 등)이 해당합니다. 줄바꿈으로 끝나지 않는 질문은 기록용 파이프 안에서 다음 줄바꿈이 올 때까지 화면에 나타나지 않아, 명령이 멈춘 것처럼 보이기 때문입니다.
 
 - 명령 하나만 기록하지 않으려면 맨 앞에 공백을 넣습니다.
 - 기록하지 않을 프로그램을 더 지정하려면: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`
   (bash/zsh에서는 `export CODIGEST_CAP_SKIP='^(myrepl|mytui)( |$)'`, 확장 정규식).
 - 지금 세션에서만 끄려면: `$env:CODIGEST_NOCAP = 1` (bash/zsh: `export CODIGEST_NOCAP=1`).
 - 훅을 없애려면: `cdg term uninstall`.
+
+프로필은 패키지 안의 파일이 아니라, `cdg term install`이 데이터 폴더(기록 옆의 `shell/`)에 둔 훅 사본을 불러옵니다. codigest를 업데이트한 뒤에는 `cdg term install`을 다시 실행해 사본을 갱신하세요.
 
 알아 둘 점:
 
@@ -429,6 +431,9 @@ cdg term clear        # 기록 모두 지우기
 - bash(4 이상)와 zsh에서는 여러 줄에 걸친 명령(여러 줄로 입력한 반복문, heredoc), 백그라운드
   작업(`cmd &`), `!` 히스토리 확장을 쓴 줄은 기록하지 않고 그냥 실행합니다. bash에서는 서브셸
   `( ... )`로 시작하는 줄도 마찬가지입니다.
+- 긴 출력에는 상한이 있습니다. PowerShell 훅은 앞뒤 2,000줄씩만 보관하고, bash와 zsh는 기록 파일이 4 MB를 넘으면 앞뒤에서 1 MB씩 읽습니다. 그다음 저장소는 64 KB만 남깁니다.
+- PowerShell에서는 종료 코드가 0이 아니거나 오류가 화면에 나오면 실패로 칩니다. `-ErrorAction`으로 감춘 오류는 실패가 아닙니다.
+- PowerShell 훅은 원격 세션, 중첩 프롬프트, 디버거에서는 줄을 감싸지 않습니다.
 - bash 훅은 DEBUG 트랩을 씁니다. 첫 프롬프트 전에 설정된 트랩(starship, bash-preexec)은 그대로
   두지만, 그 뒤에 새로 설정한 DEBUG 트랩은 훅을 덮어씁니다.
 
@@ -472,11 +477,16 @@ exclude_patterns = [
   `*.pfx`, 키스토어, `.netrc`, `.pgpass`, SSH 개인 키는 어떤 명령도 넣지 않습니다. `scan`은 뺀
   파일을 알려 주고, `pack`은 제외 목록에 남기며, diff에서는 해당 부분을 안내 문구로 바꿉니다.
 - **코드와 diff 속 토큰.** 개인 키, JWT, 주요 서비스 토큰(OpenAI, GitHub, AWS, Google, Slack,
-  GitLab, npm), URL에 들어 있는 비밀번호는 Codigest가 내보내는 모든 결과에서 가립니다.
+  GitLab, npm, Stripe `sk_`/`rk_`, Hugging Face `hf_`), URL에 들어 있는 비밀번호는 Codigest가 내보내는 모든 결과에서 가립니다.
   `token = get_token()` 같은 평범한 코드는 그대로 둡니다.
-- **터미널 기록 속 비밀정보.** 여기에 더해 터미널 출력은 디스크에 저장하기 전에 `password=...`
-  형태의 값과 `Authorization` 헤더도 가립니다. `env`, `printenv`, `gh auth token`,
-  `aws configure`처럼 인증 정보를 출력하는 명령은 출력을 아예 저장하지 않습니다.
+- **터미널 기록 속 비밀정보.** 여기에 더해 터미널 출력은 디스크에 저장하기 전에 `Authorization`
+  헤더와 `key=value`, `key: value` 형태의 값도 가립니다. 키에 따옴표가 있거나(`"password": "..."`)
+  `_`, `-` 뒤에 비밀 이름이 붙은 키(`AWS_SECRET_ACCESS_KEY`, `DB_PASS`, `pass`, `pwd` 포함)도 잡습니다.
+  인증 정보를 출력하는 명령은 출력을 아예 저장하지 않습니다: `env`, `printenv`, `gh auth token`,
+  `aws configure`, `aws sts get-session-token`/`assume-role`, `az account get-access-token`,
+  `gcloud auth print-access-token`, `kubectl get secret`, `kubectl config view --raw`, `op read`,
+  `bw get`, `pass show`, `vault read`, `.env`·`.npmrc`·`.pypirc`·`.netrc`·키 파일·`credentials.json`을
+  `cat`하는 명령 등입니다(전체 목록은 `src/codigest/core/redact.py`의 `DENY_COMMANDS`에 있습니다).
 - 이 규칙들은 흔한 형태를 잡아내는 것이고, 모든 비밀정보를 잡을 수는 없습니다.
 - **내 프로젝트.** 어떤 명령도 소스 파일을 수정하지 않습니다. `.codigest/` 폴더는 `mark`와
   `init`만 만들며, 폴더 안의 `.gitignore`(`*`) 덕분에 `git status`에 나타나지 않습니다.

@@ -74,7 +74,7 @@ src/codigest/
 | macOS, Linux | `$XDG_DATA_HOME/codigest`, 없으면 `~/.local/share/codigest` |
 | 공통 | `$CODIGEST_HOME`이 설정되어 있으면 그 폴더 |
 
-기록은 그 안의 `term/history.jsonl`에 있고, 훅이 실패한 적이 있으면 그 옆에 `term/ingest-errors.log`가 있습니다. 정확한 파일은 `cdg term path`가 출력합니다.
+기록은 그 안의 `term/history.jsonl`에 있고, 훅이 실패한 적이 있으면 그 옆에 `term/ingest-errors.log`가 있습니다. 정확한 파일은 `cdg term path`가 출력합니다. `cdg term install`은 같은 폴더의 `shell/`에 셸 훅도 복사해 두며, 시작 파일은 그 사본을 불러옵니다.
 
 ## 기준점(anchor)
 

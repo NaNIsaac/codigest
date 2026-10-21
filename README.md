@@ -439,13 +439,15 @@ fish), without their output.
 `cdg term install` edits your PowerShell profile, `~/.bashrc` and `~/.zshrc` for whichever of
 these shells is installed; choose with `--shell powershell|bash|zsh|all`. On Windows, Git Bash
 counts as bash. Commands still run in your current session (`cd`, variables and functions work
-normally) and appear in your history as typed. Editors, pagers, REPLs, `ssh` and full-screen programs such as `tmux`, `zellij` or `herdr` are skipped; they need a real terminal.
+normally) and appear in your history as typed. Programs that need a real terminal are skipped: editors, pagers, `ssh`, full-screen tools (`tmux`, `zellij`, `herdr`, `k9s`, `yazi`, ...), `docker`/`podman`/`kubectl` with `-it`, `npm`/`pnpm`/`yarn`/`bun` `init` or `create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login` and `gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, and database shells (`psql`, `mysql`, `sqlite3`, ...). A prompt that does not end its line stays invisible in the capture pipe until the next newline, so the command would look stuck.
 
 - Skip one command: start the line with a space.
 - Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'` (bash/zsh:
   `export CODIGEST_CAP_SKIP='^(myrepl|mytui)( |$)'`, an extended regex).
 - Disable for a session: `$env:CODIGEST_NOCAP = 1` (bash/zsh: `export CODIGEST_NOCAP=1`).
 - Remove the hooks: `cdg term uninstall`.
+
+The profile loads a copy of the hook that `cdg term install` puts in the data folder (`shell/` next to the captures), not the file inside the package. After updating codigest, run `cdg term install` again to refresh it.
 
 Limitations:
 
@@ -455,6 +457,11 @@ Limitations:
   normally. In bash, neither are lines that start with a subshell `( ... )`.
 - In bash the hook uses the DEBUG trap and keeps one set before the first prompt (starship,
   bash-preexec); a DEBUG trap set later replaces it.
+- Long output is bounded: the PowerShell hook keeps the first and last 2,000 lines, and a bash or
+  zsh capture file over 4 MB is read 1 MB from each end. The store then keeps 64 KB.
+- In PowerShell, a command counts as failed when its exit code is non-zero or an error reached
+  the screen; an error hidden with `-ErrorAction` is not a failure.
+- The PowerShell hook does not wrap lines in remote sessions, nested prompts or the debugger.
 
 ### MCP tools
 
@@ -498,11 +505,18 @@ skipped.
   command. `scan` says which it withheld, `pack` lists them as omitted, and their hunks in a diff
   are replaced with a notice.
 - **Tokens in code and diffs.** Private keys, JWTs, vendor tokens (OpenAI, GitHub, AWS, Google,
-  Slack, GitLab, npm) and passwords in URLs are masked in everything Codigest outputs. Ordinary
+  Slack, GitLab, npm, Stripe `sk_`/`rk_`, Hugging Face `hf_`) and passwords in URLs are masked in everything Codigest outputs. Ordinary
   code such as `token = get_token()` is left alone.
-- **Secrets in captures.** On top of that, terminal output is checked for `password=...` style
-  values and `Authorization` headers before it is written to disk, and the output of credential
-  commands (`env`, `printenv`, `gh auth token`, `aws configure`, ...) is never stored.
+- **Secrets in captures.** On top of that, terminal output is checked before it is written to
+  disk for `Authorization` headers and for `key=value` and `key: value` pairs, with a quoted key
+  (`"password": "..."`) or a key that ends in a secret name after `_` or `-`
+  (`AWS_SECRET_ACCESS_KEY`, `DB_PASS`; also `pass` and `pwd`). The output of credential-printing
+  commands is never stored: `env`, `printenv`, `gh auth token`, `aws configure` and
+  `aws sts get-session-token`/`assume-role`, `az account get-access-token`,
+  `gcloud auth print-access-token`, `kubectl get secret`, `kubectl config view --raw`,
+  `op read`, `bw get`, `pass show`, `vault read`, `cat` of `.env`, `.npmrc`, `.pypirc`, `.netrc`, key
+  files or `credentials.json`, and a few more (the full list is `DENY_COMMANDS` in
+  `src/codigest/core/redact.py`).
 - These rules catch common formats, not every possible secret.
 - **Your project.** No command changes your source files. Only `mark` and `init` create
   `.codigest/`, which holds its own `.gitignore` (`*`) so it never shows in `git status`; `init`
