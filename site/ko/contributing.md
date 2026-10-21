@@ -27,6 +27,19 @@ CI는 `main`에 push할 때와 풀 리퀘스트마다 Ubuntu에서 테스트를,
 - 명령의 출력은 인터페이스의 일부입니다. 바꾸면 그것을 고정하는 테스트와, 이 사이트에서 그 출력을 보여 주는 페이지도 함께 고칩니다.
 - 커밋 메시지는 짧은 conventional commit입니다: `fix: ...`, `feat: ...`, `docs: ...`.
 
+## Rust 빌드
+
+Rust 포팅은 `rust/`에 있고, 별도의 바이너리 `cdg-rs`를 빌드합니다. 상태는 [Rust 포팅](/ko/rust-port)을 참고하세요.
+
+```bash
+cd rust
+cargo build --release        # target/release/cdg-rs
+cargo test                   # 단위 테스트와 통합 테스트
+CODIGEST_PARITY=1 cargo test # PATH의 Python `cdg`와도 비교
+```
+
+`CODIGEST_PARITY=1`을 주면 통합 테스트가 명령마다 두 빌드를 실행해 stdout과 종료 코드를 비교하므로, `PATH`에 Python `cdg`가 있어야 합니다.
+
 ## 이 문서 사이트
 
 사이트는 `site/`에 있는 VitePress이고, 영어와 한국어로 되어 있습니다.
