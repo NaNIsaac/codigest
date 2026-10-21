@@ -30,12 +30,14 @@ jobs:
           if ($synopsis -notmatch 'Share selected code') { throw "Get-Help codigest failed: $synopsis" }
           $output = codigest --version | Out-String
           if ($LASTEXITCODE -ne 0 -or $output -notmatch 'codigest') { throw "CLI forwarding failed: $output" }
-          $psHelp = help codigest | Out-String
-          if ($psHelp -notmatch 'Share selected code') { throw "help codigest failed: $psHelp" }
+          # CI has no interactive console: PowerShell's help pager throws
+          # 'The handle is invalid', even though Get-Help resolves this function.
+          $examples = Get-Help codigest -Examples | Out-String
+          if ($examples -notmatch 'codigest term --context') { throw "Examples not found: $examples" }
       - name: Check Windows PowerShell 5.1 compatibility
         shell: powershell
         run: |
           $env:PATH = (Join-Path (Get-Location) '.venv\Scripts') + [IO.Path]::PathSeparator + $env:PATH
           . './src/codigest/shell/help.ps1'
-          $psHelp = help codigest | Out-String
-          if ($psHelp -notmatch 'Share selected code') { throw "Windows PowerShell help failed: $psHelp" }
+          $summary = (Get-Help codigest).Synopsis
+          if ($summary -notmatch 'Share selected code') { throw "Windows PowerShell help failed: $summary" }
