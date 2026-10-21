@@ -63,6 +63,8 @@ Everything a command prints, copies or writes passes through one filter just bef
 | Slack tokens (`xox...`) | `[REDACTED]` |
 | GitLab tokens (`glpat-`) | `[REDACTED]` |
 | npm tokens (`npm_`) | `[REDACTED]` |
+| Stripe keys (`sk_live_`, `sk_test_`, `rk_live_`, `rk_test_`) | `[REDACTED]` |
+| Hugging Face tokens (`hf_`) | `[REDACTED]` |
 | Passwords in URLs (`scheme://user:password@host`) | the password becomes `[REDACTED]` |
 
 `token = get_token()` and `Authorization: Bearer {token}` in source are not touched. A line such as `OPENAI_API_KEY = "sk-..."` is masked because the value has a recognised shape.
@@ -73,7 +75,7 @@ Terminal output is more likely to hold credentials than source code, so captures
 
 - Everything in the table above.
 - `Authorization: Bearer|Basic|Token ...` headers: the credential is masked.
-- `key=value` and `key: value` forms where the key is `api_key`, `apikey`, `secret`, `access_token`, `auth_token`, `token`, `password`, `passwd`, `client_secret` or `private_key` (`-`, `_` or nothing between the words) and the value is six or more characters.
+- `key=value` and `key: value` forms, with the key plain or quoted, so JSON such as `"password": "..."` is covered. The key is one of `api_key`, `apikey`, `secret`, `secret_key`, `secret_access_key`, `access_token`, `auth_token`, `token`, `password`, `passwd`, `passphrase`, `pass`, `pwd`, `client_secret` or `private_key` (`-`, `_` or nothing between the words), or ends in one of these after `_` or `-`, as in `AWS_SECRET_ACCESS_KEY` and `DB_PASS`. The value is six or more characters. `bypass` and `tokenizer` do not count, because the secret name must be a whole word after the optional prefix.
 - The command line itself gets the same treatment.
 
 ```console
@@ -96,13 +98,15 @@ What you saw on screen is unchanged; only the stored copy and what Codigest outp
 
 Some commands print credentials by definition. The output of these is never stored, whatever it contains, and the record carries a note instead. The terminal still shows the output while `cap` runs it; only the stored record is empty. After `cdg cap -- env` and the `echo` above:
 
-| Command | |
-| --- | --- |
-| `env`, `printenv` | `set` and `export` with no arguments |
-| `Get-ChildItem env:` (also `gci`, `ls`, `dir`) | `echo` / `Write-Output` of `$env:...` |
-| `cat`, `type`, `bat`, `Get-Content` of a `.env` file | `aws configure` |
-| `gh auth token` | `docker login` |
-| `security find-generic-password` | `kubectl get secret...` |
+- `env` and `printenv`, and `set` or `export` with no arguments
+- `Get-ChildItem env:` (also `gci`, `ls`, `dir`), and `echo` or `Write-Output` of `$env:...`
+- `cat`, `type`, `bat` or `Get-Content` (`gc`) of a `.env` file, of `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, a `.pem` or `.key` file, an SSH private key (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`), or a file named `credentials` or `credentials.json`
+- `aws configure`, `aws sts get-session-token`, `aws sts assume-role`
+- `gh auth token`, `docker login`, `security find-generic-password`
+- `kubectl get secret...`, `kubectl config view ... --raw`
+- `az account get-access-token`
+- `gcloud auth print-access-token`, `gcloud auth print-identity-token`, `gcloud auth application-default print-access-token`
+- `op read`, `op item get` (1Password), `bw get` (Bitwarden), `pass show`, `vault read`, `vault kv get`
 
 ```console
 $ cdg term -n 2
@@ -121,7 +125,7 @@ password=[REDACTED]
 </terminal_history>
 ```
 
-Matching is on the start of the command line, case-insensitively. A pipeline that starts with another command (`cat x | env`) is not matched, which is one more reason to review captures before sharing.
+Matching is on the start of the command line, case-insensitively. The list is what the code has today. A pipeline that starts with another command (`cat x | env`) is not matched, which is one more reason to review captures before sharing.
 
 ## Limits
 

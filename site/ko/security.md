@@ -63,6 +63,8 @@ token = get_token()
 | Slack 토큰(`xox...`) | `[REDACTED]` |
 | GitLab 토큰(`glpat-`) | `[REDACTED]` |
 | npm 토큰(`npm_`) | `[REDACTED]` |
+| Stripe 키(`sk_live_`, `sk_test_`, `rk_live_`, `rk_test_`) | `[REDACTED]` |
+| Hugging Face 토큰(`hf_`) | `[REDACTED]` |
 | URL 속 비밀번호(`scheme://user:password@host`) | 비밀번호가 `[REDACTED]`로 바뀜 |
 
 소스에 있는 `token = get_token()`이나 `Authorization: Bearer {token}`은 건드리지 않습니다. `OPENAI_API_KEY = "sk-..."` 같은 줄은 값이 알아볼 수 있는 모양이라서 가립니다.
@@ -73,7 +75,7 @@ token = get_token()
 
 - 위 표의 모든 것.
 - `Authorization: Bearer|Basic|Token ...` 헤더: 인증 값을 가립니다.
-- 키가 `api_key`, `apikey`, `secret`, `access_token`, `auth_token`, `token`, `password`, `passwd`, `client_secret`, `private_key`(단어 사이에 `-`, `_`가 있거나 없어도 됨)이고 값이 여섯 글자 이상인 `key=value`, `key: value` 형태.
+- `key=value`, `key: value` 형태. 키는 따옴표가 있어도 되므로 `"password": "..."` 같은 JSON도 잡습니다. 키는 `api_key`, `apikey`, `secret`, `secret_key`, `secret_access_key`, `access_token`, `auth_token`, `token`, `password`, `passwd`, `passphrase`, `pass`, `pwd`, `client_secret`, `private_key`(단어 사이에 `-`, `_`가 있거나 없어도 됨) 중 하나이거나, `AWS_SECRET_ACCESS_KEY`, `DB_PASS`처럼 `_`나 `-` 뒤에 이 중 하나로 끝나는 이름입니다. 값은 여섯 글자 이상입니다. `bypass`, `tokenizer`는 걸리지 않습니다. 비밀 이름은 선택적인 접두어 뒤에 단어 전체로 나와야 하기 때문입니다.
 - 명령줄 자체도 같은 처리를 합니다.
 
 ```console
@@ -96,15 +98,15 @@ password=[REDACTED]
 
 어떤 명령은 정의상 인증 정보를 출력합니다. 이런 명령의 출력은 내용과 상관없이 저장하지 않고, 기록에는 안내 문구만 남깁니다.
 
-| 명령 | |
-| --- | --- |
-| `env`, `printenv` | 인자 없는 `set`, `export` |
-| `Get-ChildItem env:`(`gci`, `ls`, `dir`도 같음) | `$env:...`를 `echo` / `Write-Output` |
-| `.env` 파일을 `cat`, `type`, `bat`, `Get-Content` | `aws configure` |
-| `gh auth token` | `docker login` |
-| `security find-generic-password` | `kubectl get secret...` |
-
-`cap`이 실행하는 동안 터미널에는 출력이 그대로 보이고, 저장된 기록만 비어 있습니다. `cdg cap -- env`와 위의 `echo`를 실행한 뒤의 모습입니다.
+- `env`, `printenv`, 그리고 인자 없는 `set`, `export`
+- `Get-ChildItem env:`(`gci`, `ls`, `dir`도 같음), `$env:...`를 `echo` 또는 `Write-Output`
+- `cat`, `type`, `bat`, `Get-Content`(`gc`)로 `.env` 파일, `.npmrc`, `.pypirc`, `.netrc`, `.pgpass`, `.pem`·`.key` 파일, SSH 개인 키(`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`), 이름이 `credentials` 또는 `credentials.json`인 파일을 읽는 명령
+- `aws configure`, `aws sts get-session-token`, `aws sts assume-role`
+- `gh auth token`, `docker login`, `security find-generic-password`
+- `kubectl get secret...`, `kubectl config view ... --raw`
+- `az account get-access-token`
+- `gcloud auth print-access-token`, `gcloud auth print-identity-token`, `gcloud auth application-default print-access-token`
+- `op read`, `op item get`(1Password), `bw get`(Bitwarden), `pass show`, `vault read`, `vault kv get`
 
 ```console
 $ cdg term -n 2
@@ -123,7 +125,7 @@ password=[REDACTED]
 </terminal_history>
 ```
 
-명령줄의 맨 앞을 대소문자 구분 없이 비교합니다. 다른 명령으로 시작하는 파이프라인(`cat x | env`)은 걸리지 않으니, 공유하기 전에 기록을 한 번 살펴보는 편이 좋습니다.
+명령줄의 맨 앞을 대소문자 구분 없이 비교합니다. 목록은 지금 코드에 있는 그대로입니다. 다른 명령으로 시작하는 파이프라인(`cat x | env`)은 걸리지 않으니, 공유하기 전에 기록을 한 번 살펴보는 편이 좋습니다.
 
 ## 한계
 
