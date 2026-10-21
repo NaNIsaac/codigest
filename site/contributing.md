@@ -27,6 +27,19 @@ CI runs the tests on Ubuntu, a PowerShell check on Windows (`Get-Help` forwardin
 - A command's output is part of its interface. If you change it, update the tests that pin it and the pages here that show it.
 - Commit messages are short conventional commits: `fix: ...`, `feat: ...`, `docs: ...`.
 
+## The Rust build
+
+The Rust port is in `rust/` and builds a separate binary, `cdg-rs`. See [Rust Port](/rust-port) for its status.
+
+```bash
+cd rust
+cargo build --release        # target/release/cdg-rs
+cargo test                   # unit and integration tests
+CODIGEST_PARITY=1 cargo test # also compare with the Python `cdg` on PATH
+```
+
+With `CODIGEST_PARITY=1` the integration tests run each command with both builds and compare stdout and the exit code, so the Python `cdg` must be on `PATH`.
+
 ## This documentation site
 
 The site is VitePress, in `site/`, in English and Korean.
