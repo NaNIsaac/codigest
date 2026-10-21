@@ -19,6 +19,8 @@ clap = { version = "4", features = ["derive", "wrap_help"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = "0.10"
+toml = "0.9"
 tree-sitter = "0.25"
 tree-sitter-python = "0.25"
 
