@@ -2,11 +2,16 @@
 //! one JSON object per line in `<data dir>/term/history.jsonl`.
 
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
+use chrono::Local;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::paths;
+use crate::redact::{is_denied_command, redact};
 use crate::tags::{escape_attr, escape_value};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -172,6 +177,172 @@ pub fn render(entries: &[Entry], include_context: bool) -> String {
     )
 }
 
+const MAX_ENTRIES: usize = 200;
+const TRIM_SLACK: usize = 50;
+pub const MAX_OUTPUT_BYTES: usize = 64 * 1024;
+const HEAD_BYTES: usize = MAX_OUTPUT_BYTES / 2;
+const TAIL_BYTES: usize = MAX_OUTPUT_BYTES - HEAD_BYTES;
+
+// CSI / OSC / single-char escapes emitted by colored CLI output.
+static ANSI: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(concat!(
+        r"\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)", // OSC ... BEL / ST
+        r"|\x1B[@-Z\\-_]",                    // Fe escapes
+        r"|\x1B\[[0-?]*[ -/]*[@-~]",          // CSI
+    ))
+    .expect("valid pattern")
+});
+
+pub fn term_dir() -> PathBuf {
+    paths::data_dir().join("term")
+}
+
+/// `datetime.now().astimezone().isoformat(timespec="seconds")`.
+pub fn now_iso() -> String {
+    Local::now().format("%Y-%m-%dT%H:%M:%S%:z").to_string()
+}
+
+pub fn strip_ansi(text: &str) -> String {
+    ANSI.replace_all(text, "").into_owned()
+}
+
+/// Collapses progress-bar redraws: within a line, only the final `\r` segment survives.
+/// Without this a single pytest/pip run can store megabytes of overwritten frames. CRLF
+/// line endings (Windows) are not redraws.
+pub fn collapse_carriage_returns(text: &str) -> String {
+    let text = text.replace("\r\n", "\n");
+    if !text.contains('\r') {
+        return text;
+    }
+    text.split('\n')
+        .map(|line| line.rsplit('\r').next().unwrap_or(line))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Python's `str.isspace`, which also counts the four ASCII information separators.
+fn is_space(c: char) -> bool {
+    c.is_whitespace() || ('\x1c'..='\x1f').contains(&c)
+}
+
+pub fn normalize_output(raw: &str) -> String {
+    collapse_carriage_returns(&strip_ansi(raw))
+        .trim_end_matches(is_space)
+        .to_string()
+}
+
+/// UTF-8 decoding that drops what it cannot read, as Python's `errors="ignore"`: a cut
+/// through a multi-byte character loses that character, not the whole half.
+fn decode_ignore(bytes: &[u8]) -> String {
+    bytes.utf8_chunks().map(|chunk| chunk.valid()).collect()
+}
+
+/// Output beyond 64 KB keeps its first and last 32 KB.
+pub fn truncate(text: &str) -> (String, bool) {
+    let bytes = text.as_bytes();
+    if bytes.len() <= MAX_OUTPUT_BYTES {
+        return (text.to_string(), false);
+    }
+    let head = decode_ignore(&bytes[..HEAD_BYTES]);
+    let tail = decode_ignore(&bytes[bytes.len() - TAIL_BYTES..]);
+    let elided = bytes.len() - HEAD_BYTES - TAIL_BYTES;
+    (
+        format!("{head}\n\n... [{elided} bytes elided by codigest] ...\n\n{tail}"),
+        true,
+    )
+}
+
+/// `json.dumps(..., ensure_ascii=False)` separates with ", " and ": ", which serde_json's
+/// compact form does not; the store is shared with the Python build, so keep its layout.
+struct PythonFormat;
+
+impl serde_json::ser::Formatter for PythonFormat {
+    fn begin_object_key<W: ?Sized + io::Write>(
+        &mut self,
+        w: &mut W,
+        first: bool,
+    ) -> io::Result<()> {
+        if first { Ok(()) } else { w.write_all(b", ") }
+    }
+
+    fn begin_object_value<W: ?Sized + io::Write>(&mut self, w: &mut W) -> io::Result<()> {
+        w.write_all(b": ")
+    }
+}
+
+fn json_line(entry: &Entry) -> anyhow::Result<String> {
+    let mut buf = Vec::new();
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormat);
+    entry.serialize(&mut ser)?;
+    Ok(String::from_utf8(buf)?)
+}
+
+/// Normalizes, redacts, truncates and appends an entry to the store, then trims the ring
+/// buffer. Denied commands are stored without their output.
+pub fn append_entry(entry: Entry, allow_secrets: bool) -> anyhow::Result<()> {
+    append_entry_in(&term_dir(), entry, allow_secrets)
+}
+
+pub fn append_entry_in(dir: &Path, mut entry: Entry, allow_secrets: bool) -> anyhow::Result<()> {
+    entry.output = normalize_output(&entry.output);
+    // Recorded at capture time: exporting old records must not relabel output from
+    // another machine as having run on the current host.
+    if entry.captured && entry.hostname.is_empty() {
+        entry.hostname = gethostname::gethostname().to_string_lossy().into_owned();
+    }
+
+    if !allow_secrets {
+        if is_denied_command(&entry.command) {
+            entry.output.clear();
+            entry.note = "output withheld (command may expose credentials)".into();
+        } else {
+            entry.output = redact(&entry.output);
+            entry.command = redact(&entry.command);
+        }
+    }
+
+    (entry.output, entry.truncated) = truncate(&entry.output);
+
+    fs::create_dir_all(dir)?;
+    let path = dir.join("history.jsonl");
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)?;
+    writeln!(file, "{}", json_line(&entry)?)?;
+    drop(file);
+
+    trim(&path)?;
+    restrict_permissions(dir, &path);
+    Ok(())
+}
+
+/// Rewrites the log keeping only the most recent `MAX_ENTRIES` lines.
+fn trim(path: &Path) -> anyhow::Result<()> {
+    let text = String::from_utf8_lossy(&fs::read(path)?).into_owned();
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    // No file lock: concurrent hook ingests can drop an entry appended between read and
+    // replace; the slack makes rewrites (and that window) rare.
+    if lines.len() <= MAX_ENTRIES + TRIM_SLACK {
+        return Ok(());
+    }
+    let tmp = path.with_extension("jsonl.tmp");
+    fs::write(&tmp, lines[lines.len() - MAX_ENTRIES..].concat())?;
+    fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+/// Best-effort owner-only permissions on POSIX; a no-op on Windows.
+#[cfg(unix)]
+fn restrict_permissions(dir: &Path, path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o700));
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+}
+
+#[cfg(not(unix))]
+fn restrict_permissions(_dir: &Path, _path: &Path) {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,5 +411,113 @@ mod tests {
              cwd=\"/p\" duration=\"1.5s\" at=\"2026-10-17T01:58:14+09:00\">\n<output>\nE  1 -> 2\n</output>\n\
              </command>\n</terminal_history>"
         );
+    }
+
+    #[test]
+    fn strips_escapes_and_collapses_redraws() {
+        assert_eq!(
+            strip_ansi("\x1b[31mred\x1b[0m \x1b]0;title\x07ok"),
+            "red ok"
+        );
+        assert_eq!(
+            normalize_output("10%\r50%\r100%\r\ndone\r\n\n \t"),
+            "100%\ndone"
+        );
+        assert_eq!(normalize_output("a\r\nb"), "a\nb");
+    }
+
+    #[test]
+    fn truncation_keeps_head_and_tail_on_character_boundaries() {
+        let (same, cut) = truncate("short");
+        assert_eq!((same.as_str(), cut), ("short", false));
+
+        // 3-byte characters, so both cut points fall inside one.
+        let text = "가".repeat(30_000);
+        let (shown, cut) = truncate(&text);
+        assert!(cut);
+        let marker = "\n\n... [24464 bytes elided by codigest] ...\n\n";
+        let (head, tail) = shown.split_once(marker).expect("marker");
+        assert_eq!(head.len(), 32_766);
+        assert_eq!(tail.len(), 32_766);
+        assert!(head.chars().all(|c| c == '가') && tail.chars().all(|c| c == '가'));
+    }
+
+    fn append(dir: &Path, command: &str, output: &str) {
+        let entry = Entry {
+            command: command.into(),
+            output: output.into(),
+            exit_code: Some(0),
+            started_at: "2026-01-01T00:00:00+00:00".into(),
+            ..Entry::default()
+        };
+        append_entry_in(dir, entry, false).unwrap();
+    }
+
+    #[test]
+    fn appended_entries_are_normalized_and_redacted() {
+        let dir = tempfile::tempdir().unwrap();
+        append(
+            dir.path(),
+            "curl -u me:pw",
+            "\x1b[1mtoken = abcdef123456\x1b[0m \n",
+        );
+        let entries = load_from(&dir.path().join("history.jsonl"));
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].output, "token = [REDACTED]");
+        assert!(entries[0].captured && !entries[0].hostname.is_empty());
+        assert!(!entries[0].truncated);
+    }
+
+    #[test]
+    fn denied_commands_keep_no_output() {
+        let dir = tempfile::tempdir().unwrap();
+        append(dir.path(), "printenv", "SECRET=1");
+        let entries = load_from(&dir.path().join("history.jsonl"));
+        assert_eq!(entries[0].output, "");
+        assert_eq!(
+            entries[0].note,
+            "output withheld (command may expose credentials)"
+        );
+    }
+
+    #[test]
+    fn lines_use_the_python_layout() {
+        let dir = tempfile::tempdir().unwrap();
+        let entry = Entry {
+            command: "echo é".into(),
+            hostname: "h".into(),
+            started_at: "t".into(),
+            ..Entry::default()
+        };
+        append_entry_in(dir.path(), entry, true).unwrap();
+        let text = fs::read_to_string(dir.path().join("history.jsonl")).unwrap();
+        assert_eq!(
+            text,
+            "{\"command\": \"echo é\", \"output\": \"\", \"exit_code\": null, \"cwd\": \"\", \
+             \"shell\": \"\", \"hostname\": \"h\", \"started_at\": \"t\", \"duration_ms\": 0, \
+             \"truncated\": false, \"captured\": true, \"note\": \"\"}\n"
+        );
+    }
+
+    #[test]
+    fn the_ring_buffer_trims_in_batches() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.jsonl");
+        let lines = |p: &Path| fs::read_to_string(p).unwrap().lines().count();
+        for i in 0..(MAX_ENTRIES + TRIM_SLACK) {
+            append(dir.path(), &format!("c{i}"), "");
+        }
+        assert_eq!(lines(&path), MAX_ENTRIES + TRIM_SLACK);
+        append(dir.path(), "last", "");
+        assert_eq!(lines(&path), MAX_ENTRIES);
+        let entries = load_from(&path);
+        assert_eq!(entries.last().unwrap().command, "last");
+        assert_eq!(entries[0].command, "c51");
+    }
+
+    #[test]
+    fn timestamps_have_the_python_shape() {
+        let shape = Regex::new(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$").unwrap();
+        assert!(shape.is_match(&now_iso()), "{}", now_iso());
     }
 }
