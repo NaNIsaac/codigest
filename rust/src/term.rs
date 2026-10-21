@@ -221,7 +221,7 @@ pub fn collapse_carriage_returns(text: &str) -> String {
 }
 
 /// Python's `str.isspace`, which also counts the four ASCII information separators.
-fn is_space(c: char) -> bool {
+pub fn is_space(c: char) -> bool {
     c.is_whitespace() || ('\x1c'..='\x1f').contains(&c)
 }
 

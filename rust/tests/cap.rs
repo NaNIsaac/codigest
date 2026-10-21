@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use codigest::runner::{join_command, which};
-use common::{normalise, parity_enabled, python, rust, rust_exe, script, stdout_of};
+use common::{normalise, python, require_parity, rust, rust_exe, script, stdout_of};
 use serde_json::Value;
 
 fn history(home: &Path) -> Vec<Value> {
@@ -187,9 +187,7 @@ fn compare_cap(args: &[&str]) {
 #[test]
 #[ignore = "needs CODIGEST_PARITY=1 and the Python cdg"]
 fn parity_cap_exit_code_streams_and_stored_entry() {
-    if !parity_enabled() {
-        return;
-    }
+    require_parity();
     let program = script(3);
     let args: Vec<&str> = program.iter().map(String::as_str).collect();
     let mut with_dashes = vec!["--"];
@@ -200,9 +198,7 @@ fn parity_cap_exit_code_streams_and_stored_entry() {
 #[test]
 #[ignore = "needs CODIGEST_PARITY=1 and the Python cdg"]
 fn parity_cap_secrets_and_missing_program() {
-    if !parity_enabled() {
-        return;
-    }
+    require_parity();
     let echo: Vec<&str> = if cfg!(windows) {
         vec!["--", "cmd", "/c", "echo", "password=hunter22xyz"]
     } else {
@@ -216,7 +212,8 @@ fn parity_cap_secrets_and_missing_program() {
 #[test]
 #[ignore = "needs CODIGEST_PARITY=1 and the Python cdg"]
 fn parity_cap_pipeline_in_one_argument() {
-    if !parity_enabled() || !has_pipeline_shell() {
+    require_parity();
+    if !has_pipeline_shell() {
         return;
     }
     compare_cap(&["echo one; echo two"]);
@@ -225,9 +222,7 @@ fn parity_cap_pipeline_in_one_argument() {
 #[test]
 #[ignore = "needs CODIGEST_PARITY=1 and the Python cdg"]
 fn parity_term_renders_what_either_build_stored() {
-    if !parity_enabled() {
-        return;
-    }
+    require_parity();
     let program = script(1);
     let (rs_home, py_home) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     rust(rs_home.path())

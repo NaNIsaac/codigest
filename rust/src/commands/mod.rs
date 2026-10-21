@@ -1,4 +1,5 @@
 pub mod cap;
+pub mod ingest;
 pub mod term;
 
 use clap::{Parser, Subcommand};

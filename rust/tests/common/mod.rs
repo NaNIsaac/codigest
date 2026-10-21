@@ -34,7 +34,7 @@ pub fn python(home: &Path) -> Process {
             cmd.env("PYTHONPATH", src);
             cmd
         }
-        None => Process::new("cdg"),
+        None => Process::new(codigest::runner::which("cdg").unwrap_or_else(|| "cdg".into())),
     };
     cmd.env("CODIGEST_HOME", home)
         .env("NO_COLOR", "1")
@@ -46,9 +46,13 @@ pub fn python(home: &Path) -> Process {
     cmd
 }
 
-/// Parity tests run only with CODIGEST_PARITY=1 (and `-- --ignored`).
-pub fn parity_enabled() -> bool {
-    std::env::var("CODIGEST_PARITY").is_ok_and(|v| v == "1")
+/// Parity tests are `#[ignore]`d; run them with `CODIGEST_PARITY=1 cargo test -- --ignored`.
+/// Run without the variable they fail loudly instead of passing without comparing anything.
+pub fn require_parity() {
+    assert!(
+        std::env::var("CODIGEST_PARITY").is_ok_and(|v| v == "1"),
+        "parity tests compare against the Python build: set CODIGEST_PARITY=1"
+    );
 }
 
 /// What a command printed, with the parts that legitimately differ between two runs
