@@ -1,0 +1,20 @@
+ 2: /** Small utilities. */
+ 9: function join(a, b)
+        Joins two paths.
+13: export const DEFAULTS = { retries: 3, verbose: false, names: ["a", "b", "c", "d",...
+15: const double = (x) =>
+18: export class Hub extends Emitter
+        An event hub.
+19:   static count = 0
+20:   #secret = 1
+21:   handler = (event) =>
+26:   async start(options = {})
+          Starts it.
+30:   static create()
+35: export default class
+36:   run()
+39: function broken()
+44: function recovered(x)
+        After the error.
+50: function wrapped(n)
+        Inside a wrapper.

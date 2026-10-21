@@ -51,7 +51,8 @@ async def serve(host='h', port=80):
             "app.js",
             "import { x } from './lib/x.js';\nconst y = require('./lib/y');\n",
         );
-        fx.write("lib/x.ts", "export const x = 1;\n");
+        // Only the Rust build outlines JS and TS, so these stay free of definitions.
+        fx.write("lib/x.ts", "const x = 1;\nexport { x };\n");
         fx.write("lib/y.js", "module.exports = 1;\n");
         fx.write("lib/z.js", "module.exports = 2;\n");
         fx.bytes("latin.py", b"def f():\n    \"\"\"caf\xe9\"\"\"\n");

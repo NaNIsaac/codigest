@@ -1,0 +1,31 @@
+ 1: /** Cart helpers. */
+10: export const TAX_RATE = 0.1
+        Tax rate applied to every order.
+12: export let label: string = "a label that is long enough that it will have to be cut ...
+15: export function applyDiscount<T extends number>(price: T, percent: number = 0): number
+        Applies a percentage discount.
+22: export const total = async (items: Item[]): Promise<number> =>
+23: const helper = (x: number) =>
+25: export interface Item
+27:   name: string
+          Display name.
+28:   price?: number
+29:   describe(): string
+32: export type Id<T> = T | { id: T }
+34: export enum Color
+41: export abstract class Cart<T extends Item> extends Base implements Iterable<T>
+        A shopping cart.
+43:   private items: T[] = []
+          Items inside.
+44:   static readonly limit = 10
+46:   constructor(private readonly owner: string)
+51:   add(item: T): void
+          Adds one.
+55:   abstract total(): number
+56:   get size(): number
+61: export default function (a: string)
+65: namespace Shapes
+66:   export function area(r: number): number
+71: function broken()
+76: export function recovered(x: number): number
+        After the error.

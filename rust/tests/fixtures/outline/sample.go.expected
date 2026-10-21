@@ -1,0 +1,28 @@
+ 4: package stack
+        Package stack holds a generic stack.
+ 9: const MaxDepth = 64
+        MaxDepth is the largest depth allowed.
+13: const ModeA = iota
+        ModeA is the first mode.
+14: const ModeB
+18: var ErrEmpty = fmt.Errorf("empty")
+19: var names = []string{"alpha", "beta", "gamma", "delta", "epsilon", "z...
+23: type Stack[T any] struct
+        Stack is a growable stack.
+25:   items []T
+          items holds the values.
+26:   limit int `json:"limit"`
+30: type Shape interface
+        Shape can report its area.
+32:   Area() float64
+          Area is the surface.
+33:   Perimeter() float64
+36: type ID = int
+38: type Handler func(name string) error
+42: func New[T any](limit int) *Stack[T]
+        New makes an empty stack.
+47: func (s *Stack[T]) Push(v T) error
+        Push adds a value.
+54: func broken()
+59: func Recovered(a int) int
+        Recovered comes after the error.
