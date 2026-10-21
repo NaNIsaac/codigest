@@ -6,6 +6,7 @@ in that order until the token budget runs out; whatever is left out is listed,
 so the reader knows what it is not seeing.
 """
 import re
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from rich.markup import escape
 from ..options import CopyOption, MessageOption, StdoutOption, OutputOption
 
 lazy import html
-lazy from ..core import common, git_ops, processor, resolver, shadow, tags, termstore, tokenizer
+lazy from ..core import callees, common, git_ops, processor, resolver, shadow, tags, termstore, tokenizer
 lazy from ..core.redact import redact_diff
 lazy from ..core.output import OutputHandler
 
@@ -24,6 +25,9 @@ DEFAULT_BUDGET = 30_000
 EXCERPT_CONTEXT = 10
 EXCERPT_MIN_LINES = 60
 FAILURE_MAX_AGE = timedelta(hours=1)
+# Lines of a long failing output kept from the start (first failures) and the end (summary).
+OUTPUT_HEAD = 80
+OUTPUT_TAIL = 40
 
 # `File "x.py", line 7` (Python) or `x.py:7` / `x.ts(7,3)` (pytest, tsc, gcc, rustc, eslint, ...)
 _LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path>[\w./\\~-]+\.\w+)[:(](?P<line>\d+)')
@@ -78,18 +82,20 @@ def referenced_files(output: str, bases: list[Path], known: set[Path]) -> dict[P
     return found
 
 
-def excerpt(path: Path, lines: list[int]) -> tuple[str, str] | None:
+def excerpt(path: Path, lines: list[int], whole: list[tuple[int, int]] | None = None) -> tuple[str, str] | None:
     """
-    The lines around each reference, numbered, with `...` between gaps, plus the ranges shown
-    ("3-23,40-60"). None when the file is short or the excerpt would be most of it anyway.
+    The lines around each reference and every span in `whole` in full, numbered, with `...`
+    between gaps, plus the ranges shown ("3-23,40-60"). None when the file is short or the
+    excerpt would be most of it anyway.
     """
     try:
         rows = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError):
         return None
+    wanted = [(max(1, line - EXCERPT_CONTEXT), min(len(rows), line + EXCERPT_CONTEXT)) for line in lines]
+    wanted += [(max(1, lo), min(len(rows), hi)) for lo, hi in whole or []]
     spans: list[list[int]] = []
-    for line in sorted(lines):
-        lo, hi = max(1, line - EXCERPT_CONTEXT), min(len(rows), line + EXCERPT_CONTEXT)
+    for lo, hi in sorted(wanted):
         if spans and lo <= spans[-1][1] + 1:
             spans[-1][1] = max(spans[-1][1], hi)
         else:
@@ -111,6 +117,33 @@ def changed_paths(diff: str, root: Path) -> list[Path]:
             if (path := (root / p).resolve()).is_file() and path not in paths:
                 paths.append(path)
     return paths
+
+
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,(?P<count>\d+))? @@")
+
+
+def hunk_spans(diff: str, root: Path) -> dict[Path, list[tuple[int, int]]]:
+    """Per changed file, the line ranges its hunks cover in the new version."""
+    spans: dict[Path, list[tuple[int, int]]] = {}
+    current = None
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            name = line[4:].strip().removeprefix("b/")
+            current = None if name == "/dev/null" else (root / name).resolve()
+        elif current and (m := _HUNK_RE.match(line)):
+            start, count = int(m["start"]), int(m["count"] or 1)
+            spans.setdefault(current, []).append((start, start + max(count, 1) - 1))
+    return spans
+
+
+def shorten_output(text: str) -> str:
+    """Long output keeps its head (the first failures) and its tail (the summary)."""
+    lines = text.splitlines()
+    if len(lines) <= OUTPUT_HEAD + OUTPUT_TAIL + 20:
+        return text
+    cut = len(lines) - OUTPUT_HEAD - OUTPUT_TAIL
+    note = f"[... {cut} lines left out; `cdg term -f` shows the whole output ...]"
+    return "\n".join([*lines[:OUTPUT_HEAD], note, *lines[-OUTPUT_TAIL:]])
 
 
 def ago(iso: str) -> str:
@@ -186,22 +219,37 @@ def handle(
             shown = ", ".join(map(str, lines[:3])) + (", ..." if len(lines) > 3 else "")
             wanted.setdefault(path, f"line{'s' * (len(lines) > 1)} {shown} in failing output")
 
-    diff, diff_source, changed_all = working_changes(root, sorted(known)) if "changes" in auto else ("", "", [])
-    changed = [p.resolve() for p in changed_all if p.resolve() in known]
-    for path in changed:
-        wanted.setdefault(path, "changed")
-
     deps = resolver.DependencyResolver(root)
 
     def imports(path: Path) -> set[Path]:
         return deps.imports_of(path) & known
+
+    # The code the failing tests call: a traceback that ends in an assertion names only the test.
+    calls: dict[Path, list[tuple[int, int]]] = {}
+    for test, lines in list(refs.items()):
+        if test.suffix != ".py":
+            continue
+        # Two levels, so `from pkg import f` reaches the module behind pkg/__init__.py.
+        modules = imports(test)
+        modules |= {m for module in modules for m in imports(module)}
+        test_rel = test.relative_to(root).as_posix()
+        for path, _name, span in callees.called_definitions(test, lines, modules - {test}):
+            calls.setdefault(path, []).append(span)
+            wanted.setdefault(path, f"called from failing test {test_rel}")
+
+    diff, diff_source, changed_all = working_changes(root, sorted(known)) if "changes" in auto else ("", "", [])
+    changed = [p.resolve() for p in changed_all if p.resolve() in known]
+    for path in changed:
+        wanted.setdefault(path, "changed")
+    hunks = hunk_spans(diff, root) if diff.strip() else {}
 
     edited = {p for p, why in wanted.items() if why in ("requested", "changed")}
     for test in sorted(p for p in known if _TEST_FILE_RE.search(p.name)) if edited and "tests" in auto else []:
         if hit := sorted(imports(test) & edited):
             wanted.setdefault(test, f"tests {hit[0].relative_to(root).as_posix()}")
 
-    for path in [p for p, why in wanted.items() if not why.endswith("failing output")] if "imports" in auto else []:
+    looked_up = ("failing output", "failing test")
+    for path in [p for p, why in wanted.items() if not why.endswith(looked_up)] if "imports" in auto else []:
         for dep in sorted(imports(path)):
             wanted.setdefault(dep, f"imported by {path.relative_to(root).as_posix()}")
 
@@ -214,7 +262,7 @@ def handle(
     if message:
         head.append(f"<user_instruction>\n{tags.escape_xml_value(message)}\n</user_instruction>")
     if failure:
-        head.append(termstore.render([failure]))
+        head.append(termstore.render([replace(failure, output=shorten_output(failure.output))]))
     if diff.strip():
         head.append(f'<changes source="{html.escape(diff_source)}">\n{tags.escape_xml_value(diff.rstrip())}\n</changes>')
     used = tokenizer.estimate_tokens("\n".join(head))
@@ -230,8 +278,14 @@ def handle(
             omitted.append((path.relative_to(root).as_posix(), "may contain secrets"))
     for path, reason in wanted.items():
         rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
-        # Files you changed or asked for come whole; files the output only points at come as excerpts.
-        part = excerpt(path, refs[path]) if path in refs and reason.endswith("failing output") and path not in changed else None
+        # Files you asked for come whole. The rest come as excerpts where that saves much: around
+        # the places the output points at, the definitions the failing tests call, and the hunks
+        # of the diff above (which already shows the change itself).
+        part = None
+        if reason != "requested":
+            whole = calls.get(path, []) + (hunks.get(path, []) if path in changed else [])
+            if path in refs or whole:
+                part = excerpt(path, refs.get(path, []), whole)
         content, shown = part or (processor.read_file_content(path, add_line_numbers=True), "")
         lines_attr = f' lines="{shown}"' if shown else ""
         block = f'<file path="{html.escape(rel)}" reason="{html.escape(reason)}"{lines_attr}>\n{tags.escape_xml_value(content)}\n</file>'
