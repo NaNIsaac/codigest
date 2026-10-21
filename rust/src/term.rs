@@ -10,9 +10,9 @@ use chrono::Local;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::paths;
 use crate::redact::{is_denied_command, redact};
 use crate::tags::{escape_attr, escape_value};
+use crate::{format, paths};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -175,6 +175,90 @@ pub fn render(entries: &[Entry], include_context: bool) -> String {
         "<terminal_history>\n{}\n</terminal_history>",
         blocks.join("\n")
     )
+}
+
+/// Entries as Markdown: a heading per command, its details as a list, and the command with
+/// its output in one console block, the way it looked in the terminal.
+pub fn render_markdown(entries: &[Entry], include_context: bool) -> String {
+    let total = entries.len();
+    let blocks: Vec<String> = entries
+        .iter()
+        .enumerate()
+        .map(|(offset, entry)| {
+            let status = match entry.exit_code {
+                Some(code) => format!(" (exit {code})"),
+                None => String::new(),
+            };
+            let mut lines = vec![
+                format!("## Command {}{status}", total - offset),
+                String::new(),
+            ];
+            let mut detail = |name: &str, value: &str| {
+                if !value.is_empty() {
+                    lines.push(format!("- {name}: {value}"));
+                }
+            };
+            detail("cwd", &entry.cwd);
+            if include_context {
+                detail("hostname", &entry.hostname);
+                detail("shell", &entry.shell);
+            }
+            if entry.duration_ms > 0 {
+                detail("duration", &fmt_duration(entry.duration_ms));
+            }
+            detail("at", &entry.started_at);
+            if entry.truncated {
+                detail("truncated", "middle of the output left out");
+            }
+            if !entry.captured {
+                detail("output", "not stored (read from shell history)");
+            }
+            detail("note", &entry.note);
+            if lines.len() > 2 {
+                lines.push(String::new());
+            }
+            let mut console = format!("$ {}", entry.command);
+            if !entry.output.is_empty() {
+                console.push('\n');
+                console.push_str(&entry.output);
+            }
+            let fence = format::fence(&console);
+            lines.push(format!("{fence}console\n{console}\n{fence}"));
+            lines.join("\n")
+        })
+        .collect();
+    blocks.join("\n\n")
+}
+
+/// Entries as a JSON array, newest last, each with its `index` counting back from the latest.
+pub fn render_json(entries: &[Entry], include_context: bool) -> anyhow::Result<String> {
+    let total = entries.len();
+    let items: Vec<serde_json::Value> = entries
+        .iter()
+        .enumerate()
+        .map(|(offset, entry)| {
+            let mut item = serde_json::json!({
+                "index": total - offset,
+                "command": entry.command,
+                "exit_code": entry.exit_code,
+                "cwd": entry.cwd,
+                "started_at": entry.started_at,
+                "duration_ms": entry.duration_ms,
+                "output": entry.output,
+                "output_available": entry.captured,
+                "truncated": entry.truncated,
+            });
+            if include_context {
+                item["hostname"] = entry.hostname.clone().into();
+                item["shell"] = entry.shell.clone().into();
+            }
+            if !entry.note.is_empty() {
+                item["note"] = entry.note.clone().into();
+            }
+            item
+        })
+        .collect();
+    Ok(serde_json::to_string_pretty(&items)?)
 }
 
 const MAX_ENTRIES: usize = 200;

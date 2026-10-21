@@ -7,6 +7,7 @@ use std::path::Path;
 use clap::{Args, Subcommand};
 
 use super::{hook, ingest};
+use crate::format::Format;
 use crate::output::{Output, OutputArgs};
 use crate::style::{dim, green, red, yellow};
 use crate::{paths, shellhist, term};
@@ -37,6 +38,9 @@ pub struct TermArgs {
     /// Print only the stored output of one command, without tags or metadata
     #[arg(long, conflicts_with = "context")]
     pub raw: bool,
+    /// Output format
+    #[arg(long, value_enum, default_value_t = Format::Xml, conflicts_with = "raw")]
+    pub format: Format,
     #[command(flatten)]
     pub out: OutputArgs,
 }
@@ -130,7 +134,11 @@ pub fn run(args: TermArgs) -> anyhow::Result<i32> {
         return raw(&out, &selected);
     }
 
-    let content = term::render(&selected, args.context);
+    let content = match args.format {
+        Format::Xml => term::render(&selected, args.context),
+        Format::Markdown => term::render_markdown(&selected, args.context),
+        Format::Json => term::render_json(&selected, args.context)?,
+    };
     let item = if selected.len() == 1 {
         "1 terminal entry".to_string()
     } else {

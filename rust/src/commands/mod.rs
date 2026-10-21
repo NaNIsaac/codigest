@@ -13,7 +13,24 @@ pub mod status;
 pub mod term;
 pub mod tree;
 
-use clap::{Parser, Subcommand};
+use std::ffi::OsString;
+
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+
+/// Parses `argv` with a repeated option replacing the earlier one, so options typed after
+/// a preset's override it instead of being rejected as given twice.
+pub fn parse(argv: Vec<OsString>) -> Cli {
+    let mut cmd = Cli::command().args_override_self(true);
+    let names: Vec<String> = cmd
+        .get_subcommands()
+        .map(|s| s.get_name().to_string())
+        .collect();
+    for name in names {
+        cmd = cmd.mut_subcommand(name, |sub| sub.args_override_self(true));
+    }
+    let matches = cmd.get_matches_from(argv);
+    Cli::from_arg_matches(&matches).unwrap_or_else(|err| err.exit())
+}
 
 #[derive(Parser, Debug)]
 #[command(

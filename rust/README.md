@@ -71,3 +71,25 @@ The release binary is 4.6 MB and needs no Python.
   `\n` on Windows, where Python writes `\r\n`. The command results themselves (stdout of
   `scan`, `pack`, ... and `-o` files) use the platform line ending, as Python does.
 - `cap` forwards Ctrl+C and gives the command 5 seconds before killing it.
+- `term --format markdown|json` is new. Markdown gives each command a heading, its details
+  as a list, and the command with its output in one `console` block; the fence grows past
+  any backticks in the output. JSON is an array with `index` counting back from the latest.
+- `--preset NAME` is new and works on every command: it inserts the options stored under
+  `[presets.<command>.<NAME>]` right after the command name, so anything typed on the
+  command line wins. Presets are read from the user configuration file
+  (`%APPDATA%\codigest\config.toml` on Windows, `~/.config/codigest/config.toml` elsewhere)
+  and then from the project's `.codigest/config.toml`, which replaces a user preset of the
+  same name. Keys are option names with `_` for `-`; `true` adds a flag, lists are joined
+  with commas.
+
+  ```toml
+  [presets.term.debug]
+  format = "markdown"
+  count = 3
+  failed = true
+  ```
+
+  ```console
+  $ cdg-rs term --preset debug          # last 3 failed commands as Markdown
+  $ cdg-rs term --preset debug -n 1     # the same, only the last one
+  ```
