@@ -208,17 +208,62 @@ pub fn resolve_shell() -> Option<Vec<String>> {
     Some(vec![shell, "-c".into()])
 }
 
+/// Leaves plain words bare, so `-Name` stays a parameter, and single-quotes the rest.
+fn powershell_quote(arg: &str) -> String {
+    if !arg.is_empty()
+        && arg
+            .chars()
+            .all(|c| c.is_alphanumeric() || "-_./\\:=+~".contains(c))
+    {
+        return arg.to_string();
+    }
+    format!("'{}'", arg.replace('\'', "''"))
+}
+
+/// PowerShell aliases, cmdlets and functions (`ls`, `Get-ChildItem`) are not executables,
+/// so CreateProcess cannot start them. When the shell is PowerShell and knows the name,
+/// returns the argv as a command string for it; otherwise None, and the caller reports
+/// the program as not found.
+pub fn powershell_command(args: &[String], prefix: &[String]) -> Option<String> {
+    let stem = Path::new(&prefix[0])
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    if stem != "pwsh" && stem != "powershell" {
+        return None;
+    }
+    let probe = format!(
+        "exit [int](-not (Get-Command -Name {} -ErrorAction Ignore))",
+        powershell_quote(&args[0])
+    );
+    let known = Command::new(&prefix[0])
+        .args(&prefix[1..])
+        .arg(probe)
+        .output()
+        .is_ok_and(|out| out.status.success());
+    known.then(|| {
+        let words: Vec<String> = args.iter().map(|a| powershell_quote(a)).collect();
+        format!("& {}", words.join(" "))
+    })
+}
+
 /// Maps user-supplied arguments onto an argv for the process.
 pub fn build_argv(args: &[String]) -> Vec<String> {
     if !needs_shell(args) {
-        // CreateProcess finds neither `.cmd` shims (npm, yarn, pnpm) nor relative paths
-        // written with forward slashes; which() resolves both the way the user's shell would.
-        if cfg!(windows)
-            && let Some(found) = args.first().and_then(|a| which(a))
-        {
-            let mut argv = vec![found.to_string_lossy().into_owned()];
-            argv.extend(args[1..].iter().cloned());
-            return argv;
+        if cfg!(windows) && !args.is_empty() {
+            // CreateProcess finds neither `.cmd` shims (npm, yarn, pnpm) nor relative paths
+            // written with forward slashes; which() resolves both the way the user's shell would.
+            if let Some(found) = which(&args[0]) {
+                let mut argv = vec![found.to_string_lossy().into_owned()];
+                argv.extend(args[1..].iter().cloned());
+                return argv;
+            }
+            if let Some(mut prefix) = resolve_shell()
+                && let Some(command) = powershell_command(args, &prefix)
+            {
+                prefix.push(command);
+                return prefix;
+            }
         }
         return args.to_vec();
     }
@@ -369,6 +414,16 @@ mod tests {
             list2cmdline(&args(&[&format!("a{}b", bs(1))])),
             format!("a{}b", bs(1))
         );
+    }
+
+    #[test]
+    fn powershell_words_stay_bare_and_the_rest_is_single_quoted() {
+        assert_eq!(powershell_quote("-Name"), "-Name");
+        assert_eq!(powershell_quote("C:\\dir/a.txt"), "C:\\dir/a.txt");
+        assert_eq!(powershell_quote("a b"), "'a b'");
+        assert_eq!(powershell_quote("it's"), "'it''s'");
+        assert_eq!(powershell_quote("a,b"), "'a,b'");
+        assert_eq!(powershell_quote(""), "''");
     }
 
     #[test]

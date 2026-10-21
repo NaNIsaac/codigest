@@ -117,3 +117,20 @@ def test_cap_resolves_cmd_shims_and_relative_paths_on_windows(tmp_path, monkeypa
     monkeypatch.setenv("PATH", str(tmp_path))
     assert runner.build_argv(["tool", "-x"])[0].lower() == str(tmp_path / "tool.cmd").lower()
     assert runner.run(["tool"])[0] == 3
+
+
+def test_cap_runs_powershell_aliases_and_cmdlets_on_windows():
+    import shutil
+    import sys
+
+    import pytest
+
+    from codigest.core import runner
+    if sys.platform != "win32" or not (shutil.which("pwsh") or shutil.which("powershell")):
+        pytest.skip("PowerShell commands exist only on Windows with pwsh or powershell")
+    code, output, _ = runner.run(["Write-Output", "a b", "it's"])
+    assert code == 0
+    assert [line.strip() for line in output.splitlines()] == ["a b", "it's"]
+    assert runner.run(["ls", "-Name"])[0] == 0
+    with pytest.raises(FileNotFoundError):
+        runner.run(["codigest-no-such-program-xyz"])

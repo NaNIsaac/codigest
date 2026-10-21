@@ -65,13 +65,38 @@ def resolve_shell() -> list[str] | None:
     return [shell, "-c"]
 
 
+def _powershell_quote(arg: str) -> str:
+    """Leaves plain words bare, so `-Name` stays a parameter, and single-quotes the rest."""
+    if arg and all(ch.isalnum() or ch in "-_./\\:=+~" for ch in arg):
+        return arg
+    return "'" + arg.replace("'", "''") + "'"
+
+
+def powershell_command(args: list[str], prefix: list[str]) -> str | None:
+    """
+    PowerShell aliases, cmdlets and functions (`ls`, `Get-ChildItem`) are not executables,
+    so CreateProcess cannot start them. When the shell is PowerShell and knows the name,
+    returns the argv as a command string for it; otherwise None, and the caller reports
+    the program as not found.
+    """
+    if Path(prefix[0]).stem.lower() not in ("pwsh", "powershell"):
+        return None
+    probe = f"exit [int](-not (Get-Command -Name {_powershell_quote(args[0])} -ErrorAction Ignore))"
+    if subprocess.run([*prefix, probe], check=False, capture_output=True).returncode != 0:
+        return None
+    return "& " + " ".join(_powershell_quote(arg) for arg in args)
+
+
 def build_argv(args: list[str]) -> list[str]:
     """Maps user-supplied arguments onto an argv for subprocess."""
     if not needs_shell(args):
-        # CreateProcess finds neither `.cmd` shims (npm, yarn, pnpm) nor relative paths written
-        # with forward slashes; which() resolves both the way the user's shell would.
-        if sys.platform == "win32" and (found := shutil.which(args[0])):
-            return [found, *args[1:]]
+        if sys.platform == "win32":
+            # CreateProcess finds neither `.cmd` shims (npm, yarn, pnpm) nor relative paths
+            # written with forward slashes; which() resolves both the way the user's shell would.
+            if found := shutil.which(args[0]):
+                return [found, *args[1:]]
+            if (prefix := resolve_shell()) and (command := powershell_command(args, prefix)):
+                return [*prefix, command]
         return args
     if not (prefix := resolve_shell()):
         return args

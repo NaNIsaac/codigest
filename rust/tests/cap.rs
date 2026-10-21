@@ -114,6 +114,31 @@ fn one_argument_with_metacharacters_runs_through_a_shell() {
 }
 
 #[test]
+fn powershell_aliases_and_cmdlets_run_on_windows() {
+    if !cfg!(windows) || !has_pipeline_shell() {
+        return;
+    }
+    let home = tempfile::tempdir().unwrap();
+    let output = rust(home.path())
+        .args(["cap", "Write-Output", "a b", "it's"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let lines: Vec<String> = stdout_of(&output)
+        .lines()
+        .map(|l| l.trim().to_string())
+        .collect();
+    assert_eq!(lines, ["a b", "it's"]);
+    assert_eq!(history(home.path()).len(), 1);
+
+    let listing = rust(home.path())
+        .args(["cap", "ls", "-Name"])
+        .output()
+        .unwrap();
+    assert!(listing.status.success());
+}
+
+#[test]
 fn secrets_are_masked_in_the_store_but_shown_live() {
     let home = tempfile::tempdir().unwrap();
     let echo = if cfg!(windows) {
@@ -218,6 +243,16 @@ fn parity_cap_pipeline_in_one_argument() {
         return;
     }
     compare_cap(&["echo one; echo two"]);
+}
+
+#[test]
+#[ignore = "needs CODIGEST_PARITY=1 and the Python cdg"]
+fn parity_cap_powershell_cmdlet() {
+    require_parity();
+    if !cfg!(windows) || !has_pipeline_shell() {
+        return;
+    }
+    compare_cap(&["Write-Output", "a b", "it's"]);
 }
 
 #[test]
