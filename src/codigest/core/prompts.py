@@ -2,6 +2,7 @@
 Prompt Management Module.
 Templates are aligned flush-left to prevent indentation issues when injecting large code blocks.
 """
+
 lazy import html
 lazy import tomllib
 from collections.abc import Callable
@@ -10,6 +11,7 @@ from . import tags
 
 # RenderFunction takes keyword arguments and returns a processed string
 type RenderFunc = Callable[..., str]
+
 
 def _instruction_block(instruction: str) -> str:
     if not instruction:
@@ -26,31 +28,47 @@ def _block(root: str, attrs: dict[str, str], instruction: str, *parts: str) -> s
 
 
 # Note: source_code / digest_content arrive already formatted via tags.file().
-def _default_snapshot(project_name: str, tree_structure: str, source_code: str, instruction: str = "") -> str:
+def _default_snapshot(
+    project_name: str, tree_structure: str, source_code: str, instruction: str = ""
+) -> str:
     return _block(
-        "project_snapshot", {"project": project_name}, instruction,
+        "project_snapshot",
+        {"project": project_name},
+        instruction,
         f"<project_structure>\n{tree_structure}\n</project_structure>",
         f"<source_code>\n{source_code}\n</source_code>",
     )
 
 
-def _default_diff(project_name: str, context_message: str, diff_content: str, instruction: str = "") -> str:
+def _default_diff(
+    project_name: str, context_message: str, diff_content: str, instruction: str = ""
+) -> str:
     return _block(
-        "changes", {"project": project_name, "source": context_message}, instruction,
+        "changes",
+        {"project": project_name, "source": context_message},
+        instruction,
         tags.escape_xml_value(diff_content),
     )
 
 
-def _default_semdiff(project_name: str, context_message: str, semdiff_content: str, instruction: str = "") -> str:
+def _default_semdiff(
+    project_name: str, context_message: str, semdiff_content: str, instruction: str = ""
+) -> str:
     return _block(
-        "semantic_diff", {"project": project_name, "source": context_message}, instruction,
+        "semantic_diff",
+        {"project": project_name, "source": context_message},
+        instruction,
         semdiff_content,
     )
 
 
-def _default_digest(project_name: str, tree_structure: str, digest_content: str, instruction: str = "") -> str:
+def _default_digest(
+    project_name: str, tree_structure: str, digest_content: str, instruction: str = ""
+) -> str:
     return _block(
-        "code_digest", {"project": project_name, "contents": "signatures and docstrings, no bodies"}, instruction,
+        "code_digest",
+        {"project": project_name, "contents": "signatures and docstrings, no bodies"},
+        instruction,
         f"<project_structure>\n{tree_structure}\n</project_structure>",
         digest_content,
     )
@@ -65,6 +83,7 @@ DEFAULT_RENDERERS: dict[str, RenderFunc] = {
     "digest": _default_digest,
 }
 
+
 class PromptEngine:
     def __init__(self, root_path: Path):
         self.root_path = root_path
@@ -75,7 +94,7 @@ class PromptEngine:
         prompt_file = self.root_path / ".codigest" / "prompts.toml"
         if not prompt_file.exists():
             return {}
-        
+
         try:
             with open(prompt_file, "rb") as f:
                 data = tomllib.load(f)
@@ -92,7 +111,10 @@ class PromptEngine:
         if (raw_template := self.overrides.get(key)) is not None:
             # Code blocks arrive already wrapped by tags.file(); escaping them again would
             # turn their own <file> tags into text.
-            safe_kwargs = {**kwargs, "instruction": tags.escape_xml_value(kwargs.get("instruction", ""))}
+            safe_kwargs = {
+                **kwargs,
+                "instruction": tags.escape_xml_value(kwargs.get("instruction", "")),
+            }
             try:
                 return raw_template.format(**safe_kwargs)
             except KeyError as e:
@@ -104,6 +126,7 @@ class PromptEngine:
             return renderer(**kwargs)
 
         return f"Error: Prompt template '{key}' not found."
+
 
 def get_engine(root_path: Path) -> PromptEngine:
     return PromptEngine(root_path)

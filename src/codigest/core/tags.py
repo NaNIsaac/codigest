@@ -2,15 +2,27 @@
 Core Template Engine & XML Factory.
 Centralizes XML escaping and block generation logic.
 """
+
 import re
 import textwrap
 
 # The elements codigest itself wraps context in. Only a closing tag of one of these inside
 # the content could end a block early; everything else is left exactly as written.
 WRAPPERS = (
-    "file", "source_code", "project_snapshot", "project_structure", "code_digest",
-    "changes", "semantic_diff", "user_instruction", "context_pack", "omitted",
-    "terminal_history", "command", "output", "note",
+    "file",
+    "source_code",
+    "project_snapshot",
+    "project_structure",
+    "code_digest",
+    "changes",
+    "semantic_diff",
+    "user_instruction",
+    "context_pack",
+    "omitted",
+    "terminal_history",
+    "command",
+    "output",
+    "note",
 )
 _CLOSING = re.compile(rf"</({'|'.join(WRAPPERS)})>")
 
@@ -21,15 +33,18 @@ def escape_xml_value(value: object) -> str:
     one of codigest's own blocks are neutralised."""
     return _CLOSING.sub(r"&lt;/\1>", str(value))
 
+
 def dedent(template: str) -> str:
     """[Plain] Removes common leading whitespace."""
     if not isinstance(template, str):
         template = str(template)
     return textwrap.dedent(template.expandtabs(4)).strip()
 
+
 def xml(template: str) -> str:
     """[XML] Wrapper for dedent (legacy support)."""
     return dedent(template)
+
 
 # 파일 블록 생성기 (이스케이프 자동화)
 def file(path: str, content: str, status: str = "", lines: str = "") -> str:

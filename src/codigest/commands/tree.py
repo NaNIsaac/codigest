@@ -12,6 +12,7 @@ lazy from ..core.output import OutputHandler
 
 app = typer.Typer()
 
+
 def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
     # (기존의 이모티콘 없는 버전 로직 유지)
     tree = Tree(f"[bold blue]{root_path.name}[/bold blue]", guide_style="bold bright_black")
@@ -41,17 +42,23 @@ def _build_rich_tree(root_path: Path, files: list[Path]) -> Tree:
         size_str = decimal(stat.st_size)
 
         match path.suffix:
-            case ".py": style = "green"
-            case ".js" | ".ts": style = "yellow"
-            case ".json" | ".toml": style = "blue"
-            case ".md": style = "cyan"
-            case _: style = "white"
+            case ".py":
+                style = "green"
+            case ".js" | ".ts":
+                style = "yellow"
+            case ".json" | ".toml":
+                style = "blue"
+            case ".md":
+                style = "cyan"
+            case _:
+                style = "white"
 
         label = Text(filename, style=style)
         label.append(f" ({size_str})", style="dim")
         current_node.add(label)
 
     return tree
+
 
 @app.callback(invoke_without_command=True)
 def handle(
@@ -62,7 +69,11 @@ def handle(
     all: AllOption = False,
     resolve: ResolveOption = False,
     depth: int | None = typer.Option(
-        None, "-L", "--depth", min=1, help="Show this many levels; deeper folders become a file count"
+        None,
+        "-L",
+        "--depth",
+        min=1,
+        help="Show this many levels; deeper folders become a file count",
     ),
 ) -> None:
     """

@@ -1,6 +1,7 @@
 """
 `cdg term` -- recall recent terminal commands (and their output) as LLM context.
 """
+
 import os
 import sys
 import traceback
@@ -68,9 +69,12 @@ def _summarize(handler: OutputHandler, entries: list[termstore.Entry]) -> None:
     for offset, entry in enumerate(entries):
         index = total - offset
         match entry.exit_code:
-            case None: status = ""
-            case 0: status = " [green]✓[/green]"
-            case code: status = f" [red](exit {code})[/red]"
+            case None:
+                status = ""
+            case 0:
+                status = " [green]✓[/green]"
+            case code:
+                status = f" [red](exit {code})[/red]"
         marker = "" if entry.captured else " [yellow](no output)[/yellow]"
         log.print(f"[dim]{index}.[/dim] [cyan]{escape(entry.command)}[/cyan]{status}{marker}")
 
@@ -132,7 +136,9 @@ def handle(
     if failed or here:
         entries = termstore.select(entries, failed=failed, under=Path.cwd() if here else None)
         if not entries:
-            what = " and ".join(w for w, on in (("failed", failed), ("in this directory", here)) if on)
+            what = " and ".join(
+                w for w, on in (("failed", failed), ("in this directory", here)) if on
+            )
             log.print(f"[yellow]No captured commands match ({what}).[/yellow]")
             raise typer.Exit(code=1)
 
@@ -178,7 +184,9 @@ def path() -> None:
 
 @app.command("ingest", hidden=True)
 def ingest(
-    file: Annotated[Path | None, typer.Option(help="Command, NUL, output; deleted afterwards")] = None,
+    file: Annotated[
+        Path | None, typer.Option(help="Command, NUL, output; deleted afterwards")
+    ] = None,
     exit_code: Annotated[int | None, typer.Option()] = None,
     cwd: Annotated[str, typer.Option()] = "",
     shell: Annotated[str, typer.Option()] = "",
@@ -211,7 +219,7 @@ def ingest(
         # The hook discards our stderr; leave a trail `cdg term` can surface.
         with _ingest_log().open("a", encoding="utf-8") as f:
             f.write(f"--- {termstore.now_iso()}\n{traceback.format_exc()}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
     finally:
         if file:
             file.unlink(missing_ok=True)
@@ -315,7 +323,7 @@ def _strip_block(text: str) -> str:
     end = text.find(_END)
     if start == -1 or end == -1:
         return text
-    rest = (text[:start] + text[end + len(_END):]).strip("\n")
+    rest = (text[:start] + text[end + len(_END) :]).strip("\n")
     return rest + "\n" if rest else ""
 
 
@@ -368,7 +376,9 @@ def _rewrite_profiles(add: bool, shell: str) -> None:
             console.print(f"  PowerShell:  . '{hook_ps1}'", highlight=False)
         if any(t.suffix != ".ps1" for t in targets):
             console.print(f"  bash / zsh:  . '{sh}'", highlight=False)
-        console.print("[dim]Skip one command: start it with a space. Disable: set CODIGEST_NOCAP=1[/dim]")
+        console.print(
+            "[dim]Skip one command: start it with a space. Disable: set CODIGEST_NOCAP=1[/dim]"
+        )
 
 
 @app.command("install")

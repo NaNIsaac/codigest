@@ -5,6 +5,7 @@ uncommitted changes, and the local modules those files import. Files are added
 in that order until the token budget runs out; whatever is left out is listed,
 so the reader knows what it is not seeing.
 """
+
 import re
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -16,7 +17,17 @@ from rich.markup import escape
 from ..options import CopyOption, MessageOption, StdoutOption, OutputOption
 
 lazy import html
-lazy from ..core import callees, common, git_ops, processor, resolver, shadow, tags, termstore, tokenizer
+lazy from ..core import (
+    callees,
+    common,
+    git_ops,
+    processor,
+    resolver,
+    shadow,
+    tags,
+    termstore,
+    tokenizer,
+)
 lazy from ..core.redact import redact_diff
 lazy from ..core.output import OutputHandler
 
@@ -30,7 +41,9 @@ OUTPUT_HEAD = 80
 OUTPUT_TAIL = 40
 
 # `File "x.py", line 7` (Python) or `x.py:7` / `x.ts(7,3)` (pytest, tsc, gcc, rustc, eslint, ...)
-_LOCATION_RE = re.compile(r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path>[\w./\\~-]+\.\w+)[:(](?P<line>\d+)')
+_LOCATION_RE = re.compile(
+    r'File "(?P<py>[^"]+)", line (?P<py_line>\d+)|(?P<path>[\w./\\~-]+\.\w+)[:(](?P<line>\d+)'
+)
 
 _TEST_FILE_RE = re.compile(r"^test_.*\.py$|^.*_test\.py$|\.(test|spec)\.[cm]?[jt]sx?$")
 
@@ -41,7 +54,9 @@ SOURCES = ("failure", "changes", "tests", "imports")
 def parse_sources(text: str) -> set[str]:
     chosen = {s.strip() for s in text.split(",") if s.strip()}
     if unknown := chosen - set(SOURCES) - {"none"}:
-        raise typer.BadParameter(f"unknown source {', '.join(sorted(unknown))}; choose from {', '.join(SOURCES)}")
+        raise typer.BadParameter(
+            f"unknown source {', '.join(sorted(unknown))}; choose from {', '.join(SOURCES)}"
+        )
     return chosen - {"none"}
 
 
@@ -76,13 +91,17 @@ def referenced_files(output: str, bases: list[Path], known: set[Path]) -> dict[P
         raw = Path(m["py"] or m["path"]).expanduser()
         for base in bases:
             if (path := (base / raw).resolve()) in known:
-                if (line := int(m["py_line"] or m["line"])) not in (lines := found.setdefault(path, [])):
+                if (line := int(m["py_line"] or m["line"])) not in (
+                    lines := found.setdefault(path, [])
+                ):
                     lines.append(line)
                 break
     return found
 
 
-def excerpt(path: Path, lines: list[int], whole: list[tuple[int, int]] | None = None) -> tuple[str, str] | None:
+def excerpt(
+    path: Path, lines: list[int], whole: list[tuple[int, int]] | None = None
+) -> tuple[str, str] | None:
     """
     The lines around each reference and every span in `whole` in full, numbered, with `...`
     between gaps, plus the ranges shown ("3-23,40-60"). None when the file is short or the
@@ -90,9 +109,11 @@ def excerpt(path: Path, lines: list[int], whole: list[tuple[int, int]] | None = 
     """
     try:
         rows = path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return None
-    wanted = [(max(1, line - EXCERPT_CONTEXT), min(len(rows), line + EXCERPT_CONTEXT)) for line in lines]
+    wanted = [
+        (max(1, line - EXCERPT_CONTEXT), min(len(rows), line + EXCERPT_CONTEXT)) for line in lines
+    ]
     wanted += [(max(1, lo), min(len(rows), hi)) for lo, hi in whole or []]
     spans: list[list[int]] = []
     for lo, hi in sorted(wanted):
@@ -162,7 +183,11 @@ def working_changes(root: Path, files: list[Path]) -> tuple[str, str, list[Path]
     anchor = shadow.ContextAnchor(root)
     if anchor.has_history():
         diff = anchor.get_changes(files)
-        return redact_diff(diff), f"since cdg mark ({anchor.get_last_update_time()})", changed_paths(diff, root)
+        return (
+            redact_diff(diff),
+            f"since cdg mark ({anchor.get_last_update_time()})",
+            changed_paths(diff, root),
+        )
     if git := git_ops.working_changes(root):
         diff, untracked = git
         return redact_diff(diff), "uncommitted changes (git)", changed_paths(diff, root) + untracked
@@ -174,9 +199,13 @@ def handle(
         None, help="Files or directories to include first", exists=True, resolve_path=True
     ),
     message: MessageOption = "",
-    budget: int = typer.Option(DEFAULT_BUDGET, "-b", "--budget", min=1000, help="Token budget (estimated)"),
+    budget: int = typer.Option(
+        DEFAULT_BUDGET, "-b", "--budget", min=1000, help="Token budget (estimated)"
+    ),
     with_: str | None = typer.Option(
-        None, "--with", metavar="SOURCES",
+        None,
+        "--with",
+        metavar="SOURCES",
         help="Automatic sources to add: failure,changes,tests,imports (all, or none when you name files)",
     ),
     copy: CopyOption = None,
@@ -237,25 +266,35 @@ def handle(
             calls.setdefault(path, []).append(span)
             wanted.setdefault(path, f"called from failing test {test_rel}")
 
-    diff, diff_source, changed_all = working_changes(root, sorted(known)) if "changes" in auto else ("", "", [])
+    diff, diff_source, changed_all = (
+        working_changes(root, sorted(known)) if "changes" in auto else ("", "", [])
+    )
     changed = [p.resolve() for p in changed_all if p.resolve() in known]
     for path in changed:
         wanted.setdefault(path, "changed")
     hunks = hunk_spans(diff, root) if diff.strip() else {}
 
     edited = {p for p, why in wanted.items() if why in ("requested", "changed")}
-    for test in sorted(p for p in known if _TEST_FILE_RE.search(p.name)) if edited and "tests" in auto else []:
+    for test in (
+        sorted(p for p in known if _TEST_FILE_RE.search(p.name))
+        if edited and "tests" in auto
+        else []
+    ):
         if hit := sorted(imports(test) & edited):
             wanted.setdefault(test, f"tests {hit[0].relative_to(root).as_posix()}")
 
     looked_up = ("failing output", "failing test")
-    for path in [p for p, why in wanted.items() if not why.endswith(looked_up)] if "imports" in auto else []:
+    for path in (
+        [p for p, why in wanted.items() if not why.endswith(looked_up)] if "imports" in auto else []
+    ):
         for dep in sorted(imports(path)):
             wanted.setdefault(dep, f"imported by {path.relative_to(root).as_posix()}")
 
     if not (failure or diff.strip() or wanted):
         log.print("[yellow]Nothing to pack:[/yellow] no failing command here and no changes.")
-        log.print("  Capture one with [cyan]cdg cap -- pytest[/cyan], or name files: [cyan]cdg pack src/app.py[/cyan]")
+        log.print(
+            "  Capture one with [cyan]cdg cap -- pytest[/cyan], or name files: [cyan]cdg pack src/app.py[/cyan]"
+        )
         raise typer.Exit(1)
 
     head: list[str] = []
@@ -264,7 +303,9 @@ def handle(
     if failure:
         head.append(termstore.render([replace(failure, output=shorten_output(failure.output))]))
     if diff.strip():
-        head.append(f'<changes source="{html.escape(diff_source)}">\n{tags.escape_xml_value(diff.rstrip())}\n</changes>')
+        head.append(
+            f'<changes source="{html.escape(diff_source)}">\n{tags.escape_xml_value(diff.rstrip())}\n</changes>'
+        )
     used = tokenizer.estimate_tokens("\n".join(head))
 
     blocks: list[str] = []
@@ -274,7 +315,9 @@ def handle(
     # were asked for or changed, so it is clear they were left out on purpose.
     named_or_changed = {p.resolve() for p in targets or []} | {p.resolve() for p in changed_all}
     for path in ctx.withheld:
-        if path.resolve() in named_or_changed or any(path.is_relative_to(t.resolve()) for t in targets or [] if t.is_dir()):
+        if path.resolve() in named_or_changed or any(
+            path.is_relative_to(t.resolve()) for t in targets or [] if t.is_dir()
+        ):
             omitted.append((path.relative_to(root).as_posix(), "may contain secrets"))
     for path, reason in wanted.items():
         rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
@@ -295,14 +338,20 @@ def handle(
             continue
         used += cost
         blocks.append(block)
-        brief = f"{len(refs[path])} places in failing output" if reason.startswith("lines ") else reason
+        brief = (
+            f"{len(refs[path])} places in failing output" if reason.startswith("lines ") else reason
+        )
         included.append((rel, f"{brief} (excerpt)" if shown else brief))
 
     if omitted:
         listing = "\n".join(f"{rel}: {why}" for rel, why in omitted)
         blocks.append(f"<omitted>\n{tags.escape_xml_value(listing)}\n</omitted>")
 
-    pack = f'<context_pack project="{html.escape(root.name)}">\n' + "\n".join(head + blocks) + "\n</context_pack>"
+    pack = (
+        f'<context_pack project="{html.escape(root.name)}">\n'
+        + "\n".join(head + blocks)
+        + "\n</context_pack>"
+    )
 
     over = " [red](fixed parts alone exceed the budget)[/red]" if used > budget else ""
     log.print(f"[bold]Packed ~{used:,} / {budget:,} tokens[/bold]{over}")
@@ -311,7 +360,9 @@ def handle(
         log.print(f"  [dim]auto     {on} (--with {','.join(SOURCES)} adds more)[/dim]")
     if failure:
         when = ago(failure.started_at)
-        log.print(f"  [red]failed [/red]  [cyan]{escape(failure.command)}[/cyan] [dim](exit {failure.exit_code}{', ' + when if when else ''})[/dim]")
+        log.print(
+            f"  [red]failed [/red]  [cyan]{escape(failure.command)}[/cyan] [dim](exit {failure.exit_code}{', ' + when if when else ''})[/dim]"
+        )
     if diff.strip():
         log.print(f"  [yellow]changes[/yellow]  [dim]{diff_source}[/dim]")
     width = max((len(rel) for rel, _ in included + omitted), default=0)

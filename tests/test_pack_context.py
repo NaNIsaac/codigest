@@ -1,5 +1,6 @@
 """What pack shows about the code itself: the function a failing test calls, and only the
 changed parts of a changed file."""
+
 import subprocess
 from datetime import datetime
 
@@ -26,19 +27,27 @@ def run_pack(tmp_path, monkeypatch, failing_output=None):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CODIGEST_HOME", str(tmp_path / "home"))
     if failing_output:
-        termstore.append_entry(termstore.Entry(
-            command="pytest -q", output=failing_output, exit_code=1, cwd=str(tmp_path),
-            started_at=datetime.now().astimezone().isoformat(),
-        ))
+        termstore.append_entry(
+            termstore.Entry(
+                command="pytest -q",
+                output=failing_output,
+                exit_code=1,
+                cwd=str(tmp_path),
+                started_at=datetime.now().astimezone().isoformat(),
+            )
+        )
     return CliRunner().invoke(app, ["pack"]).stdout
 
 
 def test_a_committed_bug_brings_the_function_the_failing_test_calls(tmp_path, monkeypatch):
-    repo(tmp_path, {
-        "shop/__init__.py": "from .prices import total\n",
-        "shop/prices.py": PADDING + "def total(items):\n    return sum(items) * 2\n",
-        "tests/test_prices.py": "from shop import total\n\n\ndef test_total():\n    assert total([1, 2]) == 3\n",
-    })
+    repo(
+        tmp_path,
+        {
+            "shop/__init__.py": "from .prices import total\n",
+            "shop/prices.py": PADDING + "def total(items):\n    return sum(items) * 2\n",
+            "tests/test_prices.py": "from shop import total\n\n\ndef test_total():\n    assert total([1, 2]) == 3\n",
+        },
+    )
 
     out = run_pack(tmp_path, monkeypatch, "tests/test_prices.py:5: AssertionError\n1 failed")
 
@@ -54,7 +63,7 @@ def test_a_changed_long_file_comes_as_its_hunks(tmp_path, monkeypatch):
 
     out = run_pack(tmp_path, monkeypatch)
 
-    block = out[out.index('<file path="shop/prices.py"'):]
+    block = out[out.index('<file path="shop/prices.py"') :]
     assert 'reason="changed" lines="' in block
     assert "return sum(items) * 2" in block
     assert "unrelated_3()" not in block

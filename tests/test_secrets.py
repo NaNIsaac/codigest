@@ -43,7 +43,9 @@ def test_diff_drops_secret_files_and_masks_tokens_elsewhere():
 
 def test_captures_are_redacted_before_they_are_stored(tmp_path, monkeypatch):
     monkeypatch.setenv("CODIGEST_HOME", str(tmp_path))
-    termstore.append_entry(Entry(command="python deploy.py", output=f"using {OPENAI_KEY}", exit_code=1))
+    termstore.append_entry(
+        Entry(command="python deploy.py", output=f"using {OPENAI_KEY}", exit_code=1)
+    )
     assert OPENAI_KEY not in termstore.get_history_path().read_text(encoding="utf-8")
 
 

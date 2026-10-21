@@ -1,4 +1,5 @@
 """`.codigest/` must not show up in `git status` of a project that never ignored it."""
+
 import subprocess
 
 from typer.testing import CliRunner

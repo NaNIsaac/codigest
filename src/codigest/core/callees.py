@@ -6,6 +6,7 @@ moved past it), nothing else in a pack shows it. The calls made by the failing
 test functions, matched against the definitions in the project modules the test
 imports, recover it.
 """
+
 import ast
 import warnings
 from pathlib import Path
@@ -18,7 +19,7 @@ def _parse(path: Path) -> ast.Module | None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SyntaxWarning)
             return ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, SyntaxError, ValueError):
+    except OSError, UnicodeDecodeError, SyntaxError, ValueError:
         return None
 
 

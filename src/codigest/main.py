@@ -1,6 +1,7 @@
 """
 Entry Point with Global Error Handling & Version Check
 """
+
 import sys
 
 import typer
@@ -11,7 +12,22 @@ from rich.markup import escape
 lazy from importlib.metadata import PackageNotFoundError, version
 
 from .core import presets
-from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp, pack, mark, shell_help
+from .commands import (
+    init,
+    scan,
+    tree,
+    digest,
+    diff,
+    semdiff,
+    status,
+    clean,
+    cap,
+    term,
+    mcp,
+    pack,
+    mark,
+    shell_help,
+)
 
 console = Console()
 
@@ -23,12 +39,16 @@ app = typer.Typer(
     name="codigest",
     help="Share the code context you choose with an AI: the project, a few files, what changed, or a failing command.",
     add_completion=False,
-    no_args_is_help=True
+    no_args_is_help=True,
 )
 
 # `cdg --help` groups commands by what you are trying to do, in the order most people need them.
 SHARE, CHANGES, TERMINAL, AGENTS, SETUP = (
-    "Share code", "Share changes", "Share a failing command", "Agents", "Setup",
+    "Share code",
+    "Share changes",
+    "Share a failing command",
+    "Agents",
+    "Setup",
 )
 app.command(name="scan", rich_help_panel=SHARE)(scan.handle)
 app.command(name="digest", rich_help_panel=SHARE)(digest.handle)
@@ -47,6 +67,7 @@ app.command(name="init", rich_help_panel=SETUP)(init.handle)
 app.command(name="clean", rich_help_panel=SETUP)(clean.handle)
 app.add_typer(shell_help.app, name="shell-help", rich_help_panel=SETUP)
 
+
 def version_callback(value: bool) -> None:
     """
     Callback function to handle --version flag.
@@ -60,27 +81,33 @@ def version_callback(value: bool) -> None:
         console.print(f"codigest {pkg_version}")
         raise typer.Exit()
 
+
 @app.callback()
 def common(
     ctx: typer.Context,
     version: bool = typer.Option(
         None,
-        "--version", "-v",
+        "--version",
+        "-v",
         help="Show the application version and exit.",
         callback=version_callback,
-        is_eager=True
-    )
+        is_eager=True,
+    ),
 ) -> None:
     pass
+
 
 def cli() -> None:
     """The `cdg` command: `app` with `--preset NAME` expanded first."""
     try:
         argv = presets.expand(sys.argv[1:])
     except presets.PresetError as e:
-        Console(stderr=True).print(f"[red]Error:[/red] {escape(str(e))}", highlight=False, soft_wrap=True)
+        Console(stderr=True).print(
+            f"[red]Error:[/red] {escape(str(e))}", highlight=False, soft_wrap=True
+        )
         sys.exit(2)
     app(args=argv)
+
 
 def main() -> None:
     try:
@@ -90,6 +117,7 @@ def main() -> None:
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

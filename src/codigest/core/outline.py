@@ -1,4 +1,5 @@
 """Outlines for `digest`: one numbered line per definition, bodies left out."""
+
 import re
 
 from . import semdiff
@@ -35,8 +36,10 @@ def _section_title(lines: list[str], i: int) -> str:
 
 def _continues_title(lines: list[str], i: int) -> bool:
     """True when the `%%` line just above already had words of its own."""
-    return i > 0 and bool(_MATLAB_SECTION.match(lines[i - 1])) and bool(
-        re.search(r"\w", _comment_text(lines[i - 1]))
+    return (
+        i > 0
+        and bool(_MATLAB_SECTION.match(lines[i - 1]))
+        and bool(re.search(r"\w", _comment_text(lines[i - 1])))
     )
 
 

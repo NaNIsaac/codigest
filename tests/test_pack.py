@@ -1,4 +1,3 @@
-
 from codigest.commands import pack
 from codigest.core import resolver
 from codigest.core.termstore import Entry
@@ -67,7 +66,7 @@ def test_js_imports_resolve_like_tsc(tmp_path):
     main = tmp_path / "main.ts"
     main.write_text(
         "import { a } from './price.js'\n"
-        "export * from \"./lib\"\n"
+        'export * from "./lib"\n'
         "const o = require('./old.cjs')\n"
         "import './app.service'\n"
         "import React from 'react'\n"
@@ -96,7 +95,9 @@ def test_scan_resolve_follows_ts_imports_recursively(tmp_path, monkeypatch):
     (tmp_path / ".git").mkdir()  # project root marker
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "main.ts").write_text("import { p } from './prices.js'\n")
-    (tmp_path / "src" / "prices.ts").write_text("import { RATE } from './rate'\nexport const p = 1\n")
+    (tmp_path / "src" / "prices.ts").write_text(
+        "import { RATE } from './rate'\nexport const p = 1\n"
+    )
     (tmp_path / "src" / "rate.ts").write_text("export const RATE = 0.1\n")
     (tmp_path / "src" / "unrelated.ts").write_text("export const X = 1\n")
     monkeypatch.chdir(tmp_path)
@@ -131,11 +132,18 @@ def test_naming_files_turns_automatic_sources_off_until_with_asks(tmp_path, monk
     assert "<changes" not in only and "prices.py" not in only
     assert "auto     none" in only
 
-    more = runner.invoke(app, ["pack", "shop/tax.py", "--with", "changes,tests", "-s", "--no-copy"]).output
+    more = runner.invoke(
+        app, ["pack", "shop/tax.py", "--with", "changes,tests", "-s", "--no-copy"]
+    ).output
     assert "<changes" in more and 'path="tests/test_prices.py"' in more
 
-    own_tests = runner.invoke(app, ["pack", "shop/prices.py", "--with", "tests", "-s", "--no-copy"]).output
-    assert 'path="tests/test_prices.py" reason="tests shop/prices.py"' in own_tests and "<changes" not in own_tests
+    own_tests = runner.invoke(
+        app, ["pack", "shop/prices.py", "--with", "tests", "-s", "--no-copy"]
+    ).output
+    assert (
+        'path="tests/test_prices.py" reason="tests shop/prices.py"' in own_tests
+        and "<changes" not in own_tests
+    )
 
     bad = runner.invoke(app, ["pack", "--with", "everything"])
     assert bad.exit_code == 2 and "unknown source everything" in bad.output

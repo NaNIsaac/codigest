@@ -9,10 +9,14 @@ lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
+
 @app.callback(invoke_without_command=True)
 def handle(
     targets: list[Path] = typer.Argument(
-        None, help="Files or directories to outline (default: the project)", exists=True, resolve_path=True
+        None,
+        help="Files or directories to outline (default: the project)",
+        exists=True,
+        resolve_path=True,
     ),
     copy: CopyOption = None,
     output: OutputOption = None,
@@ -72,7 +76,9 @@ def handle(
         )
 
     if unreadable:
-        log_console.print(f"[yellow]Could not read:[/yellow] {', '.join(unreadable)}", highlight=False)
+        log_console.print(
+            f"[yellow]Could not read:[/yellow] {', '.join(unreadable)}", highlight=False
+        )
     token_count = tokenizer.estimate_tokens(digest_content)
     log_console.print(f"[bold]Digest[/bold] {len(summary_blocks)} files, ~{token_count:,} tokens")
 

@@ -1,27 +1,35 @@
 """
 Core File System Scanner.
 """
+
 import pathspec
 from pathlib import Path
 from loguru import logger
 
 # Default "Safe" ignores
 ALWAYS_IGNORE = [
-    ".git/", ".codigest/",
-    ".venv/", "venv/", "env/",
-    "__pycache__/", "node_modules/",
-    ".idea/", ".vscode/",
-    "*.pyc", "*.DS_Store"
+    ".git/",
+    ".codigest/",
+    ".venv/",
+    "venv/",
+    "env/",
+    "__pycache__/",
+    "node_modules/",
+    ".idea/",
+    ".vscode/",
+    "*.pyc",
+    "*.DS_Store",
 ]
+
 
 class ProjectScanner:
     def __init__(
-            self,
-            root_path: Path,
-            extensions: set[str] | None = None,
-            extra_ignores: list[str] | None = None,
-            include_paths: list[Path] | None = None
-            ):
+        self,
+        root_path: Path,
+        extensions: set[str] | None = None,
+        extra_ignores: list[str] | None = None,
+        include_paths: list[Path] | None = None,
+    ):
         self.root_path = root_path
         self.extensions = extensions
         self.extra_ignores = extra_ignores or []
@@ -36,14 +44,17 @@ class ProjectScanner:
         gitignore_path = self.root_path / ".gitignore"
         if gitignore_path.exists():
             try:
-                with open(gitignore_path, "r", encoding="utf-8") as f:
-                    patterns.extend([
-                        stripped for line in f
-                        if (stripped := line.strip()) and not line.startswith("#")
-                    ])
+                with open(gitignore_path, encoding="utf-8") as f:
+                    patterns.extend(
+                        [
+                            stripped
+                            for line in f
+                            if (stripped := line.strip()) and not line.startswith("#")
+                        ]
+                    )
             except Exception as e:
                 logger.warning(f"Failed to read .gitignore: {e}")
-                
+
         return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
 
     def is_ignored(self, path: Path) -> bool:
@@ -55,7 +66,7 @@ class ProjectScanner:
                 rel_path += "/"
         except ValueError:
             return False
-            
+
         return self.ignore_spec.match_file(rel_path)
 
     def _is_included(self, entry: Path) -> bool:
@@ -83,18 +94,18 @@ class ProjectScanner:
 
         while dirs_stack:
             current = dirs_stack.pop()
-            
+
             try:
                 # Sort for deterministic output (LLMs like order)
                 entries = sorted(current.iterdir(), key=lambda x: x.name)
             except PermissionError:
                 logger.debug(f"Permission denied: {current}")
                 continue
-                
+
             for entry in entries:
                 if self.is_ignored(entry):
                     continue
-                
+
                 if entry.is_dir():
                     dirs_stack.append(entry)
 
@@ -104,16 +115,17 @@ class ProjectScanner:
                         # Allow specific config files even if extension doesn't match
                         if entry.name not in {".gitignore", "Dockerfile", "pyproject.toml"}:
                             continue
-                            
+
                     valid_files.append(entry)
 
         return sorted(set(valid_files))
 
+
 def scan_project(
-    root_path: Path, 
-    extensions: set[str] | None = None, 
-    extra_ignores: list[str] | None = None, 
-    include_paths: list[Path] | None = None
+    root_path: Path,
+    extensions: set[str] | None = None,
+    extra_ignores: list[str] | None = None,
+    include_paths: list[Path] | None = None,
 ) -> list[Path]:
     scanner = ProjectScanner(root_path, extensions, extra_ignores, include_paths)
     return scanner.scan()

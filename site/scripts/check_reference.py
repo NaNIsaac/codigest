@@ -8,6 +8,7 @@ English page and its Korean translation.
 
     uv run python site/scripts/check_reference.py
 """
+
 import re
 import sys
 from pathlib import Path
@@ -34,7 +35,12 @@ def cli_options() -> dict[str, set[str]]:
             for name, sub in command.commands.items():
                 walk(sub, [*path, name])
         if path:
-            names = {n for p in command.params if isinstance(p, click.Option) for n in (*p.opts, *p.secondary_opts)}
+            names = {
+                n
+                for p in command.params
+                if isinstance(p, click.Option)
+                for n in (*p.opts, *p.secondary_opts)
+            }
             found[" ".join(path)] = names - IGNORED
 
     walk(typer.main.get_command(app), [])
@@ -64,16 +70,22 @@ def main() -> int:
         for command in sorted(actual.keys() - docs.keys()):
             problems.append(f"{label}: command `cdg {command}` is not documented")
         for command in sorted(docs.keys() - actual.keys()):
-            problems.append(f"{label}: `cdg {command}` is documented but the CLI has no such command")
+            problems.append(
+                f"{label}: `cdg {command}` is documented but the CLI has no such command"
+            )
         for command in sorted(actual.keys() & docs.keys()):
             for option in sorted(actual[command] - docs[command]):
                 problems.append(f"{label}: `cdg {command}` option {option} is not documented")
             for option in sorted(docs[command] - actual[command]):
-                problems.append(f"{label}: `cdg {command}` documents {option}, which the CLI does not have")
+                problems.append(
+                    f"{label}: `cdg {command}` documents {option}, which the CLI does not have"
+                )
     for problem in problems:
         print(problem, file=sys.stderr)
     if not problems:
-        print(f"reference matches the CLI: {len(actual)} commands, {sum(map(len, actual.values()))} options")
+        print(
+            f"reference matches the CLI: {len(actual)} commands, {sum(map(len, actual.values()))} options"
+        )
     return 1 if problems else 0
 
 

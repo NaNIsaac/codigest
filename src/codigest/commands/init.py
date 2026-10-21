@@ -33,6 +33,7 @@ format = "xml"
 structure = "toon"
 """
 
+
 @app.callback(invoke_without_command=True)
 def handle(
     # target 인자 추가 (기본값: 현재 위치)
@@ -42,7 +43,7 @@ def handle(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        resolve_path=True
+        resolve_path=True,
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
 ) -> None:
@@ -68,6 +69,7 @@ def handle(
 
     console.print("\nEdit .codigest/config.toml to choose which files are included.")
     console.print("[dim]To compare against this point later, run cdg mark.[/dim]")
+
 
 def _update_gitignore(path: Path) -> None:
     entry = ".codigest/"

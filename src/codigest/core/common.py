@@ -3,6 +3,7 @@ Common Logic & Project Context Manager.
 Centralizes project discovery, config loading, scanning, and dependency resolution.
 Facade pattern to simplify command implementations.
 """
+
 lazy import os
 lazy import shutil
 lazy import stat
@@ -19,10 +20,11 @@ console = Console(stderr=True)
 
 type Targets = list[Path] | Path
 
+
 class ProjectContext:
     # [수정] targets 타입을 list[Path] | Path로 확장
     def __init__(self, targets: Targets | None = None):
-        
+
         # [추가] 단일 Path가 들어오면 리스트로 감싸기 (Safety)
         if isinstance(targets, Path):
             targets = [targets]
@@ -36,7 +38,7 @@ class ProjectContext:
             self.start_path = cwd
         else:
             self.start_path = Path(os.path.commonpath(resolved))
-            
+
         # 2. 루트 찾기
         self.root_path = self._find_project_root(self.start_path)
         self.withheld: list[Path] = []
@@ -47,21 +49,21 @@ class ProjectContext:
         Locates the project root by looking for marker directories/files.
         """
         current = start_path if start_path.is_dir() else start_path.parent
-        
+
         # Traverse up
         for parent in [current, *current.parents]:
             if (parent / ".codigest").exists():
                 return parent
             if (parent / ".git").exists() or (parent / ".shadow_git").exists():
                 return parent
-        
+
         return start_path if start_path.is_dir() else start_path.parent
 
     def _load_config_filters(self) -> tuple[set[str] | None, list[str]]:
         config_path = self.root_path / ".codigest" / "config.toml"
         extensions: set[str] | None = None
         exclude_patterns: list[str] = []
-        
+
         if config_path.exists():
             try:
                 with open(config_path, "rb") as f:
@@ -71,14 +73,14 @@ class ProjectContext:
                         extensions = set(ext_list)
                     exclude_patterns = filters.get("exclude_patterns", [])
             except Exception:
-                pass 
+                pass
         return extensions, exclude_patterns
 
     def get_target_files(
-        self, 
+        self,
         targets: Targets | None = None,
         ignore_config: bool = False,
-        resolve_deps: bool = False
+        resolve_deps: bool = False,
     ) -> list[Path]:
         """
         The Master Method:
@@ -93,7 +95,7 @@ class ProjectContext:
 
         # 이후 로직에서는 변환된 resolved_targets를 사용
         scan_scope = resolved_targets or None
-        
+
         # 1. Determine Filters
         exts, ignores = (None, [])
         if not ignore_config:
@@ -102,14 +104,13 @@ class ProjectContext:
         # 2. Scope Warning UI (이제 정상 작동함)
         for p in scan_scope or []:
             if not p.is_relative_to(self.root_path):
-                console.print(f"[yellow][Warning] {p.name} is outside detected root {self.root_path}[/yellow]")
+                console.print(
+                    f"[yellow][Warning] {p.name} is outside detected root {self.root_path}[/yellow]"
+                )
 
         # 3. Scan
         files = scanner.scan_project(
-            self.root_path, 
-            extensions=exts, 
-            extra_ignores=ignores, 
-            include_paths=scan_scope
+            self.root_path, extensions=exts, extra_ignores=ignores, include_paths=scan_scope
         )
 
         # 4. Resolve Dependencies
@@ -120,6 +121,7 @@ class ProjectContext:
         self.withheld = sorted({f for f in files if is_secret_file(f.name)} | set(self.withheld))
         return [f for f in files if not is_secret_file(f.name)]
 
+
 # Helper for quick access
 def get_context(targets: Targets | None = None) -> ProjectContext:
     return ProjectContext(targets)
@@ -127,6 +129,7 @@ def get_context(targets: Targets | None = None) -> ProjectContext:
 
 def remove_tree(path: Path) -> None:
     """`shutil.rmtree` that also deletes read-only files (git objects on Windows)."""
+
     def make_writable_and_retry(func, target, _exc):
         os.chmod(target, stat.S_IWRITE)
         func(target)

@@ -1,6 +1,7 @@
 """
 Centralized CLI Options & Common Annotated Types.
 """
+
 from pathlib import Path
 from typing import Annotated
 import typer
@@ -11,31 +12,24 @@ from .core.formats import Format
 CopyOption = Annotated[
     bool | None,
     typer.Option(
-        "--copy/--no-copy", "-c",
+        "--copy/--no-copy",
+        "-c",
         help="Copy the result to the clipboard [default: copy in a terminal, not when piped]",
         show_default=False,
     ),
 ]
 
 StdoutOption = Annotated[
-    bool,
-    typer.Option("-s", "--stdout", help="Also print the result (on by default when piped)")
+    bool, typer.Option("-s", "--stdout", help="Also print the result (on by default when piped)")
 ]
 
-ResolveOption = Annotated[
-    bool,
-    typer.Option("-r", "--resolve", help="Recursively resolve imports")
-]
+ResolveOption = Annotated[bool, typer.Option("-r", "--resolve", help="Recursively resolve imports")]
 
 MessageOption = Annotated[
-    str,
-    typer.Option("-m", "--message", help="Add specific instruction context")
+    str, typer.Option("-m", "--message", help="Add specific instruction context")
 ]
 
-AllOption = Annotated[
-    bool,
-    typer.Option("-a", "--all", help="Ignore config filters")
-]
+AllOption = Annotated[bool, typer.Option("-a", "--all", help="Ignore config filters")]
 
 OutputOption = Annotated[
     Path | None,

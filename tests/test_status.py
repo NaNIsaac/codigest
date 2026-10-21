@@ -1,4 +1,5 @@
 """`cdg status` on a pipe, where rich assumes 80 columns."""
+
 from typer.testing import CliRunner
 
 from codigest.main import app

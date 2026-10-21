@@ -8,6 +8,7 @@ like `-n` are never stolen from it. Only output options written before the
 command (`cdg cap -c -- pytest`) are read, by hand, and they make `cap` hand
 over the result like `cdg term` would.
 """
+
 import base64
 import shutil
 from dataclasses import dataclass
@@ -82,7 +83,9 @@ def split_options(args: list[str]) -> tuple[Delivery, list[str]]:
                     try:
                         delivery.format = Format(inline.lower())
                     except ValueError:
-                        raise ValueError(f"unknown format '{inline}' (xml, markdown or json)") from None
+                        raise ValueError(
+                            f"unknown format '{inline}' (xml, markdown or json)"
+                        ) from None
                 else:
                     delivery.output = Path(inline)
             case _:
@@ -124,8 +127,7 @@ def handle(ctx: typer.Context, command: CommandArgument = None) -> None:
 
     if not args:
         err_console.print(
-            "[yellow]Usage:[/yellow] cdg cap -- <command>\n"
-            "[dim]Example: cdg cap -- pytest -q[/dim]"
+            "[yellow]Usage:[/yellow] cdg cap -- <command>\n[dim]Example: cdg cap -- pytest -q[/dim]"
         )
         raise typer.Exit(code=2)
 
@@ -171,7 +173,11 @@ def handle(ctx: typer.Context, command: CommandArgument = None) -> None:
                 Format.MARKDOWN: termstore.render_markdown,
                 Format.JSON: termstore.render_json,
             }[delivery.format]
-            handler = OutputHandler(stdout=delivery.stdout, copy=delivery.copy, output=delivery.output)
-            handler.handle_output(render([entry], include_context=False), item_name="1 terminal entry")
+            handler = OutputHandler(
+                stdout=delivery.stdout, copy=delivery.copy, output=delivery.output
+            )
+            handler.handle_output(
+                render([entry], include_context=False), item_name="1 terminal entry"
+            )
 
     raise typer.Exit(code=exit_code)

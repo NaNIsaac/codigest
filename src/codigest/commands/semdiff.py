@@ -9,6 +9,7 @@ lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
+
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(Path("."), help="Target directory"),
@@ -40,7 +41,6 @@ def handle(
     reports = []
 
     with spinner(log_console, "[bold blue]Parsing AST...[/bold blue]"):
-
         # [2] Get Files via Context
         current_files = ctx.get_target_files(resolve_deps=resolve)
 
@@ -57,7 +57,7 @@ def handle(
                 rel_path_str = rel_path.as_posix()
             except ValueError:
                 # External files tracked via resolve logic
-                rel_path = None # Anchor might not support reading external files yet
+                rel_path = None  # Anchor might not support reading external files yet
                 rel_path_str = f"[EXTERNAL]/{file_path.name}"
 
             # Read New Content
@@ -76,10 +76,14 @@ def handle(
                 change_lines = []
                 for ch in changes:
                     match ch.change_type:
-                        case "ADDED": icon = "[ADDED]    "
-                        case "REMOVED": icon = "[REMOVED]  "
-                        case "MODIFIED": icon = "[SIGNATURE]"
-                        case _: icon = "[LOGIC]    "
+                        case "ADDED":
+                            icon = "[ADDED]    "
+                        case "REMOVED":
+                            icon = "[REMOVED]  "
+                        case "MODIFIED":
+                            icon = "[SIGNATURE]"
+                        case _:
+                            icon = "[LOGIC]    "
 
                     # The signature is the news only when it changed, and then both sides are in details.
                     detail = f" :: {ch.details}" if ch.change_type == "MODIFIED" else ""
@@ -95,7 +99,6 @@ def handle(
                 block = tags.file(rel_path_str, raw_body, status=file_status)
                 reports.append(block)
 
-
     if not reports:
         log_console.print("[green]No structural (AST) changes detected.[/green]")
         return
@@ -110,13 +113,15 @@ def handle(
             project_name=root_path.name,
             context_message=f"since cdg mark ({last_update})",
             semdiff_content=report_content,
-            instruction=message
+            instruction=message,
         )
     except Exception as e:
         log_console.print(f"[red]Template Error:[/red] {e}")
         raise typer.Exit(1) from e
 
     token_count = tokenizer.estimate_tokens(final_output)
-    log_console.print(f"[bold green]SemDiff Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])")
+    log_console.print(
+        f"[bold green]SemDiff Generated![/bold green] ([bold cyan]~{token_count:,} Tokens[/bold cyan])"
+    )
 
     handler.handle_output(final_output, item_name="semdiff")

@@ -2,6 +2,7 @@
 Output formats besides the XML blocks: Markdown for people and chats that render it,
 JSON for scripts.
 """
+
 import re
 from enum import StrEnum
 
@@ -13,13 +14,37 @@ class Format(StrEnum):
 
 
 _LANGUAGES = {
-    "py": "python", "pyi": "python", "rs": "rust",
-    "js": "javascript", "mjs": "javascript", "cjs": "javascript", "jsx": "jsx",
-    "ts": "typescript", "tsx": "tsx", "go": "go", "m": "matlab",
-    "c": "c", "h": "c", "cpp": "cpp", "cc": "cpp", "hpp": "cpp", "cxx": "cpp",
-    "java": "java", "sh": "bash", "bash": "bash", "ps1": "powershell", "psm1": "powershell",
-    "json": "json", "toml": "toml", "yaml": "yaml", "yml": "yaml", "md": "markdown",
-    "html": "html", "css": "css", "sql": "sql", "xml": "xml",
+    "py": "python",
+    "pyi": "python",
+    "rs": "rust",
+    "js": "javascript",
+    "mjs": "javascript",
+    "cjs": "javascript",
+    "jsx": "jsx",
+    "ts": "typescript",
+    "tsx": "tsx",
+    "go": "go",
+    "m": "matlab",
+    "c": "c",
+    "h": "c",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "hpp": "cpp",
+    "cxx": "cpp",
+    "java": "java",
+    "sh": "bash",
+    "bash": "bash",
+    "ps1": "powershell",
+    "psm1": "powershell",
+    "json": "json",
+    "toml": "toml",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "md": "markdown",
+    "html": "html",
+    "css": "css",
+    "sql": "sql",
+    "xml": "xml",
 }
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 

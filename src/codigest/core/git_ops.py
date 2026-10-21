@@ -1,6 +1,7 @@
 """
 Git Operations (read-only, against the user's real repository).
 """
+
 lazy import subprocess
 from pathlib import Path
 
@@ -11,7 +12,13 @@ def is_git_repo(root_path: Path) -> bool:
 
 def _git(root_path: Path, *args: str) -> str | None:
     result = subprocess.run(
-        ["git", *args], cwd=root_path, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False
+        ["git", *args],
+        cwd=root_path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
     )
     return result.stdout if result.returncode == 0 else None
 

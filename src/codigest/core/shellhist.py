@@ -6,6 +6,7 @@ it. The command text, however, is recoverable from the shell's own history file.
 This module provides that degraded fallback so `cdg term` is still useful in a
 terminal that was never wrapped.
 """
+
 import os
 import re
 import sys
@@ -35,7 +36,7 @@ def _psreadline_path() -> Path | None:
 
 
 def _read_lines(path: Path) -> list[str]:
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8", errors="replace") as f:
         return [ln.rstrip("\n") for ln in f]
 
 

@@ -8,6 +8,7 @@ lazy from ..core import common
 app = typer.Typer()
 console = Console()
 
+
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(
@@ -16,9 +17,11 @@ def handle(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        resolve_path=True
+        resolve_path=True,
     ),
-    yes: bool = typer.Option(False, "-y", "--yes", "-f", "--force", help="Skip confirmation prompt"),
+    yes: bool = typer.Option(
+        False, "-y", "--yes", "-f", "--force", help="Skip confirmation prompt"
+    ),
 ) -> None:
     """
     Delete .codigest/: the config, the baseline and the cache.
@@ -32,7 +35,9 @@ def handle(
         return
 
     if not yes:
-        console.print(f"[yellow]Warning: This will remove [bold]{codigest_dir}[/bold] and all stored context/anchors.[/yellow]")
+        console.print(
+            f"[yellow]Warning: This will remove [bold]{codigest_dir}[/bold] and all stored context/anchors.[/yellow]"
+        )
         if not typer.confirm("Are you sure you want to remove .codigest?"):
             console.print("[red]Aborted.[/red]")
             raise typer.Exit()

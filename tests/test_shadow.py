@@ -26,13 +26,20 @@ def _project(root, files):
 
 def _scan(root):
     return sorted(
-        p for p in root.rglob("*")
+        p
+        for p in root.rglob("*")
         if p.is_file() and not {".git", ".codigest"} & set(p.relative_to(root).parts)
     )
 
 
 def test_git_named_files_show_up_in_the_diff(tmp_path):
-    names = [".gitignore", ".github/workflows/ci.yml", ".gitattributes", ".gitkeep", "notes.github.md"]
+    names = [
+        ".gitignore",
+        ".github/workflows/ci.yml",
+        ".gitattributes",
+        ".gitkeep",
+        "notes.github.md",
+    ]
     _project(tmp_path, {"a.py": "x = 1\n", **{n: "one\n" for n in names}})
     anchor = ContextAnchor(tmp_path)
     anchor.update(_scan(tmp_path))

@@ -1,8 +1,10 @@
 from pathlib import Path
 
+
 def generate_toon(paths: list[Path], root_dir: Path) -> str:
     """(Phase 2: Digest용) TOON 포맷 생성기 (Placeholder)"""
     return "# TOON generation logic here"
+
 
 def generate_ascii_tree(paths: list[Path], root_dir: Path, depth: int | None = None) -> str:
     """
@@ -31,9 +33,9 @@ def generate_ascii_tree(paths: list[Path], root_dir: Path, depth: int | None = N
 
         count = len(filtered_items)
         for i, item in enumerate(filtered_items):
-            is_last = (i == count - 1)
+            is_last = i == count - 1
             connector = "└── " if is_last else "├── "
-            
+
             if item.is_dir() and depth is not None and level >= depth:
                 under = sum(1 for p in paths if p.is_relative_to(item))
                 lines.append(f"{prefix}{connector}{item.name}/ ({under} file{'s' * (under != 1)})")

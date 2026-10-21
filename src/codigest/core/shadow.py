@@ -2,6 +2,7 @@
 Context Anchor Engine.
 Modified to hide internal git repository from VS Code by renaming .git -> .shadow_git
 """
+
 lazy import shutil
 lazy from .common import hide_from_git, remove_tree
 lazy import subprocess
@@ -41,7 +42,7 @@ def _unquote(token: str) -> str:
             j = i + 1
             while j < len(body) and j < i + 4 and body[j] in _OCTAL:
                 j += 1
-            out.append(int(body[i + 1:j], 8) & 0xFF)
+            out.append(int(body[i + 1 : j], 8) & 0xFF)
             i = j
         else:
             escaped = body[i + 1]
@@ -68,23 +69,28 @@ def diff_header_paths(line: str) -> tuple[str, str] | None:
 
     if rest.startswith('"'):
         end = _quoted_end(rest)
-        if end == -1 or rest[end + 1:end + 2] != " ":
+        if end == -1 or rest[end + 1 : end + 2] != " ":
             return None
-        old, raw = _unquote(rest[:end + 1]), rest[end + 2:]
+        old, raw = _unquote(rest[: end + 1]), rest[end + 2 :]
         new = _unquote(raw) if raw.startswith('"') else raw
     elif (cut := rest.find(' "b/')) != -1:
-        old, new = rest[:cut], _unquote(rest[cut + 1:])
+        old, new = rest[:cut], _unquote(rest[cut + 1 :])
     else:
         old = new = None
         half, odd = divmod(len(rest) - 5, 2)
         if half > 0 and not odd:
-            left, right = rest[:2 + half], rest[3 + half:]
-            if rest[2 + half] == " " and left[2:] == right[2:] and left.startswith("a/") and right.startswith("b/"):
+            left, right = rest[: 2 + half], rest[3 + half :]
+            if (
+                rest[2 + half] == " "
+                and left[2:] == right[2:]
+                and left.startswith("a/")
+                and right.startswith("b/")
+            ):
                 old, new = left, right
         if old is None:
             for found in re.finditer(" b/", rest):
                 if rest.startswith("a/"):
-                    old, new = rest[:found.start()], rest[found.start() + 1:]
+                    old, new = rest[: found.start()], rest[found.start() + 1 :]
                     break
             else:
                 return None
@@ -117,21 +123,22 @@ class ContextAnchor:
         self.anchor_dir.mkdir(parents=True, exist_ok=True)
         cmd = [
             "git",
-            "--git-dir", str(self.git_dir),
-            "--work-tree", str(self.anchor_dir),
+            "--git-dir",
+            str(self.git_dir),
+            "--work-tree",
+            str(self.anchor_dir),
             *args,
         ]
 
         target_dir = cwd or self.anchor_dir
-        
-        result = subprocess.run(
-            cmd, cwd=target_dir, capture_output=True, text=True, encoding='utf-8', errors='replace'
-        )
-        
-        if check and result.returncode != 0:
 
+        result = subprocess.run(
+            cmd, cwd=target_dir, capture_output=True, text=True, encoding="utf-8", errors="replace"
+        )
+
+        if check and result.returncode != 0:
             logger.debug(f"Shadow Git Warning ({args[0]}): {result.stderr.strip()}")
-            
+
         return (result.stdout or "").strip()
 
     def has_changes(self, current_files: list[Path]) -> bool:
@@ -152,13 +159,20 @@ class ContextAnchor:
                 src_stat = src.stat()
                 dest_stat = dest.stat()
                 # Use size + 1ms mtime tolerance for filesystem precision differences
-                if src_stat.st_size != dest_stat.st_size or (src_stat.st_mtime_ns - dest_stat.st_mtime_ns) > 1_000_000:
+                if (
+                    src_stat.st_size != dest_stat.st_size
+                    or (src_stat.st_mtime_ns - dest_stat.st_mtime_ns) > 1_000_000
+                ):
                     return True
             except Exception:
                 return True
 
         for anchor_file in self.anchor_dir.rglob("*"):
-            if anchor_file.is_file() and ".shadow_git" not in anchor_file.parts and anchor_file.name != ".gitignore":
+            if (
+                anchor_file.is_file()
+                and ".shadow_git" not in anchor_file.parts
+                and anchor_file.name != ".gitignore"
+            ):
                 try:
                     rel = anchor_file.relative_to(self.anchor_dir)
                     if rel not in current_rel_paths:
@@ -176,8 +190,7 @@ class ContextAnchor:
             if self.git_dir.exists():
                 remove_tree(self.git_dir)
             subprocess.run(
-                ["git", "init", "--bare", str(self.git_dir)],
-                capture_output=True, check=False
+                ["git", "init", "--bare", str(self.git_dir)], capture_output=True, check=False
             )
             self._run_git(["config", "core.bare", "false"])
             self._run_git(["config", "user.email", "codigest@ai"])
@@ -206,9 +219,12 @@ class ContextAnchor:
                     src_stat = src.stat()
                     dest_stat = dest.stat()
 
-                    if src_stat.st_size == dest_stat.st_size and dest_stat.st_mtime_ns >= src_stat.st_mtime_ns:
+                    if (
+                        src_stat.st_size == dest_stat.st_size
+                        and dest_stat.st_mtime_ns >= src_stat.st_mtime_ns
+                    ):
                         should_copy = False
-                
+
                 source_rel_paths.add(rel)
                 if should_copy:
                     shutil.copy2(src, dest)
@@ -234,11 +250,25 @@ class ContextAnchor:
             logger.info("Initial context anchor created.")
         else:
             # --quiet reports changes only through the exit code, never on stdout.
-            dirty = subprocess.run(
-                ["git", "--git-dir", str(self.git_dir), "--work-tree", str(self.anchor_dir),
-                 "diff-index", "--quiet", "--cached", "HEAD", "--"],
-                cwd=self.anchor_dir, capture_output=True,
-            ).returncode != 0
+            dirty = (
+                subprocess.run(
+                    [
+                        "git",
+                        "--git-dir",
+                        str(self.git_dir),
+                        "--work-tree",
+                        str(self.anchor_dir),
+                        "diff-index",
+                        "--quiet",
+                        "--cached",
+                        "HEAD",
+                        "--",
+                    ],
+                    cwd=self.anchor_dir,
+                    capture_output=True,
+                ).returncode
+                != 0
+            )
             if dirty:
                 self._run_git(["commit", "-m", f"Snapshot: {int(time.time())}"])
                 logger.info("Context anchor updated.")
@@ -252,7 +282,7 @@ class ContextAnchor:
 
         temp_current = self.root / ".codigest" / "temp_diff_current"
         temp_baseline = self.root / ".codigest" / "temp_diff_baseline"
-        
+
         for d in [temp_current, temp_baseline]:
             if d.exists():
                 remove_tree(d)
@@ -274,12 +304,18 @@ class ContextAnchor:
 
             subprocess.run(
                 [
-                    "git", 
-                    "--git-dir", str(self.git_dir),  # [변경] .shadow_git 경로 사용
-                    "--work-tree", str(temp_baseline), 
-                    "checkout", "HEAD", "--", "."
+                    "git",
+                    "--git-dir",
+                    str(self.git_dir),  # [변경] .shadow_git 경로 사용
+                    "--work-tree",
+                    str(temp_baseline),
+                    "checkout",
+                    "HEAD",
+                    "--",
+                    ".",
                 ],
-                capture_output=True, check=False
+                capture_output=True,
+                check=False,
             )
 
             self._prune_ignored_files(temp_baseline, current_rel_paths)
@@ -287,12 +323,17 @@ class ContextAnchor:
             result = subprocess.run(
                 ["git", "diff", "--no-index", "temp_diff_baseline", "temp_diff_current"],
                 cwd=self.root / ".codigest",
-                capture_output=True, text=True, encoding='utf-8', errors='replace'
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
             )
-            
-            diff_text = (result.stdout or "")
-            diff_text = diff_text.replace("temp_diff_baseline/", "").replace("temp_diff_current/", "")
-            
+
+            diff_text = result.stdout or ""
+            diff_text = diff_text.replace("temp_diff_baseline/", "").replace(
+                "temp_diff_current/", ""
+            )
+
             clean_lines = []
             skip = False
             for line in diff_text.splitlines():
@@ -338,22 +379,28 @@ class ContextAnchor:
     def read_anchor_file(self, rel_path: Path) -> str:
         if not self.git_dir.exists():
             return ""
-        
+
         git_path = rel_path.as_posix()
 
         result = subprocess.run(
             [
-                "git", 
-                "--git-dir", str(self.git_dir), # [변경]
-                "--work-tree", str(self.anchor_dir),
-                "show", f"HEAD:{git_path}"
+                "git",
+                "--git-dir",
+                str(self.git_dir),  # [변경]
+                "--work-tree",
+                str(self.anchor_dir),
+                "show",
+                f"HEAD:{git_path}",
             ],
-            capture_output=True, text=True, encoding='utf-8', errors='replace'
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
-        
+
         if result.returncode != 0:
             return ""
-            
+
         return result.stdout
 
     def get_changed_files(self, current_files: list[Path]) -> list[Path]:

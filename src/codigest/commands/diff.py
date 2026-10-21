@@ -10,6 +10,7 @@ lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
 
+
 @app.callback(invoke_without_command=True)
 def handle(
     target: Path = typer.Argument(
@@ -18,7 +19,7 @@ def handle(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        resolve_path=True
+        resolve_path=True,
     ),
     copy: CopyOption = None,
     output: OutputOption = None,
@@ -49,13 +50,10 @@ def handle(
 
     # [2] Calculate Diff via Context
     with spinner(log_console, "[bold blue]Analyzing changes...[/bold blue]"):
-
-        
         current_files = ctx.get_target_files(resolve_deps=resolve)
 
         # Compare Working Tree vs Anchor
         diff_content = redact_diff(anchor.get_changes(current_files))
-
 
     if not diff_content.strip():
         log_console.print("[green]No changes since the last mark.[/green]")
@@ -69,7 +67,7 @@ def handle(
             project_name=root_path.name,
             context_message=f"since cdg mark ({last_update})",
             diff_content=diff_content,
-            instruction=message
+            instruction=message,
         )
     except Exception:
         # Fallback if template fails (using safe escaping via tags)

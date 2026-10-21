@@ -3,6 +3,7 @@ Semantic Difference Engine (Spec 0.1 Compliant).
 Tracks: Functions, Classes, Methods, Global Variables.
 Detects: Signature Changes AND Logic Body Changes.
 """
+
 import ast
 import warnings
 lazy import hashlib
@@ -15,20 +16,23 @@ type ChangeType = Literal["ADDED", "REMOVED", "MODIFIED", "LOGIC_CHANGED"]
 # Longest value shown for a variable or attribute in an outline.
 VALUE_WIDTH = 60
 
+
 @dataclass(slots=True)
 class SymbolInfo:
     name: str
     type: SymbolKind
     signature: str
-    content_hash: str # For logic change detection
+    content_hash: str  # For logic change detection
     docstring: str | None = None
     line: int = 0
+
 
 @dataclass(slots=True)
 class SemanticChange:
     change_type: ChangeType
     symbol: SymbolInfo
     details: str = ""
+
 
 class CodeParser(ast.NodeVisitor):
     def __init__(self):
@@ -40,7 +44,7 @@ class CodeParser(ast.NodeVisitor):
         try:
             # ast.unparse returns standardized code string
             normalized_code = ast.unparse(node)
-            return hashlib.md5(normalized_code.encode('utf-8')).hexdigest()
+            return hashlib.md5(normalized_code.encode("utf-8")).hexdigest()
         except Exception:
             return ""
 
@@ -61,7 +65,9 @@ class CodeParser(ast.NodeVisitor):
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self._visit_func(node, "async_function")
 
-    def _visit_func(self, node: ast.FunctionDef | ast.AsyncFunctionDef, type_label: SymbolKind) -> None:
+    def _visit_func(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, type_label: SymbolKind
+    ) -> None:
         name = node.name
         if self.current_class:
             name = f"{self.current_class}.{name}"
@@ -71,7 +77,7 @@ class CodeParser(ast.NodeVisitor):
             name=name,
             type=type_label,
             signature=self._get_signature(node),
-            content_hash=self._get_hash(node), # Hash entire function body
+            content_hash=self._get_hash(node),  # Hash entire function body
             docstring=ast.get_docstring(node),
             line=node.lineno,
         )
@@ -87,7 +93,7 @@ class CodeParser(ast.NodeVisitor):
             name=node.name,
             type="class",
             signature=base_str,
-            content_hash=self._get_hash(node), # Hash class structure
+            content_hash=self._get_hash(node),  # Hash class structure
             docstring=ast.get_docstring(node),
             line=node.lineno,
         )
@@ -127,6 +133,7 @@ class CodeParser(ast.NodeVisitor):
                 type_hint = "..."
             self._add_variable(node.target.id, f": {type_hint}{self._value(node.value)}", node)
 
+
 def parse_code(code: str) -> dict[str, SymbolInfo]:
     if not code:
         return {}
@@ -141,6 +148,7 @@ def parse_code(code: str) -> dict[str, SymbolInfo]:
     parser.visit(tree)
     return parser.symbols
 
+
 def compare(old_code: str, new_code: str) -> list[SemanticChange]:
     old_syms = parse_code(old_code)
     new_syms = parse_code(new_code)
@@ -154,7 +162,9 @@ def compare(old_code: str, new_code: str) -> list[SemanticChange]:
                 changes.append(SemanticChange("REMOVED", old))
             # 1. Signature Change? (API Breakage)
             case old, new if old.signature != new.signature:
-                changes.append(SemanticChange("MODIFIED", new, f"{old.signature} -> {new.signature}"))
+                changes.append(
+                    SemanticChange("MODIFIED", new, f"{old.signature} -> {new.signature}")
+                )
             # 2. Logic Change? (Internal Implementation)
             # Only check if signature didn't change (to avoid double reporting)
             case old, new if old.content_hash != new.content_hash:
@@ -163,13 +173,15 @@ def compare(old_code: str, new_code: str) -> list[SemanticChange]:
     # A class hash covers its members, so a class whose members are all that changed adds nothing.
     changed = {c.symbol.name for c in changes}
     return [
-        c for c in changes
+        c
+        for c in changes
         if not (
             c.symbol.type == "class"
             and c.change_type == "LOGIC_CHANGED"
             and any(name.startswith(f"{c.symbol.name}.") for name in changed)
         )
     ]
+
 
 DOC_WIDTH = 100
 

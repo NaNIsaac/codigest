@@ -11,6 +11,7 @@ wins, so a preset only fills in what was not said.
 Presets are read from the user configuration file and then from the project's
 `.codigest/config.toml`; a project preset replaces a user preset of the same name.
 """
+
 import math
 import os
 from decimal import Decimal
@@ -46,7 +47,7 @@ def _project_config(start: Path) -> Path | None:
 def _preset_from(file: Path, command: str, name: str) -> dict | None:
     try:
         text = file.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return None
     try:
         doc = tomllib.loads(text)
@@ -78,7 +79,9 @@ def _item(value: object) -> str:
         case bool():
             return "true" if value else "false"
         case list():
-            return "[" + ", ".join(f'"{v}"' if isinstance(v, str) else _item(v) for v in value) + "]"
+            return (
+                "[" + ", ".join(f'"{v}"' if isinstance(v, str) else _item(v) for v in value) + "]"
+            )
         case _:
             return str(value)
 

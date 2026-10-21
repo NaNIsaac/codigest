@@ -1,4 +1,5 @@
 """What a script or an agent's shell sees: output on a pipe, code verbatim, outlines it can jump from."""
+
 import pyperclip
 from typer.testing import CliRunner
 

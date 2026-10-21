@@ -1,4 +1,5 @@
 """`cdg cap` options in front of the command, and PowerShell `{ }` blocks."""
+
 import base64
 
 import pytest
@@ -35,5 +36,8 @@ def test_a_block_from_powershell_is_decoded():
     # What PowerShell passes to a program for `{ ls }`.
     encoded = base64.b64encode(" ls ".encode("utf-16-le")).decode()
     assert encoded == "IABsAHMAIAA="
-    assert script_block(["-encodedCommand", encoded, "-inputFormat", "xml", "-outputFormat", "text"]) == " ls "
+    assert (
+        script_block(["-encodedCommand", encoded, "-inputFormat", "xml", "-outputFormat", "text"])
+        == " ls "
+    )
     assert script_block(["pytest", "-q"]) is None

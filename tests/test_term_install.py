@@ -10,22 +10,34 @@ def test_ingest_options_and_output_file(tmp_path, monkeypatch):
     monkeypatch.setenv("CODIGEST_HOME", str(tmp_path / "home"))
     out = tmp_path / "out"
     out.write_bytes("echo 'a' \"b\" $HOME *.py | y\0".encode() + 'say "hi" — ünïcode\n'.encode())
-    result = CliRunner().invoke(term.app, [
-        "ingest", f"--file={out}", "--exit-code=3", f"--cwd={tmp_path}",
-        "--shell=bash", "--start=1700000000,25", "--end=1700000001.5",
-    ])
+    result = CliRunner().invoke(
+        term.app,
+        [
+            "ingest",
+            f"--file={out}",
+            "--exit-code=3",
+            f"--cwd={tmp_path}",
+            "--shell=bash",
+            "--start=1700000000,25",
+            "--end=1700000001.5",
+        ],
+    )
     assert result.exit_code == 0, result.output
     [entry] = termstore.load_entries()
     assert entry.command == "echo 'a' \"b\" $HOME *.py | y"
     assert entry.output == 'say "hi" — ünïcode'
     assert (entry.exit_code, entry.shell, entry.duration_ms) == (3, "bash", 1250)
-    assert entry.cwd == str(tmp_path) and entry.started_at[:2] == "20" and entry.started_at[-6] in "+-"
+    assert (
+        entry.cwd == str(tmp_path) and entry.started_at[:2] == "20" and entry.started_at[-6] in "+-"
+    )
     assert not out.exists()
 
 
 def test_ingest_stdin_json_still_works(tmp_path, monkeypatch):
     monkeypatch.setenv("CODIGEST_HOME", str(tmp_path))
-    result = CliRunner().invoke(term.app, ["ingest"], input='{"command": "ls", "output": "x", "exit_code": 0}')
+    result = CliRunner().invoke(
+        term.app, ["ingest"], input='{"command": "ls", "output": "x", "exit_code": 0}'
+    )
     assert result.exit_code == 0
     assert [e.command for e in termstore.load_entries()] == ["ls"]
 

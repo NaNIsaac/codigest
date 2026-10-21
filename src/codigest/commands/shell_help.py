@@ -1,4 +1,5 @@
 """Optional, reversible PowerShell comment-based help integration."""
+
 from pathlib import Path
 
 import typer
@@ -20,7 +21,7 @@ def _without_block(text: str) -> str:
     end = text.find(_END, start + len(_BEGIN))
     if start < 0 or end < 0:
         return text
-    return (text[:start] + text[end + len(_END):]).strip("\n") + "\n"
+    return (text[:start] + text[end + len(_END) :]).strip("\n") + "\n"
 
 
 def _configure(installing: bool) -> None:

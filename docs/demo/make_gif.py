@@ -13,6 +13,7 @@ GIF is reproducible, but the output must come from a real run:
 
 A scene written as `cmd:file` shows `cdg cap -- cmd` when cmd does not start with cdg.
 """
+
 import re
 import sys
 from pathlib import Path
@@ -26,10 +27,22 @@ FONTS = Path("C:/Windows/Fonts")
 
 BG, FG, DIM_MIX = (13, 17, 23), (201, 209, 217), 0.55
 PALETTE = {
-    30: (72, 79, 88), 31: (255, 123, 114), 32: (63, 185, 80), 33: (210, 153, 34),
-    34: (88, 166, 255), 35: (188, 140, 255), 36: (57, 197, 207), 37: (177, 186, 196),
-    90: (110, 118, 129), 91: (255, 161, 152), 92: (86, 211, 100), 93: (227, 179, 65),
-    94: (121, 192, 255), 95: (210, 168, 255), 96: (86, 212, 221), 97: (240, 246, 252),
+    30: (72, 79, 88),
+    31: (255, 123, 114),
+    32: (63, 185, 80),
+    33: (210, 153, 34),
+    34: (88, 166, 255),
+    35: (188, 140, 255),
+    36: (57, 197, 207),
+    37: (177, 186, 196),
+    90: (110, 118, 129),
+    91: (255, 161, 152),
+    92: (86, 211, 100),
+    93: (227, 179, 65),
+    94: (121, 192, 255),
+    95: (210, 168, 255),
+    96: (86, 212, 221),
+    97: (240, 246, 252),
 }
 PROMPT = [("~/project", (88, 166, 255), False), (" $ ", FG, False)]
 
@@ -53,18 +66,26 @@ def parse(text: str) -> list[list[tuple[str, tuple, bool]]]:
             if end > pos:
                 color = fg or FG
                 if dim:
-                    color = tuple(int(c * DIM_MIX + b * (1 - DIM_MIX)) for c, b in zip(color, BG))
+                    color = tuple(
+                        int(c * DIM_MIX + b * (1 - DIM_MIX)) for c, b in zip(color, BG, strict=True)
+                    )
                 runs.append((raw[pos:end], color, bold))
             if not m:
                 break
             for code in (int(c) for c in (m[1] or "0").split(";") if c):
                 match code:
-                    case 0: fg, bold, dim = None, False, False
-                    case 1: bold = True
-                    case 2: dim = True
-                    case 22: bold = dim = False
-                    case 39: fg = None
-                    case c if c in PALETTE: fg = PALETTE[c]
+                    case 0:
+                        fg, bold, dim = None, False, False
+                    case 1:
+                        bold = True
+                    case 2:
+                        dim = True
+                    case 22:
+                        bold = dim = False
+                    case 39:
+                        fg = None
+                    case c if c in PALETTE:
+                        fg = PALETTE[c]
             pos = m.end()
         lines.append(runs)
     return lines
@@ -126,7 +147,9 @@ def main(scenes: list[str]) -> None:
     snap(1500, cursor=True)
 
     out = Path(__file__).with_name("demo.gif")
-    frames[0].save(out, save_all=True, append_images=frames[1:], duration=durations, loop=0, optimize=True)
+    frames[0].save(
+        out, save_all=True, append_images=frames[1:], duration=durations, loop=0, optimize=True
+    )
     print(f"{out} ({len(frames)} frames, {out.stat().st_size // 1024} KB)")
 
 

@@ -1,4 +1,5 @@
 """A capture file from a command that printed for hours is read from both ends only."""
+
 from codigest.commands import term
 
 

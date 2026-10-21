@@ -1,4 +1,5 @@
 """What `cdg semdiff` prints: numbered symbols, no class entry for method-only changes."""
+
 from typer.testing import CliRunner
 
 from codigest.core import semdiff

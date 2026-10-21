@@ -1,4 +1,5 @@
 """`diff`, `semdiff` and `mark` on a pipe: the payload on stdout, the banners on stderr."""
+
 import subprocess
 
 from typer.testing import CliRunner
@@ -62,6 +63,11 @@ def test_diff_headers_have_a_and_b_prefixes_and_apply_with_git(tmp_path, monkeyp
     old.mkdir()
     (old / "a.py").write_text(before, encoding="utf-8")
     applied = subprocess.run(
-        ["git", "apply", "--check", "-"], input=patch, cwd=old, text=True, capture_output=True, check=False
+        ["git", "apply", "--check", "-"],
+        input=patch,
+        cwd=old,
+        text=True,
+        capture_output=True,
+        check=False,
     )
     assert applied.returncode == 0, applied.stderr

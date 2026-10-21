@@ -22,10 +22,22 @@ def test_language_comes_from_the_extension():
 
 def history() -> list[Entry]:
     return [
-        Entry(command="pytest -q", output="1 failed\nuse ``` here", exit_code=1, cwd="/w",
-              started_at="2026-01-01T10:00:00+09:00", duration_ms=1500, hostname="PC"),
-        Entry(command="echo hi", output="hi", exit_code=0, cwd="/w",
-              started_at="2026-01-01T10:00:05+09:00"),
+        Entry(
+            command="pytest -q",
+            output="1 failed\nuse ``` here",
+            exit_code=1,
+            cwd="/w",
+            started_at="2026-01-01T10:00:00+09:00",
+            duration_ms=1500,
+            hostname="PC",
+        ),
+        Entry(
+            command="echo hi",
+            output="hi",
+            exit_code=0,
+            cwd="/w",
+            started_at="2026-01-01T10:00:05+09:00",
+        ),
     ]
 
 
@@ -52,8 +64,15 @@ def test_term_json_is_an_array_indexed_from_the_latest():
     items = json.loads(termstore.render_json(history()))
     assert [i["index"] for i in items] == [2, 1]
     assert list(items[0]) == [
-        "index", "command", "exit_code", "cwd", "started_at", "duration_ms",
-        "output", "output_available", "truncated",
+        "index",
+        "command",
+        "exit_code",
+        "cwd",
+        "started_at",
+        "duration_ms",
+        "output",
+        "output_available",
+        "truncated",
     ]
     assert "hostname" not in items[0]
     with_context = json.loads(termstore.render_json(history(), include_context=True))
@@ -72,7 +91,9 @@ def test_scan_formats_leave_the_xml_cache_out(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
 
-    md = runner.invoke(app, ["scan", "a.py:2", "b.md", "--format", "markdown", "-m", "fix it", "-s", "--no-copy"])
+    md = runner.invoke(
+        app, ["scan", "a.py:2", "b.md", "--format", "markdown", "-m", "fix it", "-s", "--no-copy"]
+    )
     assert md.exit_code == 0
     assert md.stdout.startswith(f"# {tmp_path.name}\n\nfix it\n\n## Structure\n\n```\n")
     assert "## a.py (lines 2)\n\n```python\n2: y = 2\n```\n\n" in md.stdout

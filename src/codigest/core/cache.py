@@ -2,15 +2,18 @@
 Git Blob Hash-based Content & AST Cache.
 Provides fast caching for scan snapshot blocks and digest AST summaries.
 """
+
 lazy import json
 lazy import hashlib
 from pathlib import Path
 from typing import Any
 
+
 def compute_git_blob_hash(data: bytes) -> str:
     """Computes Git-compatible SHA-1 blob hash for raw bytes."""
     header = f"blob {len(data)}\0".encode("utf-8")
     return hashlib.sha1(header + data).hexdigest()
+
 
 def get_file_blob_hash(file_path: Path) -> str | None:
     """Reads file and computes its Git blob hash."""
@@ -18,6 +21,7 @@ def get_file_blob_hash(file_path: Path) -> str | None:
         return compute_git_blob_hash(file_path.read_bytes())
     except Exception:
         return None
+
 
 # Bump when the shape of a cached block or summary changes, so stale ones are dropped.
 FORMAT = 2
@@ -36,7 +40,7 @@ class ContentCache:
         self._data = {}
         if self.cache_file.exists():
             try:
-                with open(self.cache_file, "r", encoding="utf-8") as f:
+                with open(self.cache_file, encoding="utf-8") as f:
                     self._data = json.load(f)
             except Exception:
                 self._data = {}
@@ -59,14 +63,18 @@ class ContentCache:
         rel_path: str,
         blob_hash: str | None = None,
         line_numbers: bool = False,
-        file_path: Path | None = None
+        file_path: Path | None = None,
     ) -> str | None:
         # [1] Fast path: Stat check if file_path is provided
         if file_path is not None:
             try:
                 stat = file_path.stat()
                 entry = self._data.get("files", {}).get(rel_path)
-                if entry and entry.get("mtime_ns") == stat.st_mtime_ns and entry.get("size") == stat.st_size:
+                if (
+                    entry
+                    and entry.get("mtime_ns") == stat.st_mtime_ns
+                    and entry.get("size") == stat.st_size
+                ):
                     if (block := entry.get("blocks", {}).get(str(line_numbers))) is not None:
                         self.hits += 1
                         return block
@@ -97,7 +105,7 @@ class ContentCache:
         blob_hash: str | None,
         line_numbers: bool,
         block: str,
-        file_path: Path | None = None
+        file_path: Path | None = None,
     ) -> None:
         entry = self._data.setdefault("files", {}).setdefault(rel_path, {"blocks": {}})
         if blob_hash:
@@ -113,12 +121,18 @@ class ContentCache:
 
         entry.setdefault("blocks", {})[str(line_numbers)] = block
 
-    def get_summary(self, rel_path: str, blob_hash: str, file_path: Path | None = None) -> str | None:
+    def get_summary(
+        self, rel_path: str, blob_hash: str, file_path: Path | None = None
+    ) -> str | None:
         if file_path is not None:
             try:
                 stat = file_path.stat()
                 entry = self._data.get("summaries_meta", {}).get(rel_path)
-                if entry and entry.get("mtime_ns") == stat.st_mtime_ns and entry.get("size") == stat.st_size:
+                if (
+                    entry
+                    and entry.get("mtime_ns") == stat.st_mtime_ns
+                    and entry.get("size") == stat.st_size
+                ):
                     if (summary := entry.get("summary")) is not None:
                         self.hits += 1
                         return summary
@@ -132,7 +146,9 @@ class ContentCache:
             self.misses += 1
         return val
 
-    def set_summary(self, rel_path: str, blob_hash: str, summary: str, file_path: Path | None = None) -> None:
+    def set_summary(
+        self, rel_path: str, blob_hash: str, summary: str, file_path: Path | None = None
+    ) -> None:
         self._data.setdefault("summaries", {})[f"{rel_path}:{blob_hash}"] = summary
 
         if file_path is not None:
@@ -143,7 +159,7 @@ class ContentCache:
                     "mtime_ns": stat.st_mtime_ns,
                     "size": stat.st_size,
                     "blob_hash": blob_hash,
-                    "summary": summary
+                    "summary": summary,
                 }
             except Exception:
                 pass

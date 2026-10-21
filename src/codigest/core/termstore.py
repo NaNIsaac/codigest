@@ -12,6 +12,7 @@ Layout:
 Storage is a ring buffer: at most MAX_ENTRIES entries, each output capped at
 MAX_OUTPUT_BYTES (head + tail preserved, middle elided).
 """
+
 lazy import html
 lazy import json
 import os
@@ -45,6 +46,7 @@ _ANSI_RE = re.compile(
 # Paths
 # --------------------------------------------------------------------------
 
+
 def get_data_dir() -> Path:
     """
     Resolves the machine-global Codigest data directory.
@@ -74,6 +76,7 @@ def get_history_path() -> Path:
 # Entry model
 # --------------------------------------------------------------------------
 
+
 @dataclass(slots=True)
 class Entry:
     command: str
@@ -97,6 +100,7 @@ class Entry:
 # --------------------------------------------------------------------------
 # Output normalization
 # --------------------------------------------------------------------------
+
 
 def strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text)
@@ -134,6 +138,7 @@ def _truncate(text: str) -> tuple[str, bool]:
 # Read / write
 # --------------------------------------------------------------------------
 
+
 def _inside(path: str, root: Path) -> bool:
     path, base = (os.path.normcase(os.path.abspath(p)) for p in (path, root))
     return path == base or path.startswith(base.rstrip(os.sep) + os.sep)
@@ -155,13 +160,13 @@ def load_entries() -> list[Entry]:
         return []
 
     entries: list[Entry] = []
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8", errors="replace") as f:
         for raw in f:
             if not (line := raw.strip()):
                 continue
             try:
                 entries.append(Entry.from_dict(json.loads(line)))
-            except (json.JSONDecodeError, TypeError):
+            except json.JSONDecodeError, TypeError:
                 continue
     # Shell-hook ingests run in background processes and may land out of order.
     entries.sort(key=lambda e: e.started_at)
@@ -202,7 +207,7 @@ def append_entry(entry: Entry, allow_secrets: bool = False) -> None:
 
 def _trim(path: Path) -> None:
     """Rewrites the log keeping only the most recent MAX_ENTRIES lines."""
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
     # No file lock: Concurrent hook ingests can drop an entry appended
     # between read and replace; the slack makes rewrites (and that window) rare.
@@ -238,6 +243,7 @@ def clear() -> int:
 # --------------------------------------------------------------------------
 # Rendering
 # --------------------------------------------------------------------------
+
 
 def _fmt_duration(ms: int) -> str:
     if ms < 1000:
@@ -284,11 +290,7 @@ def render(entries: list[Entry], *, include_context: bool = False) -> str:
         if entry.note:
             body.append(f"<note>{tags.escape_xml_value(entry.note)}</note>")
         if entry.captured or entry.output:
-            body.append(
-                "<output>\n"
-                + tags.escape_xml_value(entry.output)
-                + "\n</output>"
-            )
+            body.append("<output>\n" + tags.escape_xml_value(entry.output) + "\n</output>")
         blocks.append(header + "\n" + "\n".join(body) + "\n</command>")
 
     return "<terminal_history>\n" + "\n".join(blocks) + "\n</terminal_history>"

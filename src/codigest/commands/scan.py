@@ -5,7 +5,15 @@ from pathlib import Path
 import typer
 
 from ..core.formats import Format, fenced
-from ..options import CopyOption, FormatOption, StdoutOption, ResolveOption, MessageOption, AllOption, OutputOption
+from ..options import (
+    CopyOption,
+    FormatOption,
+    StdoutOption,
+    ResolveOption,
+    MessageOption,
+    AllOption,
+    OutputOption,
+)
 
 lazy from rich.filesize import decimal
 lazy import json
@@ -51,7 +59,9 @@ def handle(
     stdout: StdoutOption = False,
     all: AllOption = False,
     message: MessageOption = "",
-    line_numbers: bool = typer.Option(False, "--lines", "-l", help="Add line numbers to code blocks"),
+    line_numbers: bool = typer.Option(
+        False, "--lines", "-l", help="Add line numbers to code blocks"
+    ),
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation prompt"),
     resolve: ResolveOption = False,
     format: FormatOption = Format.XML,
@@ -71,28 +81,24 @@ def handle(
 
     # [2] File Discovery via Context
     with spinner(log_console, "[bold blue]Scanning...[/bold blue]"):
-
-        
-        files = ctx.get_target_files(
-            targets=targets,
-            ignore_config=all,
-            resolve_deps=resolve
-        )
-
+        files = ctx.get_target_files(targets=targets, ignore_config=all, resolve_deps=resolve)
 
     # [3] Pre-flight Check
     total_files = len(files)
     # A range of a big file is small: count what will be shared, not the whole file.
     total_size = sum(
         sum(len(processor.read_line_range(f, lo, hi)[0]) for lo, hi in ranges[f])
-        if f in ranges else f.stat().st_size
+        if f in ranges
+        else f.stat().st_size
         for f in files
     )
     est_tokens = int(total_size / 4)
 
     if ctx.withheld:
         names = ", ".join(p.relative_to(root_path).as_posix() for p in ctx.withheld)
-        log_console.print(f"[yellow]Withheld (may contain secrets):[/yellow] {names}", highlight=False)
+        log_console.print(
+            f"[yellow]Withheld (may contain secrets):[/yellow] {names}", highlight=False
+        )
 
     TOKEN_THRESHOLD = 30000
     FILE_COUNT_THRESHOLD = 100
@@ -126,7 +132,6 @@ def handle(
 
     # [4] Execution
     with spinner(log_console, "[bold blue]Generating Snapshot...[/bold blue]"):
-
         tree_str = structure.generate_ascii_tree(files, root_path)
 
         content_cache = cache.ContentCache(root_path)
@@ -145,9 +150,7 @@ def handle(
                 continue
 
             cached_block = content_cache.get_file_block(
-                rel_path=rel_path,
-                line_numbers=line_numbers,
-                file_path=file_path
+                rel_path=rel_path, line_numbers=line_numbers, file_path=file_path
             )
 
             if cached_block is not None:
@@ -163,7 +166,7 @@ def handle(
                         blob_hash=blob_hash,
                         line_numbers=line_numbers,
                         block=block,
-                        file_path=file_path
+                        file_path=file_path,
                     )
                 except Exception:
                     continue
@@ -178,7 +181,7 @@ def handle(
                 project_name=root_path.name,
                 tree_structure=tree_str,
                 source_code=source_code_blob,
-                instruction=message
+                instruction=message,
             )
         except Exception as e:
             log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")

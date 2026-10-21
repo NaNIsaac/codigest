@@ -5,6 +5,8 @@ Terminal output routinely contains credentials (API keys, tokens, connection
 strings, `env` dumps). Since captured output is meant to be pasted into an LLM,
 redaction runs before anything is written to disk -- never at read time.
 """
+
+import itertools
 import re
 
 MASK = "[REDACTED]"
@@ -136,7 +138,7 @@ def redact_diff(diff: str) -> str:
         return diff
     starts = [m.start() for m in _DIFF_SECTION_RE.finditer(diff)] + [len(diff)]
     parts = [diff[: starts[0]]]
-    for begin, end in zip(starts, starts[1:]):
+    for begin, end in itertools.pairwise(starts):
         section = diff[begin:end]
         name = section.split("\n", 1)[0].split()[-1].rsplit("/", 1)[-1]
         if is_secret_file(name):

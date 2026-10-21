@@ -3,6 +3,7 @@ Dependency Resolver Module.
 Finds the project files a file imports: Python through its AST, JS/TS through
 relative import specifiers. `scan -r` follows them recursively, `pack` one hop.
 """
+
 lazy import ast
 import re
 import sys
@@ -11,22 +12,27 @@ from pathlib import Path
 
 JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
 # Relative specifiers only: `from './x'`, `import './x'`, `require('./x')`, `import('./x')`.
-JS_IMPORT_RE = re.compile(r"""(?:\bfrom|\bimport|\brequire\(|\bimport\()\s*['"](\.{1,2}/[^'"]+)['"]""")
+JS_IMPORT_RE = re.compile(
+    r"""(?:\bfrom|\bimport|\brequire\(|\bimport\()\s*['"](\.{1,2}/[^'"]+)['"]"""
+)
 
 
 def js_imports(path: Path) -> set[Path]:
     """Files a JS/TS module imports by relative path, resolved the way bundlers and tsc do."""
     try:
         source = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return set()
     found = set()
     for spec in JS_IMPORT_RE.findall(source):
         base = (path.parent / spec).resolve()
         # TS ESM code imports `./x.js` for a file that is `x.ts` on disk.
         stem = base.with_suffix("") if base.suffix in JS_SUFFIXES else base
-        for candidate in (base, *(stem.with_name(stem.name + s) for s in JS_SUFFIXES),
-                          *(base / f"index{s}" for s in JS_SUFFIXES)):
+        for candidate in (
+            base,
+            *(stem.with_name(stem.name + s) for s in JS_SUFFIXES),
+            *(base / f"index{s}" for s in JS_SUFFIXES),
+        ):
             if candidate.is_file():
                 found.add(candidate)
                 break
@@ -37,7 +43,7 @@ class DependencyResolver:
     def __init__(self, root_path: Path):
         self.root_path = root_path.resolve()
         self.visited: set[Path] = set()
-        
+
         self.resolve_cache: dict[str, Path | None] = {}
 
         self.stdlib_names = self._get_stdlib_names()
@@ -71,7 +77,7 @@ class DependencyResolver:
                     self.visited.add(dep_path)
                     queue.append(dep_path)
                     results.add(dep_path)
-        
+
         return sorted(results)
 
     def get_imports(self, file_path: Path) -> set[Path]:
@@ -106,9 +112,11 @@ class DependencyResolver:
 
         return local_deps
 
-    def _check_cache_and_resolve(self, module_name: str, level: int, current_file: Path) -> Path | None:
+    def _check_cache_and_resolve(
+        self, module_name: str, level: int, current_file: Path
+    ) -> Path | None:
         """Wrapper to handle caching logic."""
-        
+
         # 1. 표준 라이브러리면 즉시 탈락 (I/O 없음)
         if level == 0 and module_name.split(".")[0] in self.stdlib_names:
             return None
@@ -116,14 +124,14 @@ class DependencyResolver:
         # 2. 상대 경로(level > 0)는 문맥(current_file)에 따라 달라지므로 캐싱 불가 -> 직접 해결
         if level > 0:
             return self._resolve_import_path(module_name, level, current_file)
-        
+
         # 3. 절대 경로(import A.B)는 캐시 확인
         if module_name in self.resolve_cache:
             return self.resolve_cache[module_name]
-        
+
         # 4. 캐시에 없으면 파일 시스템 조회 수행
         result = self._resolve_import_path(module_name, level, current_file)
-        
+
         # 5. 결과 캐싱 (찾았든 못 찾았든)
         self.resolve_cache[module_name] = result
         return result
@@ -146,9 +154,9 @@ class DependencyResolver:
         else:
             # Absolute Import Priorities
             candidates = [
-                current_file.parent.joinpath(*parts),       # 1. Sibling (같은 폴더)
-                self.root_path.joinpath(*parts),            # 2. Project Root
-                self.root_path.joinpath("src", *parts),     # 3. Project Root/src
+                current_file.parent.joinpath(*parts),  # 1. Sibling (같은 폴더)
+                self.root_path.joinpath(*parts),  # 2. Project Root
+                self.root_path.joinpath("src", *parts),  # 3. Project Root/src
             ]
 
         # Check existence
@@ -159,6 +167,7 @@ class DependencyResolver:
                     return p.resolve()
 
         return None
+
 
 def resolve_dependencies(root_path: Path, files: list[Path]) -> list[Path]:
     resolver = DependencyResolver(root_path)

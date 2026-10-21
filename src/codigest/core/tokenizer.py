@@ -1,7 +1,9 @@
 """
 Lightweight Token Estimator.
 """
+
 import math
+
 
 def estimate_tokens(text: str) -> int:
     """

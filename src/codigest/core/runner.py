@@ -9,6 +9,7 @@ stdout and stderr are merged into a single pipe on purpose: the interleaved
 stream is what the user actually saw, and that ordering is what makes the
 capture useful as LLM context.
 """
+
 import os
 lazy import shlex
 lazy import shutil

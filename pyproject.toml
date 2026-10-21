@@ -41,6 +41,9 @@ build-backend = "uv_build"
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+extend-select = ["B", "I", "UP"]
+
 # violations present when ruff became mandatory in CI; remove entries as they are fixed
 [tool.ruff.lint.extend-per-file-ignores]
 "src/codigest/commands/cap.py" = ["I001"]

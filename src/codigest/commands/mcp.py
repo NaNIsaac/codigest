@@ -12,6 +12,7 @@ dependency would only add install weight.
 Project tools shell out to the regular CLI (`-s --no-copy`), so the agent sees
 exactly what a human would paste, and stdout stays clean for the protocol.
 """
+
 import json
 import subprocess
 import sys
@@ -42,8 +43,17 @@ TOOLS: list[JSON] = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "count": {"type": "integer", "minimum": 1, "default": 1, "description": "How many recent commands"},
-                "failed": {"type": "boolean", "default": False, "description": "Only commands that exited non-zero"},
+                "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1,
+                    "description": "How many recent commands",
+                },
+                "failed": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Only commands that exited non-zero",
+                },
                 "here": {
                     "type": "boolean",
                     "default": True,
@@ -63,8 +73,17 @@ TOOLS: list[JSON] = [
             "type": "object",
             "properties": {
                 **_MESSAGE_PROP,
-                "targets": {"type": "array", "items": {"type": "string"}, "description": "Files/dirs to include first"},
-                "budget": {"type": "integer", "minimum": 1000, "default": 30000, "description": "Estimated token budget"},
+                "targets": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Files/dirs to include first",
+                },
+                "budget": {
+                    "type": "integer",
+                    "minimum": 1000,
+                    "default": 30000,
+                    "description": "Estimated token budget",
+                },
                 "with": {
                     "type": "array",
                     "items": {"enum": ["failure", "changes", "tests", "imports"]},
@@ -81,8 +100,16 @@ TOOLS: list[JSON] = [
             "properties": {
                 **_PATH_PROP,
                 **_MESSAGE_PROP,
-                "targets": {"type": "array", "items": {"type": "string"}, "description": "Limit to these files/dirs"},
-                "resolve": {"type": "boolean", "default": False, "description": "Follow imports of the targets"},
+                "targets": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Limit to these files/dirs",
+                },
+                "resolve": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Follow imports of the targets",
+                },
             },
         },
     },
@@ -123,7 +150,9 @@ def _terminal_history(args: JSON) -> str:
             entry.command = redact(entry.command)
         return termstore.render(entries)
     under = Path.cwd() if args.get("here", True) else None
-    return termstore.render(termstore.select(entries, failed=bool(args.get("failed")), under=under)[-count:])
+    return termstore.render(
+        termstore.select(entries, failed=bool(args.get("failed")), under=under)[-count:]
+    )
 
 
 def _in_project(raw: str) -> str:
@@ -149,13 +178,19 @@ def _cli(command: str, args: JSON) -> str:
         argv += ["-b", str(int(budget))]
     match command:
         case "scan" | "pack":
-            argv += [_in_project(t) for t in args.get("targets") or []] or ([_in_project(args["path"])] if "path" in args else [])
+            argv += [_in_project(t) for t in args.get("targets") or []] or (
+                [_in_project(args["path"])] if "path" in args else []
+            )
         case _ if "path" in args:
             argv.append(_in_project(args["path"]))
 
-    result = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    result = subprocess.run(
+        argv, capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}")
+        raise RuntimeError(
+            result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
+        )
     return result.stdout
 
 
@@ -201,7 +236,11 @@ def handle_message(msg: JSON) -> JSON | None:
         case _ if msg_id is None:
             return None  # notifications (initialized, cancelled, ...) need no reply
         case method:
-            return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
+            return {
+                "jsonrpc": "2.0",
+                "id": msg_id,
+                "error": {"code": -32601, "message": f"Method not found: {method}"},
+            }
 
     return None if msg_id is None else {"jsonrpc": "2.0", "id": msg_id, "result": result}
 
@@ -216,7 +255,11 @@ def handle() -> None:
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
-            response: JSON | None = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
+            response: JSON | None = {
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32700, "message": "Parse error"},
+            }
         else:
             response = handle_message(msg)
         if response is not None:

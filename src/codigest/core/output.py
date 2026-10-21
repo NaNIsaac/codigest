@@ -2,6 +2,7 @@
 Unified Output Handler for CLI commands.
 Manages stderr log console, clipboard copying, and file vs stdout output.
 """
+
 import base64
 import contextlib
 import os
@@ -86,7 +87,9 @@ class OutputHandler:
         if use_osc52():
             try:
                 send_osc52(content)
-                self.log_console.print(f"[dim]Sent {item_name} to the terminal clipboard (OSC 52)[/dim]")
+                self.log_console.print(
+                    f"[dim]Sent {item_name} to the terminal clipboard (OSC 52)[/dim]"
+                )
             except OSError:
                 self.log_console.print(
                     "[yellow]No terminal to send the clipboard to; use -s to print instead[/yellow]"
@@ -96,13 +99,12 @@ class OutputHandler:
             pyperclip.copy(content)
             self.log_console.print(f"[dim]Copied {item_name} to clipboard[/dim]")
         except Exception:
-            self.log_console.print("[yellow]Clipboard unavailable; use -s to print instead[/yellow]")
+            self.log_console.print(
+                "[yellow]Clipboard unavailable; use -s to print instead[/yellow]"
+            )
 
     def handle_output(
-        self, 
-        content: str, 
-        summary: Callable[[], None] | None = None,
-        item_name: str = "output"
+        self, content: str, summary: Callable[[], None] | None = None, item_name: str = "output"
     ) -> None:
         """
         Clipboard unless --no-copy, the file given with -o, and stdout with -s.
@@ -114,7 +116,9 @@ class OutputHandler:
         self.copy_to_clipboard(content, item_name=item_name)
         if self.output:
             self.output.write_text(content + "\n", encoding="utf-8")
-            self.log_console.print(f"[dim]Wrote {item_name} to {self.output}[/dim]", highlight=False)
+            self.log_console.print(
+                f"[dim]Wrote {item_name} to {self.output}[/dim]", highlight=False
+            )
 
         if self.stdout:
             print(content)
