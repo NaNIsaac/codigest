@@ -1,5 +1,6 @@
-from codigest.commands import shell_help
 from typer.testing import CliRunner
+
+from codigest.commands import shell_help
 
 
 def test_help_install_is_idempotent_and_uninstall_preserves_profile(tmp_path, monkeypatch):
@@ -31,7 +32,7 @@ def test_help_script_does_not_override_help_or_capture():
 
 
 def test_unavailable_powershell_fails_without_mutating_files(monkeypatch):
-    monkeypatch.setattr(shell_help.term, "_powershell_profiles", lambda: [])
+    monkeypatch.setattr(shell_help.term, "_powershell_profiles", list)
     result = CliRunner().invoke(shell_help.app, ["install"])
     assert result.exit_code == 1
     assert "PowerShell not found" in result.output
