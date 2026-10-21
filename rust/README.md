@@ -31,7 +31,7 @@ How parity is checked:
 - Integration tests run each command in a temporary project with both builds and compare
   stdout byte for byte and the exit code.
 - The Python outline used by `digest` reproduces `ast.unparse`; `scripts/outline_parity.py`
-  compares the two builds file by file (1,747 files across 30 repositories: no differences).
+  compares the two builds file by file (1,747 files across the 40 repositories checked out next to this one: no differences).
 - Import resolution (`-r`, `pack`) was compared on five repositories: no differences.
 
 ## Speed
