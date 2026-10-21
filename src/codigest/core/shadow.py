@@ -190,7 +190,7 @@ class ContextAnchor:
             self._prune_ignored_files(temp_baseline, current_rel_paths)
 
             result = subprocess.run(
-                ["git", "diff", "--no-index", "--no-prefix", "temp_diff_baseline", "temp_diff_current"],
+                ["git", "diff", "--no-index", "temp_diff_baseline", "temp_diff_current"],
                 cwd=self.root / ".codigest",
                 capture_output=True, text=True, encoding='utf-8', errors='replace'
             )

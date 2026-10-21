@@ -5,7 +5,7 @@ from rich.console import Console
 
 lazy from ..core import common, shadow
 
-console = Console()
+console = Console(stderr=True)
 
 
 def handle(
