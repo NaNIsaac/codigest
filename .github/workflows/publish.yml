@@ -48,4 +48,9 @@ jobs:
     - name: Publish
       run: |
         ./mcp-publisher login github-oidc
-        ./mcp-publisher publish
+        # The registry checks PyPI itself and can still miss a release the JSON API already shows.
+        for i in $(seq 6); do
+          ./mcp-publisher publish && exit 0
+          sleep 30
+        done
+        exit 1
