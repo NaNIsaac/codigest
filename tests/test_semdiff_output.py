@@ -72,3 +72,13 @@ def test_lines_are_numbered_like_digest_and_keep_the_signature_only_when_it_chan
     assert "[LOGIC]     13: function helper\n" in out
     assert "Implementation changed" not in out
     assert "class Box" not in out
+
+
+def test_a_change_in_a_body_too_deep_for_unparse_is_still_found():
+    def table(last: str) -> str:
+        return "def total(x):\n    return " + " + ".join(["x"] * 600 + [last]) + "\n"
+
+    changes = semdiff.compare(table("1"), table("2"))
+    assert [(c.change_type, c.symbol.name) for c in changes] == [("LOGIC_CHANGED", "total")]
+    # Formatting alone is still not a change.
+    assert semdiff.compare(table("1"), table("1").replace(" + ", "+")) == []
