@@ -73,12 +73,18 @@ def common(
 ) -> None:
     pass
 
-def main() -> None:
+def cli() -> None:
+    """The `cdg` command: `app` with `--preset NAME` expanded first."""
     try:
-        app(args=presets.expand(sys.argv[1:]))
+        argv = presets.expand(sys.argv[1:])
     except presets.PresetError as e:
         Console(stderr=True).print(f"[red]Error:[/red] {escape(str(e))}", highlight=False, soft_wrap=True)
         sys.exit(2)
+    app(args=argv)
+
+def main() -> None:
+    try:
+        cli()
     except typer.Exit:
         raise
     except Exception as e:

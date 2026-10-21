@@ -31,8 +31,8 @@ Repository = "https://github.com/NaNIsaac/codigest"
 Issues = "https://github.com/NaNIsaac/codigest/issues"
 
 [project.scripts]
-codigest = "codigest.main:app"
-cdg = "codigest.main:app"
+codigest = "codigest.main:cli"
+cdg = "codigest.main:cli"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13"]
