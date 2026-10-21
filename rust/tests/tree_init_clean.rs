@@ -27,10 +27,9 @@ fn tree_of_a_folder_with_nothing_to_show_warns_and_succeeds() {
 }
 
 #[test]
-fn tree_rejects_depth_zero_and_resolve() {
+fn tree_rejects_depth_zero() {
     let fx = Fixture::new();
     assert_eq!(fx.rust(&["tree", "-L", "0"]).code, 2);
-    assert_eq!(fx.rust(&["tree", "-r"]).code, 2);
 }
 
 #[test]

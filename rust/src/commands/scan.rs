@@ -96,10 +96,6 @@ fn parse_targets(raw: &[String]) -> Result<Targets, String> {
 }
 
 pub fn run(args: ScanArgs) -> anyhow::Result<i32> {
-    if args.resolve {
-        eprintln!("--resolve is not supported yet in this build.");
-        return Ok(2);
-    }
     let out = Output::new(&args.out, true);
     let targets = match parse_targets(&args.targets) {
         Ok(targets) => targets,
@@ -112,7 +108,7 @@ pub fn run(args: ScanArgs) -> anyhow::Result<i32> {
     let root = ctx.root_path.clone();
     let engine = prompts::get_engine(&root);
 
-    let files = ctx.get_target_files(&targets.paths, args.all)?;
+    let files = ctx.get_target_files(&targets.paths, args.all, args.resolve)?;
 
     // A range of a big file is small: count what will be shared, not the whole file.
     let mut total_size: u64 = 0;

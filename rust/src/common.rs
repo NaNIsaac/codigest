@@ -9,6 +9,7 @@ use anyhow::Result;
 
 use crate::pypath;
 use crate::redact::is_secret_file;
+use crate::resolver::Resolver;
 use crate::scanner;
 use crate::style::yellow;
 
@@ -48,6 +49,7 @@ impl ProjectContext {
         &mut self,
         targets: &[PathBuf],
         ignore_config: bool,
+        resolve_deps: bool,
     ) -> Result<Vec<PathBuf>> {
         let scope: Vec<PathBuf> = targets.iter().map(|t| pypath::resolve(t)).collect();
         let (extensions, ignores) = if ignore_config {
@@ -80,6 +82,12 @@ impl ProjectContext {
             &ignores,
             Some(scope).filter(|s| !s.is_empty()),
         )?;
+
+        let files = if resolve_deps {
+            Resolver::new(&self.root_path).resolve(&files)
+        } else {
+            files
+        };
 
         let secret = |f: &PathBuf| is_secret_file(&pypath::name(f));
         let mut withheld: Vec<PathBuf> = files.iter().filter(|f| secret(f)).cloned().collect();
@@ -278,7 +286,7 @@ mod tests {
             config_extensions: None,
             config_ignores: Vec::new(),
         };
-        let files = ctx.get_target_files(&[], false).unwrap();
+        let files = ctx.get_target_files(&[], false, false).unwrap();
         let rels: Vec<String> = files
             .iter()
             .map(|f| pypath::rel_posix(f, &root).unwrap())

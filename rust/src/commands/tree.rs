@@ -30,16 +30,12 @@ pub struct TreeArgs {
 }
 
 pub fn run(args: TreeArgs) -> anyhow::Result<i32> {
-    if args.resolve {
-        eprintln!("--resolve is not supported yet in this build.");
-        return Ok(2);
-    }
     let out = Output::new(&args.out, false);
     let targets = [args.target];
     let mut ctx = ProjectContext::new(&targets)?;
     let root = ctx.root_path.clone();
 
-    let files = match ctx.get_target_files(&targets, args.all) {
+    let files = match ctx.get_target_files(&targets, args.all, args.resolve) {
         Ok(files) => files,
         Err(err) => {
             out.log(&format!("{} {err}", red("[Error] Scan failed:")));

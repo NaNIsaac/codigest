@@ -92,14 +92,6 @@ fn scan_bad_target_is_a_usage_error() {
 }
 
 #[test]
-fn scan_resolve_is_not_supported_yet() {
-    let fx = Fixture::sample();
-    let run = fx.rust(&["scan", "-r"]);
-    assert_eq!(run.code, 2);
-    assert!(run.stderr.contains("not supported yet"));
-}
-
-#[test]
 fn a_large_project_stops_when_nobody_can_answer() {
     let fx = Fixture::new();
     fx.write("big.py", &"x = 1\n".repeat(25_000));
