@@ -85,3 +85,4 @@ tree.txt
 
 # Temporary test outputs
 test_output/
+rust/target/
