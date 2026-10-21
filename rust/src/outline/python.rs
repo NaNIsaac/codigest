@@ -298,6 +298,84 @@ impl Collector<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Change {
+    Added,
+    Removed,
+    /// The signature changed: what callers see.
+    Modified,
+    LogicChanged,
+}
+
+#[derive(Debug, Clone)]
+pub struct SemanticChange {
+    pub change: Change,
+    pub symbol: Symbol,
+    pub details: String,
+}
+
+impl Kind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Kind::Function => "function",
+            Kind::AsyncFunction => "async_function",
+            Kind::Method => "method",
+            Kind::Class => "class",
+            Kind::Variable => "variable",
+            Kind::Attribute => "attribute",
+        }
+    }
+}
+
+/// Symbol-level changes between two versions of a file, in name order.
+pub fn compare(old_code: &str, new_code: &str) -> Vec<SemanticChange> {
+    let symbols = |code: &str| parse(code).map(|p| p.symbols).unwrap_or_default();
+    let (old, new) = (symbols(old_code), symbols(new_code));
+    let mut names: Vec<&String> = old.iter().chain(new.iter()).map(|s| &s.name).collect();
+    names.sort();
+    names.dedup();
+    let find = |list: &[Symbol], name: &str| list.iter().find(|s| s.name == name).cloned();
+    let mut changes = Vec::new();
+    for name in names {
+        let change = match (find(&old, name), find(&new, name)) {
+            (None, Some(n)) => SemanticChange {
+                change: Change::Added,
+                symbol: n,
+                details: String::new(),
+            },
+            (Some(o), None) => SemanticChange {
+                change: Change::Removed,
+                symbol: o,
+                details: String::new(),
+            },
+            (Some(o), Some(n)) if o.signature != n.signature => SemanticChange {
+                change: Change::Modified,
+                details: format!("{} -> {}", o.signature, n.signature),
+                symbol: n,
+            },
+            (Some(o), Some(n)) if o.content_hash != n.content_hash => SemanticChange {
+                change: Change::LogicChanged,
+                symbol: n,
+                details: "Implementation changed".into(),
+            },
+            _ => continue,
+        };
+        changes.push(change);
+    }
+    // A class hash covers its members, so a class whose members are all that changed adds nothing.
+    let changed: Vec<String> = changes.iter().map(|c| c.symbol.name.clone()).collect();
+    changes
+        .into_iter()
+        .filter(|c| {
+            !(c.symbol.kind == Kind::Class
+                && c.change == Change::LogicChanged
+                && changed
+                    .iter()
+                    .any(|n| n.starts_with(&format!("{}.", c.symbol.name))))
+        })
+        .collect()
+}
+
 fn insert(out: &mut Vec<Symbol>, symbol: Symbol) {
     match out.iter_mut().find(|s| s.name == symbol.name) {
         Some(existing) => *existing = symbol,
