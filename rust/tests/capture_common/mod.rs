@@ -25,6 +25,17 @@ pub fn rust_exe() -> PathBuf {
 /// The Python reference. `CODIGEST_PY` names a Python that can import `codigest` (the
 /// repository's `src` is put on its path, so the checkout is what gets compared);
 /// without it the installed `cdg` on PATH is used.
+/// The `cdg` on PATH outside cargo's target folder, which cargo puts on PATH on Windows.
+fn installed_cdg() -> PathBuf {
+    let own = std::fs::canonicalize(rust_exe().parent().unwrap()).unwrap();
+    let exe = if cfg!(windows) { "cdg.exe" } else { "cdg" };
+    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .filter(|dir| std::fs::canonicalize(dir).is_ok_and(|dir| !dir.starts_with(&own)))
+        .map(|dir| dir.join(exe))
+        .find(|path| path.is_file())
+        .expect("no Python cdg on PATH outside the cargo target folder")
+}
+
 pub fn python(home: &Path) -> Process {
     let mut cmd = match std::env::var_os("CODIGEST_PY") {
         Some(py) => {
@@ -34,7 +45,7 @@ pub fn python(home: &Path) -> Process {
             cmd.env("PYTHONPATH", src);
             cmd
         }
-        None => Process::new(codigest::runner::which("cdg").unwrap_or_else(|| "cdg".into())),
+        None => Process::new(installed_cdg()),
     };
     cmd.env("CODIGEST_HOME", home)
         .env("NO_COLOR", "1")
@@ -52,6 +63,16 @@ pub fn require_parity() {
     assert!(
         std::env::var("CODIGEST_PARITY").is_ok_and(|v| v == "1"),
         "parity tests compare against the Python build: set CODIGEST_PARITY=1"
+    );
+    // a stale Python build would pass for whatever both happen to share
+    let out = python(tempfile::tempdir().unwrap().path())
+        .arg("--version")
+        .output()
+        .expect("the Python cdg runs");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        format!("codigest {}", env!("CARGO_PKG_VERSION")),
+        "the Python build is a different version from this crate"
     );
 }
 

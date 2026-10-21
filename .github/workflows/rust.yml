@@ -3,9 +3,9 @@ name: Rust
 on:
   push:
     branches: [main]
-    paths: ["rust/**", "src/codigest/shell/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/**", "pyproject.toml", "uv.lock", ".github/workflows/rust.yml"]
   pull_request:
-    paths: ["rust/**", "src/codigest/shell/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/**", "pyproject.toml", "uv.lock", ".github/workflows/rust.yml"]
 
 defaults:
   run:
@@ -29,3 +29,33 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+
+  # Rust output against the Python build of the same commit, byte for byte.
+  parity:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - uses: astral-sh/setup-uv@v10.3.0
+      - run: uv python install 3.15 && uv sync --python 3.15
+        working-directory: .
+        shell: bash
+      - name: Compare with the Python build
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            bin="$(cygpath -u "$GITHUB_WORKSPACE")/.venv/Scripts"
+            export CODIGEST_PY="$GITHUB_WORKSPACE/.venv/Scripts/python.exe"
+          else
+            bin="$GITHUB_WORKSPACE/.venv/bin"
+            export CODIGEST_PY="$bin/python"
+          fi
+          export PATH="$bin:$PATH" CODIGEST_PARITY=1
+          cargo test --no-fail-fast -- --include-ignored

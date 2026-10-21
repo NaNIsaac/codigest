@@ -97,7 +97,8 @@ impl Fixture {
     }
 
     pub fn python(&self, args: &[&str]) -> Run {
-        self.run("cdg", args, None)
+        let cdg = python_cdg();
+        self.run(&cdg.to_string_lossy(), args, None)
     }
 }
 
@@ -148,13 +149,42 @@ pub fn run_in(cwd: &Path, home: &Path, program: &str, args: &[&str], stdin: Opti
     }
 }
 
+/// The Python `cdg` on PATH. On Windows cargo puts its own target folder on PATH, where a
+/// bare `cdg` finds this crate's binary and the parity tests compare it with itself.
+pub fn python_cdg() -> PathBuf {
+    let own = fs::canonicalize(Path::new(RUST).parent().unwrap()).unwrap();
+    let exe = if cfg!(windows) { "cdg.exe" } else { "cdg" };
+    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .filter(|dir| fs::canonicalize(dir).is_ok_and(|dir| !dir.starts_with(&own)))
+        .map(|dir| dir.join(exe))
+        .find(|path| path.is_file())
+        .expect("no Python cdg on PATH outside the cargo target folder")
+}
+
 /// True when the parity tests were asked for. They need the Python `cdg` on PATH.
 pub fn parity_enabled() -> bool {
     let on = std::env::var("CODIGEST_PARITY").is_ok_and(|v| v == "1");
     if !on {
         eprintln!("skipped: set CODIGEST_PARITY=1 to compare with the Python build");
+    } else {
+        assert_python_version(&python_cdg());
     }
     on
+}
+
+/// Parity against an older Python build passes for whatever both happen to share, so a
+/// stale `cdg` on PATH must fail instead.
+pub fn assert_python_version(cdg: &Path) {
+    let out = Command::new(cdg)
+        .arg("--version")
+        .output()
+        .expect("the Python cdg runs");
+    let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    assert_eq!(
+        version,
+        format!("codigest {}", env!("CARGO_PKG_VERSION")),
+        "the Python cdg on PATH is a different version from this crate"
+    );
 }
 
 /// Both builds write the platform's line ending; content assertions compare with `\n`.
