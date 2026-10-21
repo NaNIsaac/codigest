@@ -66,6 +66,19 @@ uv tool update-shell                              # then restart your terminal
 ```
 
 The command is `codigest`, or `cdg` for short. No setup is needed in your projects.
+
+On Windows, PowerShell's `help codigest` is a separate command from `codigest --help`.
+For optional native `Get-Help` integration **without automatic command capture**:
+
+```powershell
+cdg shell-help install       # register comment-based PowerShell help
+# open a new PowerShell window
+help codigest               # or: Get-Help codigest
+cdg shell-help uninstall     # remove it when no longer needed
+```
+
+This adds a small forwarding function to your PowerShell profile; other `help` commands are
+unchanged. The CLI's own full command reference is still available via `codigest --help`.
 If the install fails with a syntax error on `lazy import`, run `uv self update` and try again.
 
 In a terminal, every command below copies its result to the clipboard. Add `-s` to also print it,
