@@ -58,6 +58,9 @@ pub fn parse(code: &str) -> Option<Parsed> {
         .expect("python grammar");
     let tree = parser.parse(code, None)?;
     let root = tree.root_node();
+    if replacement_outside_strings(root, code.as_bytes()) {
+        return None;
+    }
     let collector = Collector {
         src: code.as_bytes(),
         unparse: Unparser::new(code.as_bytes()),
@@ -376,6 +379,23 @@ pub fn compare(old_code: &str, new_code: &str) -> Vec<SemanticChange> {
         .collect()
 }
 
+/// A U+FFFD in code (not in a string or comment) comes from undecodable bytes; Python's
+/// parser rejects the whole file then, so it gets no outline there either.
+fn replacement_outside_strings(root: Node, src: &[u8]) -> bool {
+    let mut stack = vec![root];
+    while let Some(node) = stack.pop() {
+        if matches!(node.kind(), "string" | "comment" | "concatenated_string") {
+            continue;
+        }
+        if node.child_count() == 0 && node.utf8_text(src).is_ok_and(|t| t.contains('\u{FFFD}')) {
+            return true;
+        }
+        let mut cursor = node.walk();
+        stack.extend(node.children(&mut cursor));
+    }
+    false
+}
+
 fn insert(out: &mut Vec<Symbol>, symbol: Symbol) {
     match out.iter_mut().find(|s| s.name == symbol.name) {
         Some(existing) => *existing = symbol,
@@ -490,6 +510,12 @@ mod tests {
             ]
             .join("\n")
         );
+    }
+
+    #[test]
+    fn undecodable_identifiers_give_no_outline_like_python() {
+        assert!(parse("def caf\u{FFFD}():\n    pass\n").is_none());
+        assert!(parse("x = 'caf\u{FFFD}'\n").is_some());
     }
 
     #[test]
