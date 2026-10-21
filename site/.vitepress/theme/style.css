@@ -93,3 +93,68 @@
 .VPHero .text {
   max-width: 560px;
 }
+
+/* Hero: a tinted band in the accent colour, demo in the right column on wide screens. */
+.VPHome {
+  overflow-x: clip;
+}
+
+.VPHomeHero {
+  background:
+    radial-gradient(ellipse 70% 90% at 78% 30%, rgb(234 88 12 / 0.16), transparent 70%),
+    linear-gradient(180deg, rgb(234 88 12 / 0.06), transparent 85%);
+}
+
+.dark .VPHomeHero {
+  background:
+    radial-gradient(ellipse 70% 90% at 78% 30%, rgb(234 88 12 / 0.28), transparent 70%),
+    linear-gradient(180deg, #0b0908, transparent 90%);
+}
+
+.VPHero .image,
+.VPHero .image-container {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.VPHero .image-container {
+  width: 100%;
+  height: auto;
+  transform: none;
+}
+
+.VPHero .image-bg {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .VPHero.has-image .container {
+    align-items: center;
+    gap: 40px;
+  }
+
+  .VPHero.has-image .main {
+    flex: 0 0 auto;
+    width: 500px;
+    max-width: 500px;
+  }
+
+  .VPHero .name,
+  .VPHero .text {
+    font-size: 44px;
+    line-height: 1.15;
+  }
+
+  .VPHero.has-image .image {
+    flex: 1 1 0;
+    order: 2;
+    margin: 0;
+  }
+}
+
+@media (max-width: 959px) {
+  .VPHero .image {
+    order: 2;
+    margin: 32px 0 0;
+  }
+}
