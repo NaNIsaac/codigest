@@ -36,3 +36,7 @@ pub fn yellow(text: &str) -> String {
 pub fn bold(text: &str) -> String {
     paint("1", text)
 }
+
+pub fn cyan(text: &str) -> String {
+    paint("1;36", text)
+}
