@@ -256,8 +256,11 @@ mod tests {
         let root = pypath::resolve(dir.path());
         let exts: HashSet<String> = [".py".to_owned(), ".txt".to_owned()].into();
         let files = scan_project(&root, Some(exts), &[], None).unwrap();
+        // Order is case-insensitive only on Windows; this test is about which files stay.
+        let mut kept = names(&root, files);
+        kept.sort_by_key(|n| n.to_lowercase());
         assert_eq!(
-            names(&root, files),
+            kept,
             [
                 ".gitignore",
                 "a.py",
