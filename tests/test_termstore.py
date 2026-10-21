@@ -16,6 +16,28 @@ def test_render_escapes_quotes_in_command_attribute():
 
 
 
+
+def test_terminal_context_opt_in_and_escapes_host_and_shell():
+    entry = Entry(command="Get-Process", output="error output", exit_code=1,
+                  cwd="C:/work", hostname='LAB-PC & "<node>"', shell="pwsh <7>")
+    default = termstore.render([entry])
+    assert 'hostname=' not in default and 'shell=' not in default
+    with_context = termstore.render([entry], include_context=True)
+    assert 'hostname="LAB-PC &amp; &quot;&lt;node&gt;&quot;"' in with_context
+    assert 'shell="pwsh &lt;7&gt;"' in with_context
+    assert 'command="Get-Process"' in with_context
+    assert '<output>\\nerror output\\n</output>' in with_context
+
+
+def test_terminal_host_is_recorded_on_append_and_old_entries_remain_compatible(tmp_path, monkeypatch):
+    monkeypatch.setenv("CODIGEST_HOME", str(tmp_path))
+    monkeypatch.setattr(termstore.socket, "gethostname", lambda: "LAB-PC")
+    termstore.append_entry(Entry(command="echo hello", output="hello", shell="powershell"))
+    entry = termstore.load_entries()[0]
+    assert entry.hostname == "LAB-PC"
+    assert 'hostname="LAB-PC"' in termstore.render([entry], include_context=True)
+    assert Entry.from_dict({"command": "old record", "output": "ok"}).hostname == ""
+
 def test_profile_block_strip_keeps_user_content():
     from codigest.commands import term
     block = f"{term._BEGIN}\nhook\n{term._END}\n"
