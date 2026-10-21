@@ -1,0 +1,58 @@
+name: Rust release
+
+# Builds cdg-rs for each platform and attaches the archives to a GitHub release.
+on:
+  push:
+    tags: ["rust-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, archive: zip }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, archive: tar.gz }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm, archive: tar.gz }
+          - { target: x86_64-apple-darwin, os: macos-13, archive: tar.gz }
+          - { target: aarch64-apple-darwin, os: macos-latest, archive: tar.gz }
+          # Termux runs Android binaries, which are not the same as Linux ARM64 ones.
+          - { target: aarch64-linux-android, os: ubuntu-latest, archive: tar.gz }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rust
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - if: matrix.target == 'aarch64-linux-android'
+        run: |
+          ndk="$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "CC_aarch64_linux_android=$ndk/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$ndk/llvm-ar" >> "$GITHUB_ENV"
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        run: |
+          name="cdg-rs-${GITHUB_REF_NAME#rust-v}-${{ matrix.target }}"
+          mkdir "$name"
+          cp ../LICENSE "$name/"
+          if [ "${{ matrix.archive }}" = zip ]; then
+            cp "target/${{ matrix.target }}/release/cdg-rs.exe" "$name/"
+            7z a "$name.zip" "$name" > /dev/null
+          else
+            cp "target/${{ matrix.target }}/release/cdg-rs" "$name/"
+            tar czf "$name.tar.gz" "$name"
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: rust/cdg-rs-*.${{ matrix.archive }}
+          prerelease: true

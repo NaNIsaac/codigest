@@ -97,8 +97,15 @@ impl Output {
     }
 }
 
+// Termux has no window system for arboard; its own helper owns the Android clipboard.
+#[cfg(target_os = "android")]
 fn copy_to_clipboard(text: &str) -> anyhow::Result<()> {
-    // Termux has no window system for arboard; its own helper owns the Android clipboard.
+    pipe_to("termux-clipboard-set", &[], text)
+}
+
+#[cfg(not(target_os = "android"))]
+fn copy_to_clipboard(text: &str) -> anyhow::Result<()> {
+    // A linux-gnu binary run inside Termux still reports the Android environment this way.
     if std::env::var_os("TERMUX_VERSION").is_some() {
         return pipe_to("termux-clipboard-set", &[], text);
     }
