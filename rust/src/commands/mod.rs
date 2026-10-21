@@ -1,4 +1,5 @@
 pub mod clean;
+pub mod digest;
 pub mod init;
 pub mod mcp;
 pub mod scan;
@@ -24,6 +25,9 @@ pub enum Command {
     /// Bundle the whole project, or only the given paths, as one block.
     #[command(next_help_heading = "Share code")]
     Scan(scan::ScanArgs),
+    /// Outline Python and MATLAB files: numbered signatures and docstrings, no bodies.
+    #[command(next_help_heading = "Share code")]
+    Digest(digest::DigestArgs),
     /// Print the project file tree.
     #[command(next_help_heading = "Share code")]
     Tree(tree::TreeArgs),
@@ -45,6 +49,7 @@ pub enum Command {
 pub fn run(cli: Cli) -> anyhow::Result<i32> {
     match cli.command {
         Command::Scan(args) => scan::run(args),
+        Command::Digest(args) => digest::run(args),
         Command::Tree(args) => tree::run(args),
         Command::Init(args) => init::run(args),
         Command::Clean(args) => clean::run(args),
