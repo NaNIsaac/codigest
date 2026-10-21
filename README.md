@@ -70,7 +70,7 @@ This installs `cdg` to `%LOCALAPPDATA%\Programs\codigest` (added to your user `P
 `~/.local/bin` on Linux and macOS, and `$PREFIX/bin` in Termux. Run the same line again to update.
 `CDG_VERSION=0.12.1` pins a version and `CDG_INSTALL_DIR=...` picks the folder (then `PATH` is left
 alone). Supported: Windows x64, Linux x64 and ARM64, macOS Intel and Apple Silicon, Android ARM64
-(Termux). Archives for download by hand are on the
+(Termux; the tests also run inside Termux in CI). Archives for download by hand are on the
 [releases page](https://github.com/NaNIsaac/codigest/releases). No setup is needed in your projects.
 
 ### Python package

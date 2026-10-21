@@ -66,7 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh |
 `~/.local/bin`, Termux에서는 `$PREFIX/bin`에 설치됩니다. 같은 줄을 다시 실행하면 업데이트됩니다.
 `CDG_VERSION=0.12.1`로 버전을 고정하고, `CDG_INSTALL_DIR=...`로 폴더를 정합니다(이때는 `PATH`를
 건드리지 않습니다). 지원 환경은 Windows x64, Linux x64와 ARM64, macOS Intel과 Apple Silicon,
-Android ARM64(Termux)입니다. 직접 받는 압축 파일은
+Android ARM64(Termux)입니다(Termux 안에서도 CI로 테스트합니다). 직접 받는 압축 파일은
 [릴리스 페이지](https://github.com/NaNIsaac/codigest/releases)에 있습니다. 프로젝트마다 따로 설정할
 것은 없습니다.
 
