@@ -9,7 +9,7 @@ from rich.console import Console
 
 lazy from importlib.metadata import PackageNotFoundError, version
 
-from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp, pack, mark
+from .commands import init, scan, tree, digest, diff, semdiff, status, clean, cap, term, mcp, pack, mark, shell_help
 
 console = Console()
 
@@ -43,6 +43,7 @@ app.command(name="mcp", rich_help_panel=AGENTS)(mcp.handle)
 app.command(name="status", rich_help_panel=SETUP)(status.handle)
 app.command(name="init", rich_help_panel=SETUP)(init.handle)
 app.command(name="clean", rich_help_panel=SETUP)(clean.handle)
+app.add_typer(shell_help.app, name="shell-help", rich_help_panel=SETUP)
 
 def version_callback(value: bool) -> None:
     """
