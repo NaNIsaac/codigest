@@ -72,6 +72,9 @@ This installs `cdg` to `%LOCALAPPDATA%\Programs\codigest` (added to your user `P
 alone). Supported: Windows x64, Linux x64 and ARM64, macOS Intel and Apple Silicon, Android ARM64
 (Termux; the tests also run inside Termux in CI). Archives for download by hand are on the
 [releases page](https://github.com/NaNIsaac/codigest/releases). No setup is needed in your projects.
+Both scripts check the archive against the SHA-256 GitHub records for it. On Linux and macOS,
+`install.sh` will not replace a `cdg` from the Python package in the same folder unless
+`CDG_FORCE=1` is set.
 
 ### Python package
 
