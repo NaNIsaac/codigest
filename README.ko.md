@@ -414,7 +414,7 @@ cdg term clear        # 기록 모두 지우기
 `cdg term install`은 설치되어 있는 셸에 맞춰 PowerShell 프로필, `~/.bashrc`, `~/.zshrc`에 훅을
 추가합니다. `--shell powershell|bash|zsh|all`로 고를 수 있고, Windows의 Git Bash는 bash로 칩니다.
 명령은 원래 세션에서 그대로 실행되므로 `cd`, 변수, 함수가 모두 평소처럼 동작하고, 히스토리에도
-입력한 그대로 남습니다. 편집기, 페이저, REPL, `ssh`는 기록하지 않습니다.
+입력한 그대로 남습니다. 편집기, 페이저, REPL, `ssh`와 `tmux`, `zellij`, `herdr` 같은 전체 화면 프로그램은 실제 터미널이 필요해서 기록하지 않습니다.
 
 - 명령 하나만 기록하지 않으려면 맨 앞에 공백을 넣습니다.
 - 기록하지 않을 프로그램을 더 지정하려면: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`

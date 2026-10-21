@@ -34,7 +34,7 @@ The hostname and shell name are left out by default because a PC name may be sen
 
 `cdg term install` edits your PowerShell profile, `~/.bashrc` and `~/.zshrc` for whichever of these shells is installed. Choose with `--shell powershell|bash|zsh|all`. On Windows, Git Bash counts as bash. `cdg term uninstall` removes the hook.
 
-Commands still run in your current session: `cd`, variables and functions work normally, and the command appears in your history as typed. Editors, pagers, REPLs and `ssh` are skipped.
+Commands still run in your current session: `cd`, variables and functions work normally, and the command appears in your history as typed. Editors, pagers, REPLs, `ssh` and full-screen programs such as `tmux`, `zellij` or `herdr` are skipped; they need a real terminal.
 
 ```bash
 cdg term install                 # every shell found

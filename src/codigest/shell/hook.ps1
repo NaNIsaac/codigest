@@ -78,6 +78,8 @@ if (-not (Get-Module PSReadLine)) { return }
 # Denylist heuristic for programs that need a real TTY (editors, pagers,
 # REPLs, ssh). Extend with $env:CODIGEST_CAP_SKIP (a regex) when one slips through.
 $global:__cdgSkip = '^\s*(vim?|nvim|nano|emacs|less|more|ssh|htop|btop|top|fzf|lazygit|claude|codex|wsl|exit)(\.exe)?\b' +
+    # Full-screen programs: through the capture pipe they get no terminal and hang.
+    '|^\s*(herdr|tmux|screen|zellij|k9s|lazydocker|gitui|tig|yazi|ranger|nnn|mc|vifm|broot|hx|helix|micro|ncdu|btm|glances|nvtop|man)(\.exe)?\b' +
     '|^\s*(cdg|codigest)(\.exe)?\s+(term|mcp)\b' +
     '|^\s*(python3?|py|ipython|node|pwsh|powershell|bash|cmd)(\.exe)?\s*$' +
     '|^\s*git\s+(commit(?!.*\s-\w*[mF])|rebase\s+-i|add\s+-[pi]|mergetool)'

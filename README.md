@@ -439,7 +439,7 @@ fish), without their output.
 `cdg term install` edits your PowerShell profile, `~/.bashrc` and `~/.zshrc` for whichever of
 these shells is installed; choose with `--shell powershell|bash|zsh|all`. On Windows, Git Bash
 counts as bash. Commands still run in your current session (`cd`, variables and functions work
-normally) and appear in your history as typed. Editors, pagers, REPLs and `ssh` are skipped.
+normally) and appear in your history as typed. Editors, pagers, REPLs, `ssh` and full-screen programs such as `tmux`, `zellij` or `herdr` are skipped; they need a real terminal.
 
 - Skip one command: start the line with a space.
 - Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'` (bash/zsh:

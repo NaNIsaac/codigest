@@ -31,6 +31,8 @@ __cdg_dir=${TMPDIR:-/tmp}/codigest-${UID:-0}
 # Denylist heuristic for programs that need a real TTY (editors, pagers,
 # REPLs, ssh). Extend with CODIGEST_CAP_SKIP (an extended regex).
 __cdg_skip='^[[:space:]]*(vim?|nvim|nano|emacs|less|more|man|ssh|htop|btop|top|fzf|lazygit|tmux|screen|claude|codex|wsl|exit|exec|fg|bg)(\.exe)?([[:space:]]|$)'
+# Full-screen programs: through the capture pipe they get no terminal and hang.
+__cdg_skip+='|^[[:space:]]*(herdr|zellij|k9s|lazydocker|gitui|tig|yazi|ranger|nnn|mc|vifm|broot|hx|helix|micro|ncdu|btm|glances|nvtop)(\.exe)?([[:space:]]|$)'
 __cdg_skip+='|^[[:space:]]*(cdg|codigest)(\.exe)?[[:space:]]+(term|mcp)([[:space:]]|$)'
 __cdg_skip+='|^[[:space:]]*(python3?|py|ipython|node|pwsh|powershell|bash|zsh|sh|fish|cmd)(\.exe)?[[:space:]]*$'
 __cdg_skip+='|^[[:space:]]*git[[:space:]]+(rebase[[:space:]]+-i|add[[:space:]]+-[pi]|mergetool)'
