@@ -1,4 +1,5 @@
 pub mod cap;
+pub mod hook;
 pub mod ingest;
 pub mod term;
 
