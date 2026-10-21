@@ -81,8 +81,9 @@ def handle(
                         case "MODIFIED": icon = "[SIGNATURE]"
                         case _: icon = "[LOGIC]    "
 
-                    detail = f" :: {ch.details}" if ch.details else ""
-                    line = f"{icon} {ch.symbol.type} {ch.symbol.name}{ch.symbol.signature}{detail}"
+                    # The signature is the news only when it changed, and then both sides are in details.
+                    detail = f" :: {ch.details}" if ch.change_type == "MODIFIED" else ""
+                    line = f"{icon} {ch.symbol.line}: {ch.symbol.type} {ch.symbol.name}{detail}"
                     change_lines.append(line)
 
                 # File Status Tag

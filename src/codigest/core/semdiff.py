@@ -160,7 +160,16 @@ def compare(old_code: str, new_code: str) -> list[SemanticChange]:
             case old, new if old.content_hash != new.content_hash:
                 changes.append(SemanticChange("LOGIC_CHANGED", new, "Implementation changed"))
 
-    return changes
+    # A class hash covers its members, so a class whose members are all that changed adds nothing.
+    changed = {c.symbol.name for c in changes}
+    return [
+        c for c in changes
+        if not (
+            c.symbol.type == "class"
+            and c.change_type == "LOGIC_CHANGED"
+            and any(name.startswith(f"{c.symbol.name}.") for name in changed)
+        )
+    ]
 
 DOC_WIDTH = 100
 
