@@ -24,6 +24,8 @@ Every command of the Python build is ported, with the same options:
 `path`, `install`, `uninstall` and the hooks' `ingest`), `mcp`, `status`, `init`, `clean` and `shell-help`.
 
 New in this build: `term --raw` prints the stored output of one command without tags.
+`scan` and `term` take `--format markdown|json`, and every command takes `--preset NAME`,
+the same as in the Python build.
 
 How parity is checked:
 
@@ -80,33 +82,3 @@ The release binary is 4.6 MB and needs no Python.
   `\n` on Windows, where Python writes `\r\n`. The command results themselves (stdout of
   `scan`, `pack`, ... and `-o` files) use the platform line ending, as Python does.
 - `cap` forwards Ctrl+C and gives the command 5 seconds before killing it.
-- `term --format markdown|json` is new. Markdown gives each command a heading, its details
-  as a list, and the command with its output in one `console` block; the fence grows past
-  any backticks in the output. JSON is an array with `index` counting back from the latest.
-- `scan --format markdown|json` is new. Markdown gives the instruction, the structure and a
-  heading plus a fenced block per file, tagged with the language of its extension, for chats
-  that render Markdown. JSON has `project`, `instruction`, `structure` and `files` (`path`,
-  `lines` for a range, `content`). Neither uses the block cache, which holds XML.
-
-  ```console
-  $ cdg-rs scan src/app.py:40-60 --format markdown -m "Why does this loop twice?"
-  ```
-- `--preset NAME` is new and works on every command: it inserts the options stored under
-  `[presets.<command>.<NAME>]` right after the command name, so anything typed on the
-  command line wins. Presets are read from the user configuration file
-  (`%APPDATA%\codigest\config.toml` on Windows, `~/.config/codigest/config.toml` elsewhere)
-  and then from the project's `.codigest/config.toml`, which replaces a user preset of the
-  same name. Keys are option names with `_` for `-`; `true` adds a flag, lists are joined
-  with commas.
-
-  ```toml
-  [presets.term.debug]
-  format = "markdown"
-  count = 3
-  failed = true
-  ```
-
-  ```console
-  $ cdg-rs term --preset debug          # last 3 failed commands as Markdown
-  $ cdg-rs term --preset debug -n 1     # the same, only the last one
-  ```

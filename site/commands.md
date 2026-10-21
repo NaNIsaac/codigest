@@ -31,6 +31,37 @@ Most commands produce one block of text and share the same options for where it 
 
 Each command below lists the options it accepts. Not every command takes every shared option.
 
+## Formats {#formats}
+
+`scan` and `term` print XML blocks unless told otherwise. `--format markdown` is for chats that render Markdown: `scan` gives the instruction, the structure, and a heading and a fenced block per file with the language of its extension; `term` gives a heading per command, its details as a list, and the command with its output in one `console` block. A fence is always longer than any run of backticks inside it. `--format json` is for scripts. The block cache holds XML, so the other formats read the files afresh.
+
+`scan --format json` is an object with `project`, `instruction`, `structure` and `files` (`path`, `lines` for a range, `content`). `term --format json` is an array with `index` counting back from the latest, `command`, `exit_code`, `cwd`, `started_at`, `duration_ms`, `output`, `output_available` and `truncated`, plus `hostname` and `shell` with `--context` and `note` when there is one.
+
+```bash
+cdg scan src/app.py:40-60 --format markdown -m "Why does this loop twice?"
+cdg term -n 3 --failed --format json
+```
+
+## Presets {#presets}
+
+A preset is a set of options saved under a name. `--preset NAME` works on every command: it puts the saved options right after the command name, so anything typed on the command line wins. It is expanded before the options are parsed and does not appear in `--help`.
+
+```toml
+# %APPDATA%\codigest\config.toml on Windows, ~/.config/codigest/config.toml elsewhere,
+# or .codigest/config.toml in the project (replaces a user preset of the same name)
+[presets.term.debug]
+format = "markdown"
+count = 3
+failed = true
+```
+
+```bash
+cdg term --preset debug       # last 3 failed commands as Markdown
+cdg term --preset debug -n 1  # the same, only the last one
+```
+
+Keys are option names with `_` for `-` (`no_copy = true` is `--no-copy`). `true` adds a flag, `false` leaves it out, and lists are joined with commas. An unknown preset stops with exit code 2 and names the file to define it in. When an option is given twice, the later one wins.
+
 ## `cdg scan`
 
 Bundle the whole project, or only the given paths, as one block.
@@ -53,6 +84,7 @@ A target is a file, a folder, or a file with a line range: `src/app.py:40-80` fo
 | `-l`, `--lines` | Add line numbers to code blocks. |
 | `-y`, `--yes` | Skip the size confirmation. |
 | `-r`, `--resolve` | Recursively resolve imports of the targets. |
+| `--format` | `xml` (default), `markdown` or `json`. See [Formats](#formats). |
 
 Above 30,000 estimated tokens or 100 files, `scan` asks before continuing. When nobody can answer (no terminal on stdin), it stops with exit code 1 and a hint instead of waiting; `-y` takes everything. A line names any credential files that were withheld.
 
@@ -302,6 +334,7 @@ Without a subcommand it prints the most recent captures. When nothing was captur
 | `--here` | Only commands run in the current directory or below. |
 | `--history-only` | Read the native shell history instead of Codigest captures (no output). |
 | `--context` | Include the captured hostname and shell in the output. |
+| `--format` | `xml` (default), `markdown` or `json`. See [Formats](#formats). |
 | `-c`, `--copy`, `--no-copy` | Copy to the clipboard (default: copy in a terminal, not when piped). |
 | `-s`, `--stdout` | Also print the result. |
 | `-o`, `--output` | Also write the result to this file. |

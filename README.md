@@ -408,7 +408,10 @@ not when piped), `-o FILE` also writes it to a file, `-m` / `--message` adds an
 instruction.
 `scan -l` adds line numbers, `scan -a` ignores the config filters, `scan -y` skips the
 confirmation (CI). `-r` / `--resolve` on `scan`, `diff`, `semdiff` and `digest` also pulls in
-local files imported by the targets. `cdg <command> --help` lists everything.
+local files imported by the targets. `scan` and `term` take `--format markdown|json` for chats that
+render Markdown or for scripts (XML is the default). `--preset NAME` on any command fills in options
+saved under `[presets.<command>.NAME]` in `.codigest/config.toml` or your user config; options typed
+after it win. `cdg <command> --help` lists everything.
 
 ### Terminal capture
 
@@ -427,6 +430,7 @@ cdg term -f           # last failed one
 cdg term --context   # add the PC hostname and shell to the copied context (opt-in)
 cdg term --here -n 3  # last 3 run in this project
 cdg term -i 2         # only the command from 2 runs ago
+cdg term -n 3 --format json  # the last 3 as JSON (markdown also works)
 cdg term path         # where captures are stored (override with CODIGEST_HOME)
 cdg term clear        # delete all captures
 ```

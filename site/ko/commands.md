@@ -31,6 +31,37 @@
 
 아래에서 명령마다 받는 옵션을 나열합니다. 모든 명령이 모든 공통 옵션을 받는 것은 아닙니다.
 
+## 출력 형식 {#formats}
+
+`scan`과 `term`은 따로 지정하지 않으면 XML 블록을 출력합니다. `--format markdown`은 Markdown을 렌더링하는 채팅용입니다. `scan`은 요청 문구, 구조, 그리고 파일마다 제목과 확장자에 맞는 언어를 붙인 코드 블록을 만들고, `term`은 명령마다 제목, 세부 정보 목록, 그리고 명령과 출력을 담은 `console` 블록 하나를 만듭니다. 코드 펜스는 내용 속 백틱 연속보다 항상 깁니다. `--format json`은 스크립트용입니다. 블록 캐시에는 XML이 들어 있으므로, 다른 형식은 파일을 새로 읽습니다.
+
+`scan --format json`은 `project`, `instruction`, `structure`, `files`(`path`, 범위일 때 `lines`, `content`)를 가진 객체입니다. `term --format json`은 배열이며, 항목마다 최근부터 거꾸로 센 `index`, `command`, `exit_code`, `cwd`, `started_at`, `duration_ms`, `output`, `output_available`, `truncated`가 있고, `--context`를 주면 `hostname`과 `shell`, 메모가 있으면 `note`가 더해집니다.
+
+```bash
+cdg scan src/app.py:40-60 --format markdown -m "Why does this loop twice?"
+cdg term -n 3 --failed --format json
+```
+
+## 프리셋 {#presets}
+
+프리셋은 이름을 붙여 저장한 옵션 묶음입니다. `--preset NAME`은 모든 명령에서 쓸 수 있고, 저장해 둔 옵션을 명령 이름 바로 뒤에 넣으므로 명령줄에 직접 쓴 옵션이 이깁니다. 옵션을 해석하기 전에 펼쳐지며 `--help`에는 나오지 않습니다.
+
+```toml
+# Windows는 %APPDATA%\codigest\config.toml, 그 밖에는 ~/.config/codigest/config.toml,
+# 또는 프로젝트의 .codigest/config.toml (같은 이름의 사용자 프리셋을 대신함)
+[presets.term.debug]
+format = "markdown"
+count = 3
+failed = true
+```
+
+```bash
+cdg term --preset debug       # 실패한 최근 명령 3개를 Markdown으로
+cdg term --preset debug -n 1  # 같은 설정으로 마지막 하나만
+```
+
+키는 옵션 이름에서 `-`를 `_`로 바꾼 것입니다(`no_copy = true`는 `--no-copy`). `true`는 플래그를 넣고 `false`는 넣지 않으며, 목록은 쉼표로 이어 붙입니다. 없는 프리셋을 고르면 종료 코드 2로 멈추고, 정의할 파일 위치를 알려 줍니다. 같은 옵션을 두 번 쓰면 나중 것이 이깁니다.
+
 ## `cdg scan`
 
 프로젝트 전체, 또는 지정한 경로만 하나의 블록으로 묶습니다.
@@ -53,6 +84,7 @@ cdg scan [OPTIONS] [targets]...
 | `-l`, `--lines` | 코드 블록에 줄 번호를 붙입니다. |
 | `-y`, `--yes` | 크기 확인을 건너뜁니다. |
 | `-r`, `--resolve` | 대상이 import하는 파일을 재귀적으로 담습니다. |
+| `--format` | `xml`(기본), `markdown`, `json`. [출력 형식](#formats)을 참고하세요. |
 
 추정 토큰이 3만을 넘거나 파일이 100개를 넘으면 `scan`은 계속할지 묻습니다. 대답할 사람이 없을 때(stdin이 터미널이 아닐 때)는 기다리지 않고 힌트와 함께 종료 코드 1로 멈춥니다. 전부 가져오려면 `-y`를 붙입니다. 빼 놓은 인증 정보 파일이 있으면 그 이름을 알려 주는 줄이 나옵니다.
 
@@ -302,6 +334,7 @@ cdg term [OPTIONS] [COMMAND]
 | `--here` | 현재 폴더 또는 그 아래에서 실행한 명령만. |
 | `--history-only` | Codigest 기록 대신 셸 히스토리를 읽습니다 (출력 없음). |
 | `--context` | 기록된 PC 이름과 셸 정보를 결과에 넣습니다. |
+| `--format` | `xml`(기본), `markdown`, `json`. [출력 형식](#formats)을 참고하세요. |
 | `-c`, `--copy`, `--no-copy` | 클립보드에 복사합니다 (기본: 터미널에서는 복사, 파이프일 때는 복사하지 않음). |
 | `-s`, `--stdout` | 결과를 화면에도 출력합니다. |
 | `-o`, `--output` | 결과를 이 파일에도 저장합니다. |

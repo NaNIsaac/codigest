@@ -25,7 +25,7 @@ CODIGEST_PARITY=1 cargo test # PATH의 Python `cdg`와도 비교
 
 모든 명령을 같은 옵션으로 옮겼습니다: `scan`, `digest`, `tree`, `mark`, `diff`, `semdiff`, `cap`, `pack`, `term`(`clear`, `path`, `install`, `uninstall`, 훅이 호출하는 `ingest` 포함), `mcp`, `status`, `init`, `clean`, `shell-help`.
 
-이 빌드에만 있는 것: `term --raw`는 명령 하나의 저장된 출력을 태그 없이 그대로 출력합니다. [명령어 레퍼런스의 안내](/ko/commands#term-raw)를 참고하세요. 이 빌드에만 있는 다른 옵션은 아래에 정리했습니다.
+이 빌드에만 있는 것: `term --raw`는 명령 하나의 저장된 출력을 태그 없이 그대로 출력합니다. [명령어 레퍼런스의 안내](/ko/commands#term-raw)를 참고하세요. 이 빌드에만 있는 다른 기능은 아래에 정리했습니다. `scan`, `term`의 `--format markdown|json`과 `--preset NAME`은 두 빌드가 같이 지원하며, [명령어 레퍼런스](/ko/commands#formats)에 있습니다.
 
 ## 이 빌드에만 있는 기능
 
@@ -41,37 +41,6 @@ Python, MATLAB 말고도 Rust, JavaScript(`.js`, `.jsx`, `.mjs`, `.cjs`), TypeSc
         The nearest `.codigest/config.toml` from `start` upwards, stopping at a Git root.
 93: pub fn expand(argv: Vec<OsString>) -> Result<Vec<OsString>>
 ```
-
-### `scan`, `term`의 `--format markdown|json`
-
-기본은 그대로 XML입니다. Markdown은 이를 렌더링하는 채팅용입니다. `scan`은 지시문, 구조, 그리고 파일마다 제목과 확장자에 맞는 언어를 붙인 코드 블록을 만듭니다. `term`은 명령마다 제목, 세부 정보 목록, 그리고 명령과 출력을 담은 `console` 블록 하나를 만듭니다. 내용에 백틱이 있으면 펜스가 그보다 길어집니다. JSON은 스크립트용입니다.
-
-```console
-$ cdg-rs scan src/format.rs:17-31 --format markdown -m "Review these"
-$ cdg-rs term -n 3 --failed --format json
-```
-
-`scan --format json`에는 `project`, `instruction`, `structure`, `files`(`path`, 범위일 때 `lines`, `content`)가 있습니다. `term --format json`은 배열이며, 항목마다 최근부터 거꾸로 센 `index`, `command`, `exit_code`, `cwd`, `started_at`, `duration_ms`, `output`, `output_available`, `truncated`가 있습니다.
-
-### `--preset NAME`
-
-프리셋은 이름을 붙여 저장한 옵션 묶음입니다. `--preset NAME`은 그 옵션을 명령 이름 바로 뒤에 넣으므로, 명령줄에 직접 쓴 옵션이 이깁니다.
-
-```toml
-# Windows는 %APPDATA%\codigest\config.toml, 그 밖에는 ~/.config/codigest/config.toml,
-# 또는 프로젝트의 .codigest/config.toml (같은 이름의 사용자 프리셋을 대신함)
-[presets.term.debug]
-format = "markdown"
-count = 3
-failed = true
-```
-
-```console
-$ cdg-rs term --preset debug          # 실패한 최근 명령 3개를 Markdown으로
-$ cdg-rs term --preset debug -n 1     # 같은 설정으로 마지막 하나만
-```
-
-키는 옵션 이름에서 `-`를 `_`로 바꾼 것입니다(`no_copy = true`는 `--no-copy`). `true`는 플래그를 넣고 `false`는 넣지 않으며, 목록은 쉼표로 이어 붙입니다. 없는 프리셋을 고르면 종료 코드 2로 멈추고, 정의할 파일 위치를 알려 줍니다.
 
 ## 같은 결과인지 확인하는 방법
 
