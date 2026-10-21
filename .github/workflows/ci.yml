@@ -30,3 +30,12 @@ jobs:
           if ($synopsis -notmatch 'Share selected code') { throw "Get-Help codigest failed: $synopsis" }
           $output = codigest --version | Out-String
           if ($LASTEXITCODE -ne 0 -or $output -notmatch 'codigest') { throw "CLI forwarding failed: $output" }
+          $psHelp = help codigest | Out-String
+          if ($psHelp -notmatch 'Share selected code') { throw "help codigest failed: $psHelp" }
+      - name: Check Windows PowerShell 5.1 compatibility
+        shell: powershell
+        run: |
+          $env:PATH = (Join-Path (Get-Location) '.venv\Scripts') + [IO.Path]::PathSeparator + $env:PATH
+          . './src/codigest/shell/help.ps1'
+          $psHelp = help codigest | Out-String
+          if ($psHelp -notmatch 'Share selected code') { throw "Windows PowerShell help failed: $psHelp" }
