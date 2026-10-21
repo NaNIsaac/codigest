@@ -1,6 +1,7 @@
 name: Rust release
 
-# Builds cdg-rs for each platform and attaches the archives to a GitHub release.
+# Builds cdg for each platform, attaches the archives to a GitHub release, then installs
+# that release with install.ps1 / install.sh on each OS to check the installers end to end.
 on:
   push:
     tags: ["rust-v*"]
@@ -43,17 +44,44 @@ jobs:
       - run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Package
         run: |
-          name="cdg-rs-${GITHUB_REF_NAME#rust-v}-${{ matrix.target }}"
+          name="codigest-${GITHUB_REF_NAME#rust-v}-${{ matrix.target }}"
           mkdir "$name"
           cp ../LICENSE "$name/"
           if [ "${{ matrix.archive }}" = zip ]; then
-            cp "target/${{ matrix.target }}/release/cdg-rs.exe" "$name/"
+            cp "target/${{ matrix.target }}/release/cdg.exe" "$name/"
             7z a "$name.zip" "$name" > /dev/null
           else
-            cp "target/${{ matrix.target }}/release/cdg-rs" "$name/"
+            cp "target/${{ matrix.target }}/release/cdg" "$name/"
             tar czf "$name.tar.gz" "$name"
           fi
       - uses: softprops/action-gh-release@v2
         with:
-          files: rust/cdg-rs-*.${{ matrix.archive }}
-          prerelease: true
+          files: rust/codigest-*.${{ matrix.archive }}
+          prerelease: false
+
+  install:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CDG_VERSION: ${{ github.ref_name }}
+        run: |
+          ./install.ps1
+          $env:Path = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + $env:Path
+          cdg --version
+          cdg tree -L 1
+      - if: runner.os != 'Windows'
+        env:
+          CDG_VERSION: ${{ github.ref_name }}
+        run: |
+          sh install.sh
+          export PATH="$HOME/.local/bin:$PATH"
+          cdg --version
+          cdg tree -L 1

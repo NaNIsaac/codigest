@@ -7,9 +7,9 @@ use std::process::{Command as Process, Output};
 use assert_cmd::Command;
 use regex::Regex;
 
-/// `cdg-rs` with an isolated data directory and no colour or width surprises.
+/// `cdg` with an isolated data directory and no colour or width surprises.
 pub fn rust(home: &Path) -> Command {
-    let mut cmd = Command::cargo_bin("cdg-rs").expect("cdg-rs is built");
+    let mut cmd = Command::cargo_bin("cdg").expect("cdg is built");
     cmd.env("CODIGEST_HOME", home)
         .env("NO_COLOR", "1")
         .env("COLUMNS", "1000")
@@ -19,7 +19,7 @@ pub fn rust(home: &Path) -> Command {
 }
 
 pub fn rust_exe() -> PathBuf {
-    assert_cmd::cargo::cargo_bin("cdg-rs")
+    assert_cmd::cargo::cargo_bin("cdg")
 }
 
 /// The Python reference. `CODIGEST_PY` names a Python that can import `codigest` (the

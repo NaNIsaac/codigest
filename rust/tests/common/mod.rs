@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 mod code_fixture;
 
-pub const RUST: &str = env!("CARGO_BIN_EXE_cdg-rs");
+pub const RUST: &str = env!("CARGO_BIN_EXE_cdg");
 
 /// A parent folder holding `proj`, so two fixtures can have different paths and the same
 /// project name.

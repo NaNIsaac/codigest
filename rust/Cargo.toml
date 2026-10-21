@@ -8,9 +8,8 @@ license = "MIT"
 repository = "https://github.com/NaNIsaac/codigest"
 publish = false
 
-# Named cdg-rs while the port is in progress, so it can sit next to the Python `cdg`.
 [[bin]]
-name = "cdg-rs"
+name = "cdg"
 path = "src/main.rs"
 
 [dependencies]
