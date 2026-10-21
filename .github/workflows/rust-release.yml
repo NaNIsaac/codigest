@@ -17,7 +17,8 @@ jobs:
           - { target: x86_64-pc-windows-msvc, os: windows-latest, archive: zip }
           - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, archive: tar.gz }
           - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm, archive: tar.gz }
-          - { target: x86_64-apple-darwin, os: macos-13, archive: tar.gz }
+          # Intel macOS runners are retired; Apple Silicon cross-builds the Intel binary.
+          - { target: x86_64-apple-darwin, os: macos-latest, archive: tar.gz }
           - { target: aarch64-apple-darwin, os: macos-latest, archive: tar.gz }
           # Termux runs Android binaries, which are not the same as Linux ARM64 ones.
           - { target: aarch64-linux-android, os: ubuntu-latest, archive: tar.gz }
