@@ -6,6 +6,10 @@ on:
     paths:
       - 'site/**'
       - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -13,9 +17,10 @@ permissions:
   pages: write
   id-token: write
 
+# Pull requests only build; each gets its own group so it never queues behind a deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('docs-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -34,16 +39,19 @@ jobs:
           cache: npm
           cache-dependency-path: site/package-lock.json
       - uses: actions/configure-pages@v6.0.0
+        if: github.event_name != 'pull_request'
       - run: npm ci
         working-directory: site
       - run: npm run build
         working-directory: site
       - uses: actions/upload-pages-artifact@v5.0.0
+        if: github.event_name != 'pull_request'
         with:
           path: site/.vitepress/dist
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
