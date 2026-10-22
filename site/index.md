@@ -19,10 +19,17 @@ hero:
       link: https://github.com/NaNIsaac/codigest
 
 install:
-  label: Install
-  command: uv tool install codigest
+  label: Install Codigest
+  windowsLabel: Windows
+  unixLabel: Linux / macOS / Termux
+  pythonLabel: Python (uv)
+  windows: 'irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex'
+  unix: 'curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh'
+  python: 'uv tool install codigest'
   copy: Copy
   copied: Copied
+  moreLabel: All installation options
+  moreLink: /installation
 
 demo:
   alt: cdg cap runs a failing pytest, then cdg pack bundles the failure, the test file it names and the changed file
