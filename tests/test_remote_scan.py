@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import tempfile
 import time
 
@@ -85,6 +86,16 @@ def body(stdout: str) -> str:
     return stdout.split("\n", 1)[1]
 
 
+def uncolor(text: str) -> str:
+    """Without the colors rich adds where they are forced (CI)."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+def plain(text: str) -> str:
+    """Messages as words: no colors, box lines or wrapping."""
+    return " ".join(uncolor(text).replace("│", " ").split())
+
+
 def test_the_whole_repository_comes_out_as_a_local_scan_of_it(github, monkeypatch):
     remote_result = run("octo/sample", "--github", "-y")
     local_result = local(github.root, monkeypatch, "-y")
@@ -95,8 +106,8 @@ def test_the_whole_repository_comes_out_as_a_local_scan_of_it(github, monkeypatc
         '<project_snapshot project="octo/sample" source="https://github.com/octo/sample" '
         f'ref="main" commit="{github.commit}">'
     )
-    assert "Withheld (may contain secrets): .env, keys/id_rsa" in remote_result.stderr
-    assert "Withheld (may contain secrets): .env, keys/id_rsa" in local_result.stderr
+    assert "Withheld (may contain secrets): .env, keys/id_rsa" in plain(remote_result.stderr)
+    assert "Withheld (may contain secrets): .env, keys/id_rsa" in plain(local_result.stderr)
     assert "ghp_" not in remote_result.stdout
     assert "<<Binary or Non-UTF8 Content>>" in remote_result.stdout
 
@@ -142,8 +153,8 @@ def test_files_that_are_not_shared_are_never_downloaded(github):
     assert not fetched & {".env", "keys/id_rsa", "build/out.py", "debug.log"}
     assert not any(p.startswith("node_modules/") for p in fetched)
     assert "src/app.py" not in fetched  # over 12 bytes
-    assert "Skipped (over 12 bytes): " in result.stderr
-    assert "src/app.py" in result.stderr.split("Skipped (over 12 bytes): ")[1]
+    assert "Skipped (over 12 bytes): " in plain(result.stderr)
+    assert "src/app.py" in plain(result.stderr).split("Skipped (over 12 bytes): ")[1]
     assert "README.md" in fetched
 
 
@@ -193,7 +204,7 @@ def test_a_private_repository_needs_auth(github, monkeypatch):
 
     refused = run("octo/sample", "--github", "-y")
     assert refused.exit_code == 1
-    assert "octo/sample not found. If it is private, add --auth." in refused.stderr
+    assert "octo/sample not found. If it is private, add --auth." in plain(refused.stderr)
     assert refused.stdout == ""
 
     github.requests.clear()
@@ -212,7 +223,7 @@ def test_a_token_that_cannot_read_the_repository(github, monkeypatch):
     result = run("octo/sample", "--github", "-y", "--auth")
 
     assert result.exit_code == 1
-    assert "octo/sample not found, or the token cannot read it." in result.stderr
+    assert "octo/sample not found, or the token cannot read it." in plain(result.stderr)
     assert "another-token" not in result.output
 
 
@@ -222,7 +233,7 @@ def test_a_rejected_token_is_not_repeated_in_the_message(github, monkeypatch):
     result = run("octo/sample", "--github", "-y", "--auth")
 
     assert result.exit_code == 1
-    assert "GitHub rejected the token (401)." in result.stderr
+    assert "GitHub rejected the token (401)." in plain(result.stderr)
     assert TOKEN not in result.output
 
 
@@ -231,7 +242,7 @@ def test_auth_without_any_token_says_where_one_comes_from(github, monkeypatch, t
     result = run("octo/sample", "--github", "-y", "--auth")
 
     assert result.exit_code == 1
-    assert "--auth needs GH_TOKEN, GITHUB_TOKEN or a logged-in gh." in result.stderr
+    assert "--auth needs GH_TOKEN, GITHUB_TOKEN or a logged-in gh." in plain(result.stderr)
     assert github.requests == []
 
 
@@ -246,7 +257,7 @@ def test_a_moved_repository_is_followed_and_named(github):
     result = run("octo/old", "--github", "-y", "--path", "README.md")
 
     assert result.exit_code == 0, result.output
-    assert "octo/old moved to octo/sample" in result.stderr
+    assert "octo/old moved to octo/sample" in plain(result.stderr)
     assert 'project="octo/sample"' in result.stdout
 
 
@@ -255,7 +266,7 @@ def test_a_redirect_to_another_host_is_refused(github):
     result = run("octo/sample", "--github", "-y")
 
     assert result.exit_code == 1
-    assert "redirected to 192.0.2.1, which codigest does not contact" in result.stderr
+    assert "redirected to 192.0.2.1, which codigest does not contact" in plain(result.stderr)
     assert result.stdout == ""
 
 
@@ -263,8 +274,8 @@ def test_an_unknown_ref_names_the_default_branch(github):
     result = run("octo/sample", "--github", "--ref", "gone")
 
     assert result.exit_code == 1
-    assert "No branch, tag or commit gone in octo/sample (default branch: main)." in " ".join(
-        result.stderr.split()
+    assert "No branch, tag or commit gone in octo/sample (default branch: main)." in plain(
+        result.stderr
     )
 
 
@@ -294,7 +305,7 @@ def test_the_rate_limit_is_reported_with_its_reset_time(github, sleeps):
 
     when = time.strftime("%H:%M", time.localtime(reset))
     assert result.exit_code == 1
-    assert f"GitHub API rate limit reached; resets at {when} (local time)." in result.stderr
+    assert f"GitHub API rate limit reached; resets at {when} (local time)." in plain(result.stderr)
     assert sleeps == []
 
 
@@ -311,7 +322,7 @@ def test_a_long_retry_after_is_reported(github, sleeps):
     result = run("octo/sample", "--github", "-y")
 
     assert result.exit_code == 1
-    assert "GitHub asked to wait 60 s (secondary rate limit)." in result.stderr
+    assert "GitHub asked to wait 60 s (secondary rate limit)." in plain(result.stderr)
     assert sleeps == []
 
 
@@ -323,7 +334,7 @@ def test_server_errors_are_retried_twice(github, sleeps):
     github.queue["/repos/octo/sample"] = [(500, {}, b"")] * 3
     result = run("octo/sample", "--github", "-y")
     assert result.exit_code == 1
-    assert "GitHub answered 500" in result.stderr
+    assert "GitHub answered 500" in plain(result.stderr)
 
 
 def test_a_failed_download_gives_no_partial_snapshot(github, sleeps):
@@ -339,7 +350,7 @@ def test_an_unreachable_host_is_named(github, monkeypatch, sleeps):
     result = run("octo/sample", "--github", "-y")
 
     assert result.exit_code == 1
-    assert "Could not reach 127.0.0.1:9" in result.stderr
+    assert "Could not reach 127.0.0.1:9" in plain(result.stderr)
     assert sleeps == [1, 2]
 
 
@@ -349,7 +360,7 @@ def test_a_truncated_listing_walks_down_to_the_named_paths(github):
 
     whole = run("octo/sample", "--github", "-y")
     assert whole.exit_code == 1
-    assert "too large to list at once; name folders with --path" in whole.stderr
+    assert "too large to list at once; name folders with --path" in plain(whole.stderr)
 
     scoped = run("octo/sample", "--github", "-y", "--path", "src/util")
     assert scoped.exit_code == 0, scoped.output
@@ -366,9 +377,9 @@ def test_entries_that_are_not_plain_files_are_skipped_and_named(github):
     result = run("octo/sample", "--github", "-y")
 
     assert result.exit_code == 0, result.output
-    assert "Skipped (path not valid on this system): ../evil.py" in result.stderr
-    assert "Skipped (symlink): link.py" in result.stderr
-    assert "Skipped (submodule): vendor" in result.stderr
+    assert "Skipped (path not valid on this system): ../evil.py" in plain(result.stderr)
+    assert "Skipped (symlink): link.py" in plain(result.stderr)
+    assert "Skipped (submodule): vendor" in plain(result.stderr)
     assert not {"../evil.py", "link.py", "vendor"} & set(github.fetched())
 
 
@@ -391,9 +402,13 @@ def test_the_size_question_comes_before_any_download(github, monkeypatch):
     local_result = local(github.root, monkeypatch)
 
     assert remote_result.exit_code == 1
-    large = [line for line in remote_result.stderr.splitlines() if line.startswith("Large:")]
-    assert large == [line for line in local_result.stderr.splitlines() if line.startswith("Large:")]
-    assert "Stopped." in remote_result.stderr
+    large = [
+        line for line in uncolor(remote_result.stderr).splitlines() if line.startswith("Large:")
+    ]
+    assert large == [
+        line for line in uncolor(local_result.stderr).splitlines() if line.startswith("Large:")
+    ]
+    assert "Stopped." in plain(remote_result.stderr)
     assert github.fetched() == [".gitignore"]
 
 
@@ -402,7 +417,7 @@ def test_a_hard_ceiling_applies_even_with_yes(github, monkeypatch):
     result = run("octo/sample", "--github", "-y")
 
     assert result.exit_code == 1
-    assert "a GitHub scan takes at most 2 files" in result.stderr
+    assert "a GitHub scan takes at most 2 files" in plain(result.stderr)
     assert github.fetched() == [".gitignore"]
 
 
@@ -472,7 +487,7 @@ def test_usage_errors_stop_before_any_request(github, args, message):
     result = run(*args)
 
     assert result.exit_code == 2
-    assert message in " ".join(result.stderr.replace("│", " ").split())
+    assert message in plain(result.stderr)
     assert github.requests == []
 
 
@@ -481,9 +496,7 @@ def test_a_missing_local_path_that_looks_like_a_repository_suggests_github(tmp_p
     result = run("octo/sample")
 
     assert result.exit_code == 2
-    assert "add --github to scan the GitHub repository octo/sample" in " ".join(
-        result.stderr.replace("│", " ").split()
-    )
+    assert "add --github to scan the GitHub repository octo/sample" in plain(result.stderr)
 
 
 @pytest.mark.parametrize(
