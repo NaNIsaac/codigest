@@ -377,7 +377,8 @@ def _list(client: Client, name: str, commit: str, scopes: list[str]) -> list[Ent
     data = client.json(f"/repos/{name}/git/trees/{commit}?recursive=1")
     if not data.get("truncated"):
         return _entries(data)
-    if not any(scopes):
+    # The root is the listing that was cut short, so it cannot be a scope here, even next to others.
+    if not scopes or "" in scopes:
         raise RemoteError(f"{name} is too large to list at once; name folders with --path.")
     root = _entries(client.json(f"/repos/{name}/git/trees/{commit}"))
     found = {e.path: e for e in root if e.path == ".gitignore"}

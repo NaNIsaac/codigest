@@ -145,6 +145,20 @@ def test_url_forms_name_the_ref_and_path(github):
     )
 
 
+def test_max_file_size_is_a_remote_rule_the_local_scan_does_not_have(github, monkeypatch):
+    # Outside the "same as local" tests: a local scan has no size limit per file. A remote scan
+    # equals the local scan of the same folder without the files over the limit.
+    write(github.root, {"src/big.py": b"x = 1\n" * 400})
+    result = run("octo/sample", "--github", "-y", "--max-file-size", "2KB")
+    (github.root / "src" / "big.py").unlink()
+    without_big = local(github.root, monkeypatch, "-y")
+
+    assert result.exit_code == 0, result.output
+    assert "Skipped (over 2.0 kB): src/big.py" in plain(result.stderr)
+    assert "src/big.py" not in github.fetched()
+    assert body(result.stdout) == body(without_big.stdout)
+
+
 def test_files_that_are_not_shared_are_never_downloaded(github):
     result = run("octo/sample", "--github", "-y", "--max-file-size", "12")
 
@@ -365,6 +379,18 @@ def test_a_truncated_listing_walks_down_to_the_named_paths(github):
     scoped = run("octo/sample", "--github", "-y", "--path", "src/util")
     assert scoped.exit_code == 0, scoped.output
     assert scoped.stdout == expected
+
+
+@pytest.mark.parametrize("root", [".", "./", ""])
+def test_a_truncated_listing_cannot_give_the_root_by_its_name(github, root):
+    # The root is the one listing GitHub already cut short: walking to it gave only the
+    # other paths, so root files went missing with exit 0 (review on #33).
+    github.truncate = True
+    result = run("octo/sample", "--github", "-y", "--path", root, "--path", "src")
+
+    assert result.exit_code == 1
+    assert "too large to list at once; name folders with --path" in plain(result.stderr)
+    assert result.stdout == ""
 
 
 def test_entries_that_are_not_plain_files_are_skipped_and_named(github):
