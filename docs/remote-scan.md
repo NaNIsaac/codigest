@@ -1,7 +1,8 @@
 # Remote scan: `cdg scan` on a GitHub repository
 
-Status: design, not implemented. This document is the plan for the pull requests that follow it.
-Read against `c1c4d11` (0.12.2).
+Status: implemented in the Python build (`src/codigest/core/remote.py`); the Rust build and MCP
+are not. Written against `c1c4d11` (0.12.2) as the plan for the pull requests that follow it, and
+corrected where the implementation turned out different.
 
 ## Goal
 
@@ -114,7 +115,8 @@ The body is what a local scan of a checkout of the same commit gives. The differ
   Markdown gets a `Source:` line under the heading, JSON a `source` object. A local scan's
   output stays byte for byte as it is (existing tests and parity tests keep passing), and
   `prompts.toml` templates receive the three values as extra variables they may ignore.
-- The summary on stderr names the repository and the commit:
+- The summary on stderr (printed, as for local scans, only when the result is not printed)
+  names the repository and the commit:
   `Snapshot NaNIsaac/QoraGeom@main (1a2b3c4) 12 files, ~3,000 tokens`.
 - Skipped files are listed on stderr like withheld ones, by reason: `Withheld (may contain
   secrets)`, `Skipped (over 1 MB)`, `Skipped (symlink)`, `Skipped (submodule)`,
@@ -156,14 +158,19 @@ parse target ──> resolve ref to commit ──> list tree ──> select ─�
 4. **Size check.** The estimate is the sum of the selected sizes over four, as the local scan
    computes it from `stat`, with the same thresholds (30,000 tokens or 100 files), the same
    question, the same stop when stdin is not a terminal, and the same `-y`. It runs before any
-   file is downloaded.
+   file is downloaded. One difference: a file named with a line range counts with its whole
+   size, because its lines are not known before it is downloaded (a local scan counts only the
+   range).
 5. **Download** only the selected blobs (see [Requests](#requests)).
 6. **Materialize** them into a new temporary folder (`tempfile` / `std::env::temp_dir` with a
    random name, created with owner-only permissions on Unix) at their repository paths.
 7. **Scan** that folder with the existing code: `ProjectContext` gets the folder as a fixed
    root (a new optional argument; today the root is found by walking up from the current
    directory, which must not happen here) and `OWNER/REPO` as the project name; `--path`
-   values become targets inside it. The size check is not asked a second time.
+   values become targets inside it. The size check is not asked a second time. A named path
+   with nothing selected under it (ignored, or a withheld secret file) was not downloaded, and
+   shares nothing, as a local scan of it does; it is not replaced by the whole folder. A line
+   range on a `--path` that is not a file of the repository is an error.
 8. **Clean up.** The folder is removed in a `finally` / `Drop`, also on error and Ctrl+C.
 
 Why a temporary folder rather than teaching every stage to read from a listing: the scanner,
@@ -235,7 +242,7 @@ to `api.github.com`, and blobs are addressed by their content hash from the list
 
 Every request is `GET`. The HTTP layer of both builds has one function, `get(url, headers)`,
 and no way to send another method or a body. Requests carry `User-Agent: codigest/<version>`,
-`X-GitHub-Api-Version: 2022-11-28` on API calls, a 10 s connect and 30 s read timeout, and go
+`X-GitHub-Api-Version: 2022-11-28` on API calls, a 30 s socket timeout, and go
 through the proxy named in `HTTPS_PROXY` when set.
 
 Redirects are followed for `GET` only, at most five, and the `Authorization` header is dropped
@@ -333,9 +340,10 @@ All tests run without network access unless marked otherwise.
 
 ### Fake GitHub
 
-`tests/fixtures/github/` holds small repositories as plain folders. A fake server (Python:
-`http.server` on `127.0.0.1:0` in a thread; Rust: a `std::net::TcpListener` thread in
-`rust/tests/common`) builds the three API answers and the raw files from such a folder, and
+The tests write a small repository into a temporary folder (from a table in the test, so that no
+token-shaped string is committed). A fake server (Python: `tests/fake_github.py`, `http.server`
+on two ports of `127.0.0.1` for the API and raw hosts; Rust: a `std::net::TcpListener` thread in
+`rust/tests/common`) builds the API answers and the raw files from such a folder, and
 records method, host, path and headers of every request. Both builds take the base URLs from
 `CODIGEST_GITHUB_API` and `CODIGEST_GITHUB_RAW`; these are for tests and are documented as such.
 Scenarios are switched per test: rate limited, secondary limit with `Retry-After`, a `500`
