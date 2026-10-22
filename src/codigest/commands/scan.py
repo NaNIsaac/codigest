@@ -17,7 +17,7 @@ from ..options import (
 
 lazy from rich.filesize import decimal
 lazy import json
-lazy from ..core import structure, tags, prompts, processor, tokenizer, common, cache
+lazy from ..core import structure, tags, prompts, processor, tokenizer, common, cache, remote
 lazy from ..core.output import OutputHandler, spinner
 
 app = typer.Typer()
@@ -37,6 +37,8 @@ def _parse_targets(raw: list[str]) -> tuple[list[Path], dict[Path, list[tuple[in
             span = (int(m["lo"]), int(m["hi"]) if m["hi"] else None)
         if not path.exists():
             hint = " (a line range is FILE:START-END or FILE:LINE)" if ":" in item[2:] else ""
+            if re.fullmatch(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+", item):
+                hint = f"; add --github to scan the GitHub repository {item}"
             raise typer.BadParameter(f"{item} does not exist{hint}", param_hint="targets")
         path = path.resolve()
         if span:
@@ -65,26 +67,63 @@ def handle(
     yes: bool = typer.Option(False, "-y", "--yes", help="Skip confirmation prompt"),
     resolve: ResolveOption = False,
     format: FormatOption = Format.XML,
+    github: bool = typer.Option(
+        False,
+        "--github",
+        help="Read the target OWNER/REPO from GitHub (implied by a github.com URL)",
+    ),
+    ref: str | None = typer.Option(
+        None,
+        "--ref",
+        help="GitHub: branch, tag or commit [default: the repository's default branch]",
+        show_default=False,
+    ),
+    paths: list[str] = typer.Option(
+        None,
+        "--path",
+        help="GitHub: only this path of the repository; repeat for more, FILE:40-60 for lines",
+        show_default=False,
+    ),
+    auth: bool = typer.Option(
+        False,
+        "--auth",
+        help="GitHub: send your token (GH_TOKEN, GITHUB_TOKEN or gh) to read private repositories",
+    ),
+    max_file_size: str = typer.Option(
+        "1MB", "--max-file-size", help="GitHub: list larger files as skipped, without downloading"
+    ),
 ) -> None:
     """
     Bundle the whole project, or only the given paths, as one block.
+    A GitHub repository (OWNER/REPO --github, or its URL) is read the same way, without cloning.
     """
     handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log_console = handler.log_console
-    targets, ranges = _parse_targets(raw_targets or [])
+    raw_targets = raw_targets or []
+
+    if target := _remote_target(raw_targets, github, ref, paths, resolve):
+        try:
+            limit = remote.parse_size(max_file_size)
+        except ValueError as e:
+            raise typer.BadParameter(str(e), param_hint="'--max-file-size'") from None
+        try:
+            _scan_remote(handler, target, auth, limit, yes, message, line_numbers, format)
+        except remote.RemoteError as e:
+            log_console.print(f"[red]Error:[/red] {e}", highlight=False)
+            raise typer.Exit(1) from None
+        return
+
+    targets, ranges = _parse_targets(raw_targets)
 
     # [1] Context Setup (Centralized)
     ctx = common.get_context(targets)
     root_path = ctx.root_path
-
-    prompt_engine = prompts.get_engine(root_path)
 
     # [2] File Discovery via Context
     with spinner(log_console, "[bold blue]Scanning...[/bold blue]"):
         files = ctx.get_target_files(targets=targets, ignore_config=all, resolve_deps=resolve)
 
     # [3] Pre-flight Check
-    total_files = len(files)
     # A range of a big file is small: count what will be shared, not the whole file.
     total_size = sum(
         sum(len(processor.read_line_range(f, lo, hi)[0]) for lo, hi in ranges[f])
@@ -92,33 +131,146 @@ def handle(
         else f.stat().st_size
         for f in files
     )
-    est_tokens = int(total_size / 4)
 
     if ctx.withheld:
-        names = ", ".join(p.relative_to(root_path).as_posix() for p in ctx.withheld)
-        log_console.print(
-            f"[yellow]Withheld (may contain secrets):[/yellow] {names}", highlight=False
-        )
+        _report(log_console, "Withheld (may contain secrets)", ctx.withheld, root_path)
+    if not yes:
+        _confirm_size(log_console, len(files), total_size)
 
+    _render(handler, root_path, files, ranges, message, line_numbers, format)
+
+
+def _report(log_console, label: str, paths, root: Path | None = None) -> None:
+    names = ", ".join(p.relative_to(root).as_posix() if root else p for p in paths)
+    log_console.print(f"[yellow]{label}:[/yellow] {names}", highlight=False)
+
+
+def _confirm_size(log_console, total_files: int, total_size: int) -> None:
+    """Asks before sharing a large context; stops when nobody can answer."""
     TOKEN_THRESHOLD = 30000
     FILE_COUNT_THRESHOLD = 100
-    is_large_context = est_tokens > TOKEN_THRESHOLD or total_files > FILE_COUNT_THRESHOLD
+    est_tokens = int(total_size / 4)
+    if est_tokens <= TOKEN_THRESHOLD and total_files <= FILE_COUNT_THRESHOLD:
+        return
+    log_console.print(
+        f"[yellow]Large:[/yellow] {total_files} files, {decimal(total_size)}, about {est_tokens:,} tokens "
+        f"(asks above {TOKEN_THRESHOLD:,} tokens or {FILE_COUNT_THRESHOLD} files; -y skips this)"
+    )
+    hint = "Share less by naming paths (cdg scan src/), or cdg digest for signatures only."
+    if not sys.stdin.isatty():
+        # Nobody can answer the question: say how to go on instead of a bare "Aborted!".
+        log_console.print(f"Stopped. {hint} -y takes it all.")
+        raise typer.Exit(1)
+    if not typer.confirm("Continue anyway?"):
+        log_console.print(f"Nothing shared. {hint}")
+        raise typer.Exit()
 
-    if yes:
-        pass
-    elif is_large_context:
-        log_console.print(
-            f"[yellow]Large:[/yellow] {total_files} files, {decimal(total_size)}, about {est_tokens:,} tokens "
-            f"(asks above {TOKEN_THRESHOLD:,} tokens or {FILE_COUNT_THRESHOLD} files; -y skips this)"
+
+def _remote_target(
+    raw: list[str], github: bool, ref: str | None, paths: list[str] | None, resolve: bool
+) -> remote.Target | None:
+    """The repository to read from GitHub, or None for an ordinary local scan."""
+    is_remote = github or any(remote.is_url(r) for r in raw)
+    if not is_remote:
+        if ref is not None or paths:
+            raise typer.BadParameter(
+                "--ref and --path need a GitHub repository (OWNER/REPO --github, or its URL)",
+                param_hint="targets",
+            )
+        return None
+    if len(raw) != 1:
+        raise typer.BadParameter(
+            "name one GitHub repository and nothing else; choose its paths with --path",
+            param_hint="targets",
         )
-        hint = "Share less by naming paths (cdg scan src/), or cdg digest for signatures only."
-        if not sys.stdin.isatty():
-            # Nobody can answer the question: say how to go on instead of a bare "Aborted!".
-            log_console.print(f"Stopped. {hint} -y takes it all.")
-            raise typer.Exit(1)
-        if not typer.confirm("Continue anyway?"):
-            log_console.print(f"Nothing shared. {hint}")
-            raise typer.Exit()
+    if resolve:
+        raise typer.BadParameter("-r does not work on a GitHub repository yet", param_hint="'-r'")
+    try:
+        target = remote.parse_target(raw[0])
+        if ref is not None:
+            target.ref = ref
+        if paths:
+            target.paths = [remote.repo_target(p) for p in paths]
+    except ValueError as e:
+        raise typer.BadParameter(str(e), param_hint="'--path'" if paths else "targets") from None
+    return target
+
+
+def _scan_remote(
+    handler,
+    target: remote.Target,
+    auth: bool,
+    max_file_size: int,
+    yes: bool,
+    message: str,
+    line_numbers: bool,
+    format: Format,
+) -> None:
+    log_console = handler.log_console
+    with spinner(log_console, f"[bold blue]Listing {target.name}...[/bold blue]"):
+        plan = remote.plan(target, auth=auth, max_file_size=max_file_size)
+
+    for note in plan.notes:
+        log_console.print(f"[yellow]Note:[/yellow] {note}", highlight=False)
+    if plan.withheld:
+        _report(log_console, "Withheld (may contain secrets)", plan.withheld)
+    for reason, skipped in plan.skipped.items():
+        _report(log_console, f"Skipped ({reason})", skipped)
+    if len(plan.files) > remote.MAX_FILES or plan.size > remote.MAX_BYTES:
+        raise remote.RemoteError(
+            f"{len(plan.files)} files, {decimal(plan.size)} selected; a GitHub scan takes at most "
+            f"{remote.MAX_FILES:,} files or {decimal(remote.MAX_BYTES)}. Name folders with --path."
+        )
+    if not yes:
+        _confirm_size(log_console, len(plan.files), plan.size)
+
+    with (
+        spinner(log_console, f"[bold blue]Downloading {plan.name}...[/bold blue]"),
+        remote.materialize(plan) as root,
+    ):
+        # Paths named with --path become targets inside the folder, line ranges included. A
+        # named path with nothing selected under it (ignored, withheld) was not downloaded; the
+        # local scan of such a path shares nothing, so it is dropped, not scanned as the root.
+        named = [
+            str(root.joinpath(*path.split("/"))) + span
+            for path, span in plan.targets
+            if root.joinpath(*path.split("/")).exists()
+        ]
+        targets, ranges = _parse_targets(named)
+        ctx = common.get_context(targets, root=root)
+        files = [] if plan.targets and not named else ctx.get_target_files(targets=targets)
+        _render(
+            handler,
+            root,
+            files,
+            ranges,
+            message,
+            line_numbers,
+            format,
+            project=plan.name,
+            source={"source": plan.source, "ref": plan.ref, "commit": plan.commit},
+            label=f"{plan.name}@{plan.ref} ({plan.commit[:7]}) ",
+        )
+
+
+def _render(
+    handler,
+    root_path: Path,
+    files: list[Path],
+    ranges,
+    message: str,
+    line_numbers: bool,
+    format: Format,
+    project: str | None = None,
+    source: dict[str, str] | None = None,
+    label: str = "",
+) -> None:
+    """The snapshot of the selected files, handed to the output. `source` (url, ref and commit)
+    is set only for a repository read from GitHub."""
+    log_console = handler.log_console
+    project = project or root_path.name
+    source = source or {}
+    total_files = len(files)
 
     if format != Format.XML:
         with spinner(log_console, "[bold blue]Generating Snapshot...[/bold blue]"):
@@ -126,9 +278,11 @@ def handle(
             # The block cache holds XML blocks, so other formats read the files afresh.
             shared = _shared_files(files, ranges, root_path, line_numbers)
             render = _markdown if format == Format.MARKDOWN else _json
-            snapshot_content = render(root_path.name, message, tree_str, shared)
-        _deliver(handler, snapshot_content, total_files)
+            snapshot_content = render(project, message, tree_str, shared, source)
+        _deliver(handler, snapshot_content, total_files, label)
         return
+
+    prompt_engine = prompts.get_engine(root_path)
 
     # [4] Execution
     with spinner(log_console, "[bold blue]Generating Snapshot...[/bold blue]"):
@@ -178,22 +332,26 @@ def handle(
         try:
             snapshot_content = prompt_engine.render(
                 "snapshot",
-                project_name=root_path.name,
+                project_name=project,
                 tree_structure=tree_str,
                 source_code=source_code_blob,
                 instruction=message,
+                **source,
             )
         except Exception as e:
             log_console.print(f"[red][Error] Template Rendering Failed:[/red] {e}")
             raise typer.Exit(1) from e
 
-    _deliver(handler, snapshot_content, total_files)
+    _deliver(handler, snapshot_content, total_files, label)
 
 
-def _deliver(handler, snapshot: str, total_files: int) -> None:
+def _deliver(handler, snapshot: str, total_files: int, label: str = "") -> None:
     def summary():
         tokens = tokenizer.estimate_tokens(snapshot)
-        handler.log_console.print(f"[bold]Snapshot[/bold] {total_files} files, ~{tokens:,} tokens")
+        handler.log_console.print(
+            f"[bold]Snapshot[/bold] {label}{total_files} files, ~{tokens:,} tokens",
+            highlight=False,
+        )
 
     handler.handle_output(snapshot, summary=summary, item_name="snapshot")
 
@@ -216,8 +374,16 @@ def _shared_files(files, ranges, root: Path, line_numbers: bool) -> list[dict[st
     return shared
 
 
-def _markdown(project: str, instruction: str, tree: str, files: list[dict[str, str]]) -> str:
+def _markdown(
+    project: str,
+    instruction: str,
+    tree: str,
+    files: list[dict[str, str]],
+    source: dict[str, str] | None = None,
+) -> str:
     parts = [f"# {project}"]
+    if source:
+        parts.append(f"Source: {source['source']}, {source['ref']} at {source['commit']}")
     if instruction:
         parts.append(instruction)
     parts.append(f"## Structure\n\n{fenced(tree)}")
@@ -229,10 +395,27 @@ def _markdown(project: str, instruction: str, tree: str, files: list[dict[str, s
     return "\n\n".join(parts) + "\n"
 
 
-def _json(project: str, instruction: str, tree: str, files: list[dict[str, str]]) -> str:
+def _json(
+    project: str,
+    instruction: str,
+    tree: str,
+    files: list[dict[str, str]],
+    source: dict[str, str] | None = None,
+) -> str:
     return json.dumps(
         {
             "project": project,
+            **(
+                {
+                    "source": {
+                        "url": source["source"],
+                        "ref": source["ref"],
+                        "commit": source["commit"],
+                    }
+                }
+                if source
+                else {}
+            ),
             "instruction": instruction,
             "structure": tree,
             "files": [{k: v for k, v in file.items() if v or k != "lines"} for file in files],

@@ -23,24 +23,29 @@ type Targets = list[Path] | Path
 
 class ProjectContext:
     # [수정] targets 타입을 list[Path] | Path로 확장
-    def __init__(self, targets: Targets | None = None):
+    def __init__(self, targets: Targets | None = None, root: Path | None = None):
 
         # [추가] 단일 Path가 들어오면 리스트로 감싸기 (Safety)
         if isinstance(targets, Path):
             targets = [targets]
 
-        # 1. 탐색 시작점 결정
-        # Paths in different folders of the same project (aps/a.m Auto_run/b.m) share the
-        # project you are in; starting from the first path alone made its folder the root.
-        cwd = Path.cwd().resolve()
-        resolved = [t.resolve() for t in targets or []]
-        if not resolved or all(t.is_relative_to(cwd) for t in resolved):
-            self.start_path = cwd
+        if root is not None:
+            # A fixed root (a remote repository's files in a temporary folder): never look
+            # above it for a project marker.
+            self.start_path = self.root_path = root
         else:
-            self.start_path = Path(os.path.commonpath(resolved))
+            # 1. 탐색 시작점 결정
+            # Paths in different folders of the same project (aps/a.m Auto_run/b.m) share the
+            # project you are in; starting from the first path alone made its folder the root.
+            cwd = Path.cwd().resolve()
+            resolved = [t.resolve() for t in targets or []]
+            if not resolved or all(t.is_relative_to(cwd) for t in resolved):
+                self.start_path = cwd
+            else:
+                self.start_path = Path(os.path.commonpath(resolved))
 
-        # 2. 루트 찾기
-        self.root_path = self._find_project_root(self.start_path)
+            # 2. 루트 찾기
+            self.root_path = self._find_project_root(self.start_path)
         self.withheld: list[Path] = []
         self.config_extensions, self.config_ignores = self._load_config_filters()
 
@@ -123,8 +128,8 @@ class ProjectContext:
 
 
 # Helper for quick access
-def get_context(targets: Targets | None = None) -> ProjectContext:
-    return ProjectContext(targets)
+def get_context(targets: Targets | None = None, root: Path | None = None) -> ProjectContext:
+    return ProjectContext(targets, root)
 
 
 def remove_tree(path: Path) -> None:
