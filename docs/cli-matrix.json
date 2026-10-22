@@ -1,0 +1,1439 @@
+{
+  "python": {
+    "scan": [
+      "--all",
+      "--copy",
+      "--format",
+      "--lines",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "--yes",
+      "-a",
+      "-c",
+      "-l",
+      "-m",
+      "-o",
+      "-r",
+      "-s",
+      "-y"
+    ],
+    "digest": [
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-c",
+      "-m",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "tree": [
+      "--all",
+      "--copy",
+      "--depth",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-L",
+      "-a",
+      "-c",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "mark": [],
+    "diff": [
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-c",
+      "-m",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "semdiff": [
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-c",
+      "-m",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "cap": [],
+    "pack": [
+      "--budget",
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--stdout",
+      "--with",
+      "-b",
+      "-c",
+      "-m",
+      "-o",
+      "-s"
+    ],
+    "mcp": [],
+    "status": [],
+    "init": [
+      "--force",
+      "-f"
+    ],
+    "clean": [
+      "--force",
+      "--yes",
+      "-f",
+      "-y"
+    ],
+    "term": [
+      "--context",
+      "--copy",
+      "--count",
+      "--failed",
+      "--format",
+      "--here",
+      "--history-only",
+      "--index",
+      "--no-copy",
+      "--output",
+      "--stdout",
+      "-c",
+      "-f",
+      "-i",
+      "-n",
+      "-o",
+      "-s"
+    ],
+    "term clear": [],
+    "term path": [],
+    "term ingest": [
+      "--cwd",
+      "--end",
+      "--exit-code",
+      "--file",
+      "--shell",
+      "--start"
+    ],
+    "term install": [
+      "--shell"
+    ],
+    "term uninstall": [
+      "--shell"
+    ],
+    "shell-help": [],
+    "shell-help install": [],
+    "shell-help uninstall": []
+  },
+  "rust": {
+    "scan": [
+      "--all",
+      "--copy",
+      "--format",
+      "--lines",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "--yes",
+      "-a",
+      "-c",
+      "-l",
+      "-m",
+      "-o",
+      "-r",
+      "-s",
+      "-y"
+    ],
+    "digest": [
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-c",
+      "-m",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "tree": [
+      "--all",
+      "--copy",
+      "--depth",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-L",
+      "-a",
+      "-c",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "mark": [],
+    "diff": [
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-c",
+      "-m",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "semdiff": [
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--resolve",
+      "--stdout",
+      "-c",
+      "-m",
+      "-o",
+      "-r",
+      "-s"
+    ],
+    "cap": [],
+    "pack": [
+      "--budget",
+      "--copy",
+      "--message",
+      "--no-copy",
+      "--output",
+      "--stdout",
+      "--with",
+      "-b",
+      "-c",
+      "-m",
+      "-o",
+      "-s"
+    ],
+    "term": [
+      "--context",
+      "--copy",
+      "--count",
+      "--failed",
+      "--format",
+      "--here",
+      "--history-only",
+      "--index",
+      "--no-copy",
+      "--output",
+      "--raw",
+      "--stdout",
+      "-c",
+      "-f",
+      "-i",
+      "-n",
+      "-o",
+      "-s"
+    ],
+    "term clear": [],
+    "term path": [],
+    "term install": [
+      "--shell"
+    ],
+    "term uninstall": [
+      "--shell"
+    ],
+    "term ingest": [
+      "--cwd",
+      "--end",
+      "--exit-code",
+      "--file",
+      "--shell",
+      "--start"
+    ],
+    "mcp": [],
+    "status": [],
+    "init": [
+      "--force",
+      "-f"
+    ],
+    "clean": [
+      "--force",
+      "--yes",
+      "-f",
+      "-y"
+    ],
+    "shell-help": [],
+    "shell-help install": [],
+    "shell-help uninstall": []
+  },
+  "statuses": {
+    "both": "both builds",
+    "python-only": "Python build only",
+    "rust-only": "Rust build only",
+    "hidden": "both builds, not shown by --help",
+    "pending": "in an open pull request or planned; not on main",
+    "differs": "both builds, with a different result"
+  },
+  "commands": [
+    {
+      "command": "scan",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "mark",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "diff",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "cap",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "mcp",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "status",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "init",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "clean",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term clear",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term path",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "python": true,
+      "rust": true,
+      "status": "hidden",
+      "note": ""
+    },
+    {
+      "command": "term install",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term uninstall",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "shell-help",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "shell-help install",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "shell-help uninstall",
+      "python": true,
+      "rust": true,
+      "status": "both",
+      "note": ""
+    }
+  ],
+  "options": [
+    {
+      "command": "",
+      "option": "--version",
+      "python": [
+        "--version",
+        "-v"
+      ],
+      "rust": [
+        "--version",
+        "-V",
+        "-v"
+      ],
+      "status": "both",
+      "note": "names differ: Python --version, -v; Rust --version, -V, -v"
+    },
+    {
+      "command": "scan",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "scan",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--all",
+      "python": [
+        "--all",
+        "-a"
+      ],
+      "rust": [
+        "--all",
+        "-a"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--message",
+      "python": [
+        "--message",
+        "-m"
+      ],
+      "rust": [
+        "--message",
+        "-m"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--lines",
+      "python": [
+        "--lines",
+        "-l"
+      ],
+      "rust": [
+        "--lines",
+        "-l"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--yes",
+      "python": [
+        "--yes",
+        "-y"
+      ],
+      "rust": [
+        "--yes",
+        "-y"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--resolve",
+      "python": [
+        "--resolve",
+        "-r"
+      ],
+      "rust": [
+        "--resolve",
+        "-r"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--format",
+      "python": [
+        "--format"
+      ],
+      "rust": [
+        "--format"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "digest",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "option": "--message",
+      "python": [
+        "--message",
+        "-m"
+      ],
+      "rust": [
+        "--message",
+        "-m"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "option": "--resolve",
+      "python": [
+        "--resolve",
+        "-r"
+      ],
+      "rust": [
+        "--resolve",
+        "-r"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "tree",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "option": "--all",
+      "python": [
+        "--all",
+        "-a"
+      ],
+      "rust": [
+        "--all",
+        "-a"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "option": "--resolve",
+      "python": [
+        "--resolve",
+        "-r"
+      ],
+      "rust": [
+        "--resolve",
+        "-r"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "tree",
+      "option": "--depth",
+      "python": [
+        "--depth",
+        "-L"
+      ],
+      "rust": [
+        "--depth",
+        "-L"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "diff",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "diff",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "diff",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "diff",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "diff",
+      "option": "--message",
+      "python": [
+        "--message",
+        "-m"
+      ],
+      "rust": [
+        "--message",
+        "-m"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "diff",
+      "option": "--resolve",
+      "python": [
+        "--resolve",
+        "-r"
+      ],
+      "rust": [
+        "--resolve",
+        "-r"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "semdiff",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "option": "--message",
+      "python": [
+        "--message",
+        "-m"
+      ],
+      "rust": [
+        "--message",
+        "-m"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "option": "--resolve",
+      "python": [
+        "--resolve",
+        "-r"
+      ],
+      "rust": [
+        "--resolve",
+        "-r"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "option": "--message",
+      "python": [
+        "--message",
+        "-m"
+      ],
+      "rust": [
+        "--message",
+        "-m"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "option": "--budget",
+      "python": [
+        "--budget",
+        "-b"
+      ],
+      "rust": [
+        "--budget",
+        "-b"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "option": "--with",
+      "python": [
+        "--with"
+      ],
+      "rust": [
+        "--with"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "pack",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "pack",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "init",
+      "option": "--force",
+      "python": [
+        "--force",
+        "-f"
+      ],
+      "rust": [
+        "--force",
+        "-f"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "clean",
+      "option": "--yes",
+      "python": [
+        "--yes",
+        "--force",
+        "-f",
+        "-y"
+      ],
+      "rust": [
+        "--yes",
+        "--force",
+        "-f",
+        "-y"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--count",
+      "python": [
+        "--count",
+        "-n"
+      ],
+      "rust": [
+        "--count",
+        "-n"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--index",
+      "python": [
+        "--index",
+        "-i"
+      ],
+      "rust": [
+        "--index",
+        "-i"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--failed",
+      "python": [
+        "--failed",
+        "-f"
+      ],
+      "rust": [
+        "--failed",
+        "-f"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--here",
+      "python": [
+        "--here"
+      ],
+      "rust": [
+        "--here"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--history-only",
+      "python": [
+        "--history-only"
+      ],
+      "rust": [
+        "--history-only"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--context",
+      "python": [
+        "--context"
+      ],
+      "rust": [
+        "--context"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--format",
+      "python": [
+        "--format"
+      ],
+      "rust": [
+        "--format"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--copy",
+      "python": [
+        "--copy",
+        "-c"
+      ],
+      "rust": [
+        "--copy",
+        "-c"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--no-copy",
+      "python": [
+        "--no-copy"
+      ],
+      "rust": [
+        "--no-copy"
+      ],
+      "status": "both",
+      "note": "hidden in the Rust build only"
+    },
+    {
+      "command": "term",
+      "option": "--stdout",
+      "python": [
+        "--stdout",
+        "-s"
+      ],
+      "rust": [
+        "--stdout",
+        "-s"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--output",
+      "python": [
+        "--output",
+        "-o"
+      ],
+      "rust": [
+        "--output",
+        "-o"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term",
+      "option": "--raw",
+      "python": null,
+      "rust": [
+        "--raw"
+      ],
+      "status": "rust-only",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "option": "--file",
+      "python": [
+        "--file"
+      ],
+      "rust": [
+        "--file"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "option": "--exit-code",
+      "python": [
+        "--exit-code"
+      ],
+      "rust": [
+        "--exit-code"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "option": "--cwd",
+      "python": [
+        "--cwd"
+      ],
+      "rust": [
+        "--cwd"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "option": "--shell",
+      "python": [
+        "--shell"
+      ],
+      "rust": [
+        "--shell"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "option": "--start",
+      "python": [
+        "--start"
+      ],
+      "rust": [
+        "--start"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term ingest",
+      "option": "--end",
+      "python": [
+        "--end"
+      ],
+      "rust": [
+        "--end"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term install",
+      "option": "--shell",
+      "python": [
+        "--shell"
+      ],
+      "rust": [
+        "--shell"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "term uninstall",
+      "option": "--shell",
+      "python": [
+        "--shell"
+      ],
+      "rust": [
+        "--shell"
+      ],
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "scan",
+      "option": "--github",
+      "python": null,
+      "rust": null,
+      "status": "pending",
+      "note": "Python: #33, not merged. Rust: waits for the decision in DotFiles#81."
+    },
+    {
+      "command": "scan",
+      "option": "--ref",
+      "python": null,
+      "rust": null,
+      "status": "pending",
+      "note": "Python: #33, not merged. Rust: waits for the decision in DotFiles#81."
+    },
+    {
+      "command": "scan",
+      "option": "--path",
+      "python": null,
+      "rust": null,
+      "status": "pending",
+      "note": "Python: #33, not merged. Rust: waits for the decision in DotFiles#81."
+    },
+    {
+      "command": "scan",
+      "option": "--auth",
+      "python": null,
+      "rust": null,
+      "status": "pending",
+      "note": "Python: #33, not merged. Rust: waits for the decision in DotFiles#81."
+    },
+    {
+      "command": "scan",
+      "option": "--max-file-size",
+      "python": null,
+      "rust": null,
+      "status": "pending",
+      "note": "Python: #33, not merged. Rust: waits for the decision in DotFiles#81."
+    },
+    {
+      "command": "mcp",
+      "option": "--allow-remote",
+      "python": null,
+      "rust": null,
+      "status": "pending",
+      "note": "Python: planned (docs/remote-scan.md in #30). Rust: planned (same)."
+    }
+  ],
+  "global": [
+    {
+      "command": "every command",
+      "option": "--preset NAME",
+      "python": "yes",
+      "rust": "yes",
+      "status": "both",
+      "note": "expanded before parsing"
+    }
+  ],
+  "behavior": [
+    {
+      "command": "digest",
+      "what": "Python and MATLAB outlines",
+      "python": "yes",
+      "rust": "yes",
+      "status": "both",
+      "note": ""
+    },
+    {
+      "command": "digest",
+      "what": "Rust, JavaScript, TypeScript and Go outlines",
+      "python": "no",
+      "rust": "yes",
+      "status": "rust-only",
+      "note": "tree-sitter grammars"
+    },
+    {
+      "command": "digest",
+      "what": "outline of a Python file with a syntax error",
+      "python": "nothing",
+      "rust": "what parses",
+      "status": "rust-only",
+      "note": ""
+    },
+    {
+      "command": "semdiff",
+      "what": "function and class changes",
+      "python": "Python files",
+      "rust": "Python files",
+      "status": "both",
+      "note": "Python only in both builds"
+    },
+    {
+      "command": "pack",
+      "what": "order of modules called by a failing test",
+      "python": "ast.walk order",
+      "rust": "order of the calls",
+      "status": "differs",
+      "note": ""
+    },
+    {
+      "command": "cap",
+      "what": "Ctrl+C",
+      "python": "default",
+      "rust": "forwarded, 5 s before kill",
+      "status": "differs",
+      "note": ""
+    },
+    {
+      "command": "init, clean, term clear",
+      "what": "status line ending on Windows",
+      "python": "\\r\\n",
+      "rust": "\\n",
+      "status": "differs",
+      "note": "results and -o files use the platform ending in both"
+    },
+    {
+      "command": "scan",
+      "what": "a GitHub repository (OWNER/REPO --github, URL)",
+      "python": "#33, not merged",
+      "rust": "no",
+      "status": "pending",
+      "note": "network requests, see docs/remote-scan.md"
+    }
+  ]
+}
