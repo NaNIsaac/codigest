@@ -501,6 +501,30 @@ Limitations:
   the screen; an error hidden with `-ErrorAction` is not a failure.
 - The PowerShell hook does not wrap lines in remote sessions, nested prompts or the debugger.
 
+Cost. Budget per command, at p95: 10 ms added in PowerShell, 100 ms in Git Bash on Windows,
+and 50 µs per output line. Measured on Windows 11, Ryzen 5 7500F, PowerShell 7.6.7 with
+PSReadLine 2.4.5 and Git Bash 5.3, 60 runs each, while a CPU-bound job ran in the background at
+below-normal priority (so read the numbers as an upper range; rerun with
+`benchmarks/hook_overhead.ps1` and `benchmarks/hook_overhead.sh`):
+
+| | median | p95 |
+| --- | ---: | ---: |
+| PowerShell, line rewrite before a command runs | 0.2 ms | 0.5 ms |
+| PowerShell, added to a one-line command (buffering, starting ingest) | 5.0-6.4 ms | 7.1-8.8 ms |
+| PowerShell, added per output line (20,000 lines) | 25-44 µs | |
+| Git Bash, added to a one-line command | 83 ms | 92 ms |
+| Git Bash, of which the syntax check of the typed line (`bash -n`) | 31 ms | 37 ms |
+| Git Bash, 20,000 output lines: without / with the hook | 183 / 257 ms | |
+| `cdg term ingest`, after the prompt is back: Python build | 474 ms | 504 ms |
+| `cdg term ingest`, after the prompt is back: Rust build | 40 ms | 46 ms |
+
+In Git Bash the cost is process creation (the syntax check, `tee`, the background ingest), which
+is slow on Windows, and output lines cost nothing measurable beyond it; bash on Linux and macOS
+was not measured. The PowerShell per-line cost is the hook's filter running once per output
+object, so a command that prints hundreds of thousands of lines is worth skipping (start it with a
+space). Ingest does not delay the prompt, but it is a process per command; the Rust build takes
+about a tenth of the Python build's time.
+
 ### MCP tools
 
 | Tool | Returns |

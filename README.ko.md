@@ -472,6 +472,27 @@ cdg term clear        # 기록 모두 지우기
 - bash 훅은 DEBUG 트랩을 씁니다. 첫 프롬프트 전에 설정된 트랩(starship, bash-preexec)은 그대로
   두지만, 그 뒤에 새로 설정한 DEBUG 트랩은 훅을 덮어씁니다.
 
+비용. 명령 하나당 예산(p95): PowerShell 10 ms, Windows의 Git Bash 100 ms, 출력 한 줄당 50 µs.
+측정 환경은 Windows 11, Ryzen 5 7500F, PowerShell 7.6.7과 PSReadLine 2.4.5, Git Bash 5.3이고 각
+60회입니다. CPU를 쓰는 다른 작업이 낮은 우선순위로 함께 돌고 있었으므로 상한 쪽 값으로 보십시오.
+`benchmarks/hook_overhead.ps1`, `benchmarks/hook_overhead.sh`로 다시 잴 수 있습니다.
+
+| | 중앙값 | p95 |
+| --- | ---: | ---: |
+| PowerShell, 명령 실행 전 줄 바꿔 쓰기 | 0.2 ms | 0.5 ms |
+| PowerShell, 한 줄짜리 명령에 더해지는 시간(버퍼링, ingest 시작) | 5.0-6.4 ms | 7.1-8.8 ms |
+| PowerShell, 출력 한 줄당 더해지는 시간(20,000줄) | 25-44 µs | |
+| Git Bash, 한 줄짜리 명령에 더해지는 시간 | 83 ms | 92 ms |
+| Git Bash, 그중 입력 줄 문법 검사(`bash -n`) | 31 ms | 37 ms |
+| Git Bash, 출력 20,000줄: 훅 없이 / 훅과 함께 | 183 / 257 ms | |
+| 프롬프트가 돌아온 뒤의 `cdg term ingest`: Python 빌드 | 474 ms | 504 ms |
+| 프롬프트가 돌아온 뒤의 `cdg term ingest`: Rust 빌드 | 40 ms | 46 ms |
+
+Git Bash의 비용은 프로세스 생성(문법 검사, `tee`, 백그라운드 ingest)이며 Windows에서 느립니다. 출력 줄 수에 따른 비용은 그 위로 잴 만큼 나오지 않았습니다.
+Linux와 macOS의 bash는 재지 않았습니다. PowerShell의 줄당 비용은 출력 객체마다 훅의 필터가 한 번씩
+도는 데서 나오므로, 수십만 줄을 찍는 명령은 앞에 공백을 넣어 기록에서 빼는 편이 낫습니다. ingest는
+프롬프트를 늦추지 않지만 명령마다 프로세스 하나이며, Rust 빌드는 Python 빌드의 약 10분의 1 시간이 걸립니다.
+
 ### MCP 도구
 
 | 도구 | 돌려주는 내용 |
