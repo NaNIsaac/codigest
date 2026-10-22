@@ -492,3 +492,33 @@ def test_a_missing_local_path_that_looks_like_a_repository_suggests_github(tmp_p
 )
 def test_sizes(raw, size):
     assert remote.parse_size(raw) == size
+
+
+@pytest.mark.skipif(
+    not os.environ.get("CODIGEST_NETWORK"), reason="reads github.com; CODIGEST_NETWORK=1"
+)
+def test_github_gives_what_a_checkout_of_the_same_tag_gives(tmp_path, monkeypatch):
+    import io
+    import subprocess
+    import tarfile
+    from pathlib import Path
+
+    tag, folder = "v0.9.0", "src/codigest/core"
+    archive = subprocess.run(
+        ["git", "archive", "--format=tar", tag, ".gitignore", folder],
+        cwd=Path(__file__).parent.parent,
+        capture_output=True,
+        check=True,
+    ).stdout
+    checkout = tmp_path / "checkout"
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        tar.extractall(checkout, filter="data")
+    for name in ("CODIGEST_GITHUB_API", "CODIGEST_GITHUB_RAW", "GH_TOKEN", "GITHUB_TOKEN"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    on_github = run("NaNIsaac/codigest", "--github", "--ref", tag, "--path", folder, "-y")
+    on_disk = local(checkout, monkeypatch, folder, "-y")
+
+    assert on_github.exit_code == 0, on_github.output
+    assert body(on_github.stdout) == body(on_disk.stdout)
