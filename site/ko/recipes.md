@@ -2,7 +2,7 @@
 
 상황에서 붙여 넣기까지 이어지는 작업 흐름을 모았습니다. 예시는 [빠른 시작](/ko/getting-started)의 작은 프로젝트(`prices.py`, `test_prices.py`, `legacy/` 폴더)를 씁니다.
 
-## 테스트가 실패하는데 이유를 모를 때
+## 테스트가 실패하는데 이유를 모를 때 {#a-test-fails-and-you-do-not-know-why}
 
 테스트를 `cap`으로 실행하고 pack을 만듭니다.
 
@@ -33,7 +33,7 @@ pack이 생각보다 크면 예산을 줄이거나(`-b 8000`) 필요한 것만 �
 
 기록된 것 전부를 보려면 `cdg term -f`를 쓰세요.
 
-## mark와 semdiff로 리팩터링 검토하기
+## mark와 semdiff로 리팩터링 검토하기 {#review-a-refactor-with-mark-and-semdiff}
 
 작업을 시작하기 전에 기준점을 잡습니다. Git을 건드리지 않으므로 변경이 쌓인 상태나 저장소가 없는 폴더에서도 쓸 수 있습니다.
 
@@ -62,7 +62,7 @@ SemDiff Generated! (~70 Tokens)
 
 `semdiff`는 Python을 읽습니다. 다른 언어는 `cdg diff`를 쓰세요. `cdg mark`를 다시 실행하면 기준점이 지금 시점으로 옮겨 갑니다.
 
-## 폴더 하나, 또는 질문에 필요한 파일만 보여 주기
+## 폴더 하나, 또는 질문에 필요한 파일만 보여 주기 {#share-one-folder-or-one-question-s-worth-of-files}
 
 작게 시작하고, 요청이 있을 때만 넓혀 갑니다.
 
