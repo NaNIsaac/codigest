@@ -102,7 +102,10 @@
 }
 
 /* Korean wraps between words, not between syllables. */
-:lang(ko) .VPHome {
+:lang(ko) .VPHome,
+:lang(ko) .vp-doc,
+:lang(ko) .VPSidebar,
+:lang(ko) .VPDocAsideOutline {
   word-break: keep-all;
   overflow-wrap: break-word;
 }
