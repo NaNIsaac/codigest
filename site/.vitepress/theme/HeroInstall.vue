@@ -1,19 +1,27 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useData } from 'vitepress'
+import { computed, onMounted, ref } from 'vue'
+import { useData, withBase } from 'vitepress'
+
+type Platform = 'windows' | 'unix' | 'python'
 
 const { frontmatter } = useData()
-const selected = ref<'windows' | 'unix' | 'python'>('windows')
+const selected = ref<Platform>('windows')
 const copied = ref(false)
 
 const choices = computed(() => [
-  { key: 'windows' as const, label: frontmatter.value.install?.windowsLabel || 'Windows', command: frontmatter.value.install?.windows },
-  { key: 'unix' as const, label: frontmatter.value.install?.unixLabel || 'Linux / macOS / Termux', command: frontmatter.value.install?.unix },
-  { key: 'python' as const, label: frontmatter.value.install?.pythonLabel || 'Python (uv)', command: frontmatter.value.install?.python },
+  { key: 'windows' as const, prompt: '>', label: frontmatter.value.install?.windowsLabel || 'Windows', command: frontmatter.value.install?.windows },
+  { key: 'unix' as const, prompt: '$', label: frontmatter.value.install?.unixLabel || 'Linux / macOS / Termux', command: frontmatter.value.install?.unix },
+  { key: 'python' as const, prompt: '$', label: frontmatter.value.install?.pythonLabel || 'Python (uv)', command: frontmatter.value.install?.python },
 ])
 const active = computed(() => choices.value.find(c => c.key === selected.value) || choices.value[0])
+const moreLink = computed(() => withBase(frontmatter.value.install?.moreLink ?? '/installation'))
 
-function select(key: 'windows' | 'unix' | 'python') {
+// The page is prerendered with Windows selected; switch to the visitor's platform after hydration.
+onMounted(() => {
+  if (!/Windows/i.test(navigator.userAgent)) selected.value = 'unix'
+})
+
+function select(key: Platform) {
   selected.value = key
   copied.value = false
 }
@@ -45,12 +53,13 @@ async function copy() {
       >{{ choice.label }}</button>
     </div>
     <div class="installer-command">
-      <code><span class="prompt">&gt;</span> {{ active.command }}</code>
-      <button type="button" class="installer-copy" :aria-label="frontmatter.install.copy" @click="copy">
+      <code><span class="prompt">{{ active.prompt }}</span> {{ active.command }}</code>
+      <button type="button" class="installer-copy" @click="copy">
         {{ copied ? frontmatter.install.copied : frontmatter.install.copy }}
       </button>
+      <span class="visually-hidden" aria-live="polite">{{ copied ? frontmatter.install.copied : '' }}</span>
     </div>
-    <a class="installer-more" :href="frontmatter.install.moreLink">{{ frontmatter.install.moreLabel }} →</a>
+    <a class="installer-more" :href="moreLink">{{ frontmatter.install.moreLabel }} →</a>
   </div>
 </template>
 

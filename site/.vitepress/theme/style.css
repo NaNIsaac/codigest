@@ -94,6 +94,12 @@
   max-width: 560px;
 }
 
+/* Korean wraps between words, not between syllables. */
+:lang(ko) .VPHome {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
 /* Hero: a tinted band in the accent colour, demo in the right column on wide screens. */
 .VPHome {
   overflow-x: clip;
