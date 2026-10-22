@@ -6,6 +6,8 @@ The cases live in fixtures/capture_secrets.json, which the Rust tests read too.
 """
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,7 @@ from typer.testing import CliRunner
 
 from codigest.commands import term
 from codigest.core import termstore
+from codigest.core.redact import MASK, redact
 
 CASES = json.loads(
     (Path(__file__).parent / "fixtures" / "capture_secrets.json").read_text(encoding="utf-8")
@@ -113,3 +116,34 @@ def test_a_complete_private_key_still_collapses_to_one_marker():
         "-----BEGIN PRIVATE KEY-----[REDACTED]-----END PRIVATE KEY-----",
         "after",
     ]
+
+
+CAMEL_CASE_KEYS = [
+    ("SessionToken=AQoDYXdzEJr1K2", f"SessionToken={MASK}"),
+    ('awsSecretAccessKey: "wJalrXUtnFEMI"', f'awsSecretAccessKey: "{MASK}"'),
+    ("AccountKey=abc123def456", f"AccountKey={MASK}"),
+    ("x_PrivateKey=0123456789ab", f"x_PrivateKey={MASK}"),
+    ('"ApiKey": "sk_live_abcdef"', f'"ApiKey": "{MASK}"'),
+    ("AWSSessionToken=FQoGZXIvYXdzE", f"AWSSessionToken={MASK}"),
+    ("accessToken = eyJhbGciOi", f"accessToken = {MASK}"),
+    ("maxtokens=4096000", "maxtokens=4096000"),
+    ("passkey=abcdef123", "passkey=abcdef123"),
+    ("myTokenizer=abcdef123", "myTokenizer=abcdef123"),
+]
+
+
+@pytest.mark.parametrize(("line", "expected"), CAMEL_CASE_KEYS)
+def test_camel_case_keys_are_masked_and_lookalikes_kept(line, expected):
+    assert redact(line) == expected
+
+
+def test_a_long_run_of_letters_is_redacted_quickly():
+    """#26: the camelCase rule tried every split of a word into words, 2^n for n letters."""
+    code = (
+        "import time; from codigest.core.redact import redact; "
+        "start = time.perf_counter(); redact('x' * 60); print(time.perf_counter() - start)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=30, check=True
+    )
+    assert float(result.stdout) < 1.0

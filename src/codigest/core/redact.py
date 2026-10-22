@@ -105,10 +105,11 @@ _CAPTURE_RULES: list[tuple[re.Pattern[str], str]] = [
         rf"\1{MASK}",
     ),
     # The same keys in camelCase or PascalCase (SessionToken, AccountKey). Case-sensitive,
-    # so `maxtokens` or `passkey` stay as they are.
+    # so `maxtokens` or `passkey` stay as they are. Words after the first start with a capital,
+    # so a run of letters splits one way only; `(?:[A-Za-z][a-z0-9]*)*` backtracked 2^n (#26).
     (
         re.compile(
-            r"((?:^|[^A-Za-z0-9])[\"']?(?:[A-Za-z][a-z0-9]*)*?"
+            r"((?:^|[^A-Za-z0-9])[\"']?(?:[a-z][a-z0-9]*)?(?:[A-Z][a-z0-9]*)*?"
             r"(?:Token|Secret|Password|Passwd|Passphrase|ApiKey|AccessKey|AccountKey|SecretKey|"
             r"PrivateKey|SharedAccessKey)"
             r"[\"']?\s*[:=]\s*[\"']?)([^\s\"',;\[][^\s\"',;]{5,})"
