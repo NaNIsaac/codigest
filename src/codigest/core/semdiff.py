@@ -6,6 +6,7 @@ Detects: Signature Changes AND Logic Body Changes.
 
 import ast
 import warnings
+from collections.abc import Iterator
 lazy import hashlib
 from dataclasses import dataclass
 from typing import Literal
@@ -42,11 +43,13 @@ class CodeParser(ast.NodeVisitor):
     def _get_hash(self, node: ast.AST) -> str:
         """Normalized hash of the node body (ignoring formatting/comments implicitly by unparse)."""
         try:
-            # ast.unparse returns standardized code string
             normalized_code = ast.unparse(node)
-            return hashlib.md5(normalized_code.encode("utf-8")).hexdigest()
-        except Exception:
-            return ""
+        except RecursionError:
+            # A long operator chain (a generated sum of a few hundred terms) is deeper than
+            # unparse can recurse. An empty hash on both sides would hide every change, so
+            # hash the tree through ast.walk, which does not recurse.
+            normalized_code = "\n".join(_walk_text(node))
+        return hashlib.md5(normalized_code.encode("utf-8")).hexdigest()
 
     def _get_signature(self, node: ast.AST) -> str:
         """Reconstructs signature."""
@@ -132,6 +135,15 @@ class CodeParser(ast.NodeVisitor):
             except Exception:
                 type_hint = "..."
             self._add_variable(node.target.id, f": {type_hint}{self._value(node.value)}", node)
+
+
+def _walk_text(node: ast.AST) -> Iterator[str]:
+    """Node types and their non-node values in walk order; positions are not fields."""
+    for child in ast.walk(node):
+        yield type(child).__name__
+        for _, value in ast.iter_fields(child):
+            items = value if isinstance(value, list) else [value]
+            yield from (repr(item) for item in items if not isinstance(item, ast.AST))
 
 
 def parse_code(code: str) -> dict[str, SymbolInfo]:
