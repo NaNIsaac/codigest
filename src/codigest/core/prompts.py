@@ -29,11 +29,18 @@ def _block(root: str, attrs: dict[str, str], instruction: str, *parts: str) -> s
 
 # Note: source_code / digest_content arrive already formatted via tags.file().
 def _default_snapshot(
-    project_name: str, tree_structure: str, source_code: str, instruction: str = ""
+    project_name: str,
+    tree_structure: str,
+    source_code: str,
+    instruction: str = "",
+    source: str = "",
+    ref: str = "",
+    commit: str = "",
 ) -> str:
+    # source, ref and commit are set only for a repository read from GitHub.
     return _block(
         "project_snapshot",
-        {"project": project_name},
+        {"project": project_name, "source": source, "ref": ref, "commit": commit},
         instruction,
         f"<project_structure>\n{tree_structure}\n</project_structure>",
         f"<source_code>\n{source_code}\n</source_code>",

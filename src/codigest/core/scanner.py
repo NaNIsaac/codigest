@@ -62,12 +62,14 @@ class ProjectScanner:
         try:
             # pathspec requires relative paths (e.g., "src/main.py")
             rel_path = path.relative_to(self.root_path).as_posix()
-            if path.is_dir():
-                rel_path += "/"
         except ValueError:
             return False
 
-        return self.ignore_spec.match_file(rel_path)
+        return self.is_ignored_rel(rel_path, path.is_dir())
+
+    def is_ignored_rel(self, rel_path: str, is_dir: bool = False) -> bool:
+        """The same check for a POSIX path relative to the root, which need not exist on disk."""
+        return self.ignore_spec.match_file(rel_path + "/" if is_dir else rel_path)
 
     def _is_included(self, entry: Path) -> bool:
         """파일이 지정된 include_paths 범위 안에 있는지 확인"""
