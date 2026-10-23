@@ -68,7 +68,7 @@ def test_install_uninstall_rc_files(tmp_path, monkeypatch):
 
     assert runner.invoke(term.app, ["uninstall"]).exit_code == 0  # auto removes everywhere
     assert bashrc.read_bytes() == b"alias g=git\n"
-    assert zshrc.read_text() == ""
+    assert not zshrc.exists()  # install created it
 
 
 def test_posix_hook_path():

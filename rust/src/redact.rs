@@ -56,6 +56,17 @@ static RULES: LazyLock<Vec<(Regex, String)>> = LazyLock::new(|| {
             .expect("valid pattern"),
             format!("-----BEGIN PRIVATE KEY-----{MASK}-----END PRIVATE KEY-----"),
         ),
+        // A key cut by a capture limit keeps only one marker: mask the key lines next to it.
+        (
+            Regex::new(r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:[ \t]*\r?\n[A-Za-z0-9+/=]+)+")
+                .expect("valid pattern"),
+            format!("-----BEGIN PRIVATE KEY-----{MASK}"),
+        ),
+        (
+            Regex::new(r"(?m)(?:^[A-Za-z0-9+/=]+[ \t]*\r?\n)+-----END [A-Z ]*PRIVATE KEY-----")
+                .expect("valid pattern"),
+            format!("{MASK}-----END PRIVATE KEY-----"),
+        ),
         token(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"),
         token(r"\bsk-[A-Za-z0-9_-]{16,}"),
         token(r"\bgh[pousr]_[A-Za-z0-9]{20,}"),
@@ -80,17 +91,30 @@ static RULES: LazyLock<Vec<(Regex, String)>> = LazyLock::new(|| {
 static CAPTURE_RULES: LazyLock<Vec<(Regex, String)>> = LazyLock::new(|| {
     vec![
         (
-            Regex::new(r"(?i)\b(authorization\s*:\s*)(bearer|basic|token)\s+\S+")
+            Regex::new(r#"(?i)\b(authorization\s*:\s*)(bearer|basic|token)\s+[^\s"']+"#)
                 .expect("valid pattern"),
             format!("${{1}}${{2}} {MASK}"),
         ),
+        // A value a rule above already masked is left as it is.
         (
             Regex::new(concat!(
                 r#"(?im)((?:^|[^A-Za-z0-9])["']?(?:[A-Za-z0-9]+[_-])*"#,
                 r"(?:api[_-]?key|secret[_-]?access[_-]?key|secret[_-]?key|secret|",
-                r"access[_-]?token|auth[_-]?token|token|password|passwd|passphrase|pass|pwd|",
+                r"access[_-]?token|auth[_-]?token|token|auth|password|passwd|passphrase|pass|pwd|",
                 r"client[_-]?secret|private[_-]?key)",
-                r#"["']?\s*[:=]\s*["']?)([^\s"',;]{6,})"#,
+                r#"["']?\s*[:=]\s*["']?)([^\s"',;\[][^\s"',;]{5,})"#,
+            ))
+            .expect("valid pattern"),
+            format!("${{1}}{MASK}"),
+        ),
+        // The same keys in camelCase or PascalCase (SessionToken, AccountKey). Case-sensitive,
+        // so `maxtokens` or `passkey` stay as they are.
+        (
+            Regex::new(concat!(
+                r#"((?:^|[^A-Za-z0-9])["']?(?:[A-Za-z][a-z0-9]*)*?"#,
+                r"(?:Token|Secret|Password|Passwd|Passphrase|ApiKey|AccessKey|AccountKey|SecretKey|",
+                r"PrivateKey|SharedAccessKey)",
+                r#"["']?\s*[:=]\s*["']?)([^\s"',;\[][^\s"',;]{5,})"#,
             ))
             .expect("valid pattern"),
             format!("${{1}}{MASK}"),

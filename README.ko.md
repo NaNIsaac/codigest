@@ -453,7 +453,9 @@ cdg term clear        # 기록 모두 지우기
 - 기록하지 않을 프로그램을 더 지정하려면: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`
   (bash/zsh에서는 `export CODIGEST_CAP_SKIP='^(myrepl|mytui)( |$)'`, 확장 정규식).
 - 지금 세션에서만 끄려면: `$env:CODIGEST_NOCAP = 1` (bash/zsh: `export CODIGEST_NOCAP=1`).
-- 훅을 없애려면: `cdg term uninstall`.
+- 훅을 없애려면: `cdg term uninstall`. 각 시작 파일은 install 전의 바이트 그대로(줄바꿈, BOM,
+  마지막 줄바꿈 포함) 돌아가고, install이 만든 파일은 그때 만든 폴더와 함께 지워집니다. 데이터 폴더의
+  훅 사본도 지워집니다. 기록된 명령은 `cdg term clear`로 지울 때까지 남습니다.
 
 프로필은 패키지 안의 파일이 아니라, `cdg term install`이 데이터 폴더(기록 옆의 `shell/`)에 둔 훅 사본을 불러옵니다. codigest를 업데이트한 뒤에는 `cdg term install`을 다시 실행해 사본을 갱신하세요.
 

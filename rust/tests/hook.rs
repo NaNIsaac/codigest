@@ -73,18 +73,26 @@ echo '{}'
         }
     }
 
+    /// Also points the temp folder into the sandbox: uninstall cleans up the bash hook's
+    /// capture folder there.
     fn env(&self, cmd: &mut Process) {
+        let tmp = self.home.join("tmp");
         cmd.env("HOME", &self.home)
             .env("USERPROFILE", &self.home)
             .env("PATH", &self.bin)
+            .env("TEMP", &tmp)
+            .env("TMPDIR", &tmp)
             .env_remove("ZDOTDIR");
     }
 
     fn rust(&self, args: &[&str]) -> std::process::Output {
+        let tmp = self.home.join("tmp");
         let mut cmd = rust(&self.data);
         cmd.env("HOME", &self.home)
             .env("USERPROFILE", &self.home)
             .env("PATH", &self.bin)
+            .env("TEMP", &tmp)
+            .env("TMPDIR", &tmp)
             .env_remove("ZDOTDIR");
         cmd.args(args).output().unwrap()
     }
@@ -133,7 +141,10 @@ fn bash_and_zsh_get_one_block_each_and_lose_it_again() {
 
     sandbox.rust(&["term", "uninstall", "--shell", "all"]);
     assert_eq!(sandbox.read(&bashrc), "export KEEP=1\n");
-    assert_eq!(sandbox.read(&zshrc), "");
+    assert!(
+        !zshrc.exists(),
+        "install created it, so uninstall removes it"
+    );
 }
 
 #[test]
@@ -153,7 +164,95 @@ fn the_powershell_profile_is_found_through_pwsh_and_written_with_a_bom() {
     assert!(!hook.contains("Get-Command cdg"));
 
     sandbox.rust(&["term", "uninstall", "--shell", "powershell"]);
-    assert_eq!(fs::read(&sandbox.profile).unwrap(), [0xEF, 0xBB, 0xBF]);
+    assert!(!sandbox.profile.exists());
+    assert!(!sandbox.home.join("Documents").exists());
+}
+
+fn tree(root: &Path) -> Vec<(String, Option<Vec<u8>>)> {
+    let mut found = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            let name = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            if path.is_dir() {
+                found.push((name, None));
+                stack.push(path);
+            } else {
+                found.push((name, Some(fs::read(&path).unwrap())));
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+#[test]
+fn uninstall_restores_startup_files_byte_for_byte() {
+    let originals: [&[u8]; 8] = [
+        b"alias g=git\n",
+        b"alias g=git",
+        b"alias g=git\n\n\n",
+        b"\n",
+        b"",
+        b"export A=1\r\nexport B=2\r\n",
+        b"export A=1\r\nexport B=2",
+        "export NAME='\u{dc}n\u{ef}'\n".as_bytes(),
+    ];
+    for original in originals {
+        let sandbox = Sandbox::new(true);
+        let files = [
+            sandbox.home.join(".bashrc"),
+            sandbox.home.join(".zshrc"),
+            sandbox.profile.clone(),
+        ];
+        fs::create_dir_all(sandbox.profile.parent().unwrap()).unwrap();
+        for path in &files {
+            fs::write(path, original).unwrap();
+        }
+        sandbox.rust(&["term", "install", "--shell", "all"]);
+        // Windows PowerShell 5.1 needs the BOM to read a non-ASCII hook path.
+        assert!(
+            fs::read(&sandbox.profile)
+                .unwrap()
+                .starts_with(&[0xEF, 0xBB, 0xBF])
+        );
+        sandbox.rust(&["term", "uninstall"]);
+        for path in &files {
+            assert_eq!(fs::read(path).unwrap(), original, "{}", path.display());
+        }
+    }
+}
+
+#[test]
+fn install_then_uninstall_leaves_home_and_data_as_they_were() {
+    let sandbox = Sandbox::new(true);
+    let root = sandbox.home.parent().unwrap();
+    fs::write(sandbox.home.join(".bashrc"), "alias g=git\n").unwrap();
+    let before = tree(root);
+    sandbox.rust(&["term", "install", "--shell", "all"]);
+    sandbox.rust(&["term", "install", "--shell", "all"]);
+    assert_ne!(tree(root), before);
+    sandbox.rust(&["term", "uninstall"]);
+    sandbox.rust(&["term", "uninstall"]);
+    assert_eq!(tree(root), before);
+}
+
+#[test]
+fn lines_added_after_install_survive_uninstall() {
+    let sandbox = Sandbox::new(false);
+    let bashrc = sandbox.home.join(".bashrc");
+    fs::write(&bashrc, "alias g=git\n").unwrap();
+    sandbox.rust(&["term", "install", "--shell", "bash"]);
+    let mut text = fs::read(&bashrc).unwrap();
+    text.extend_from_slice(b"export LATER=1\n");
+    fs::write(&bashrc, text).unwrap();
+    sandbox.rust(&["term", "uninstall"]);
+    assert_eq!(sandbox.read(&bashrc), "alias g=git\nexport LATER=1\n");
 }
 
 #[test]
