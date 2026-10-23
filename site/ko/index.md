@@ -19,10 +19,17 @@ hero:
       link: https://github.com/NaNIsaac/codigest
 
 install:
-  label: 설치
-  command: uv tool install codigest
+  label: Codigest 설치
+  windowsLabel: Windows
+  unixLabel: Linux / macOS / Termux
+  pythonLabel: Python (uv)
+  windows: 'irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex'
+  unix: 'curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh'
+  python: 'uv tool install codigest'
   copy: 복사
   copied: 복사됨
+  moreLabel: 설치 방법 자세히 보기
+  moreLink: /ko/installation
 
 demo:
   alt: cdg cap으로 실패하는 pytest를 실행한 뒤, cdg pack이 실패 출력과 오류가 가리키는 테스트 파일, 바뀐 파일을 묶는 화면
