@@ -57,7 +57,7 @@ function stop() {
   padding: 0;
   border-radius: 12px;
   cursor: pointer;
-  box-shadow: 0 30px 70px -28px rgb(194 65 12 / 0.55), 0 2px 10px rgb(0 0 0 / 0.25);
+  box-shadow: 0 20px 48px -24px rgb(0 0 0 / 0.45);
 }
 
 .screen img {
