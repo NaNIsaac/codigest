@@ -5,10 +5,20 @@
 #
 # CDG_VERSION=0.12.1 picks a release instead of the latest one. CDG_INSTALL_DIR picks the
 # folder (default ~/.local/bin, or $PREFIX/bin in Termux). Running it again replaces the
-# installed binary.
+# installed binary. If GITHUB_TOKEN or GH_TOKEN is set, it is sent to api.github.com only, which
+# lifts the low rate limit of anonymous requests (shared CI runners hit it).
 set -eu
 
 repo=NaNIsaac/codigest
+token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+
+api() {
+    if [ -n "$token" ]; then
+        curl -fsSL -H "Authorization: Bearer $token" "$1"
+    else
+        curl -fsSL "$1"
+    fi
+}
 
 if [ "$(uname -o 2>/dev/null || true)" = Android ]; then
     target=aarch64-linux-android
@@ -38,7 +48,7 @@ if [ -n "${CDG_VERSION:-}" ]; then
 else
     # The newest rust-v* release that is not a draft or pre-release. Not releases/latest:
     # a GitHub release for a Python v* tag would take that spot.
-    tag=$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=30" | awk '
+    tag=$(api "https://api.github.com/repos/$repo/releases?per_page=30" | awk '
         /^    "tag_name":/ { split($0, f, "\""); tag = f[4]; draft = 0 }
         /^    "draft": false/ { draft = 1 }
         /^    "prerelease": false/ && draft && tag ~ /^rust-v/ { print tag; exit }')
@@ -56,7 +66,7 @@ if [ -f "$dir/cdg" ] && [ "$(head -c 2 "$dir/cdg")" = "#!" ] && [ -z "${CDG_FORC
 fi
 
 # GitHub records each asset's SHA-256 as "sha256:<hex>"
-want=$(curl -fsSL "https://api.github.com/repos/$repo/releases/tags/rust-v$version" | awk -v asset="$name.tar.gz" '
+want=$(api "https://api.github.com/repos/$repo/releases/tags/rust-v$version" | awk -v asset="$name.tar.gz" '
     index($0, "\"name\": \"" asset "\"") { found = 1 }
     found && /"digest": "sha256:/ { split($0, f, "\""); sub("sha256:", "", f[4]); print f[4]; exit }')
 [ -n "$want" ] || { echo "Release rust-v$version has no SHA-256 digest for $name.tar.gz." >&2; exit 1; }
