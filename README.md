@@ -6,7 +6,7 @@
 
 **Share the code context you choose with an AI: your project, a few files, what changed, or the command that failed.**
 
-[한국어](README.ko.md)
+**Documentation: [nanisaac.github.io/codigest](https://nanisaac.github.io/codigest/)** (installation, guides, command reference). [한국어](README.ko.md)
 
 <p align="center">
   <a href="https://mcprush.com/to/codigest-mcp?ref=badge">

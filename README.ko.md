@@ -4,7 +4,7 @@
 
 **AI에게 보여 줄 코드를 내가 고르게 해 주는 도구. 프로젝트 전체든, 파일 몇 개든, 바뀐 부분이든, 실패한 명령이든.**
 
-[English](README.md)
+**문서 사이트: [nanisaac.github.io/codigest/ko](https://nanisaac.github.io/codigest/ko/)** (설치, 안내서, 명령 레퍼런스). [English](README.md)
 
 <p align="center">
   <a href="https://mcprush.com/to/codigest-mcp?ref=badge">
