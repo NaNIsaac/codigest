@@ -28,7 +28,7 @@ $env:CDG_VERSION = "0.12.1"; irm https://raw.githubusercontent.com/NaNIsaac/codi
 curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | CDG_INSTALL_DIR=/opt/codigest sh
 ```
 
-압축 파일을 직접 받으려면 [Rust 포팅](/ko/rust-port#설치)을 참고하세요. 그 페이지에 속도 수치와 Python 패키지와의 차이도 있습니다.
+압축 파일을 직접 받으려면 [Rust 포팅](/ko/rust-port#install)을 참고하세요. 그 페이지에 속도 수치와 Python 패키지와의 차이도 있습니다.
 
 명령 이름은 `cdg`입니다. 프로젝트마다 따로 설정할 것은 없습니다.
 

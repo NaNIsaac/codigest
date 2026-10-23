@@ -8,7 +8,7 @@ Python 빌드의 모든 명령을 Rust로 옮겼고, 빌드된 바이너리가 C
 
 두 빌드 모두 `cdg`라는 명령을 설치하므로 `PATH`에는 하나만 두세요. 두 프로그램은 별개이고, 같은 데이터를 읽고 씁니다. 터미널 기록 저장소, 프로젝트의 `.codigest/`(설정, 기준점, 캐시), 셸 훅이 그것입니다.
 
-## 설치
+## 설치 {#install}
 
 Windows(PowerShell)에서는 설치 스크립트가 `cdg.exe`를 `%LOCALAPPDATA%\Programs\codigest`에 넣고 그 폴더를 사용자 `PATH`에 추가합니다.
 
