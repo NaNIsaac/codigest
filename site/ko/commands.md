@@ -414,7 +414,13 @@ cdg term --context    # PC 이름과 셸 정보 추가
 cdg mcp
 ```
 
-옵션은 없으며, stdin과 stdout으로 줄 단위 JSON-RPC를 주고받습니다. 등록 방법과 제공하는 도구는 [MCP 연동](/ko/mcp)을 참고하세요.
+stdin과 stdout으로 줄 단위 JSON-RPC를 주고받습니다. 등록 방법과 제공하는 도구는 [MCP 연동](/ko/mcp)을 참고하세요.
+
+#### Python-only: `--allow-remote`, `--auth`
+
+The Python build can add `scan_github` with `--allow-remote`. Add `--auth` only to
+allow the server to use existing GitHub credentials. The Rust build does not yet
+support these options. See [MCP Integration](/mcp).
 
 ## `cdg status`
 
