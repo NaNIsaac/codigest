@@ -67,7 +67,7 @@ def handle(
                 new_code = ""
 
             # Read Old Content (From Anchor)
-            # Note: Anchor only stores files inside root. External files will likely return empty old_code.
+            # The anchor only stores files inside root, so an external file gives an empty old_code.
             old_code = anchor.read_anchor_file(rel_path) if rel_path else ""
 
             changes = semdiff.compare(old_code, new_code)

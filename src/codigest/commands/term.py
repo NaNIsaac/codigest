@@ -262,10 +262,6 @@ def _diagnose(log) -> None:
         log.print(f"[red]Capture errors were logged:[/red] {errors}", highlight=False)
 
 
-# --------------------------------------------------------------------------
-# Hook install (PowerShell profiles, ~/.bashrc, ~/.zshrc)
-# --------------------------------------------------------------------------
-
 HOOK_PATH = Path(__file__).resolve().parent.parent / "shell" / "hook.ps1"
 SH_HOOK_PATH = HOOK_PATH.with_name("hook.sh")
 _BEGIN = "# >>> codigest terminal capture >>>"

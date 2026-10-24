@@ -27,7 +27,7 @@ def _block(root: str, attrs: dict[str, str], instruction: str, *parts: str) -> s
     return f"<{root} {head}>\n" + "\n".join(body) + f"\n</{root}>"
 
 
-# Note: source_code / digest_content arrive already formatted via tags.file().
+# source_code and digest_content arrive already formatted by tags.file().
 def _default_snapshot(
     project_name: str,
     tree_structure: str,
@@ -114,7 +114,6 @@ class PromptEngine:
         Renders a prompt by key.
         Priority: TOML Override > Default t-string Function
         """
-        # 1. Check for TOML Override (String-based)
         if (raw_template := self.overrides.get(key)) is not None:
             # Code blocks arrive already wrapped by tags.file(); escaping them again would
             # turn their own <file> tags into text.
@@ -127,7 +126,6 @@ class PromptEngine:
             except KeyError as e:
                 return f"Error rendering template '{key}': Missing argument {e}"
 
-        # 2. Use Default (Code-based t-string)
         if renderer := DEFAULT_RENDERERS.get(key):
             # Default functions handle their own escaping logic internally where needed
             return renderer(**kwargs)

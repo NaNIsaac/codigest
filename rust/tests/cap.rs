@@ -171,10 +171,6 @@ fn a_signal_death_exits_like_the_python_build() {
     assert_eq!(history(home.path())[0]["exit_code"], -9);
 }
 
-// --------------------------------------------------------------------------
-// Parity with the Python build
-// --------------------------------------------------------------------------
-
 /// The stored entry without the fields that differ from run to run.
 fn stable(mut entry: Value) -> Value {
     let map = entry.as_object_mut().unwrap();

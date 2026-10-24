@@ -117,22 +117,19 @@ class DependencyResolver:
     ) -> Path | None:
         """Wrapper to handle caching logic."""
 
-        # 1. 표준 라이브러리면 즉시 탈락 (I/O 없음)
         if level == 0 and module_name.split(".")[0] in self.stdlib_names:
             return None
 
-        # 2. 상대 경로(level > 0)는 문맥(current_file)에 따라 달라지므로 캐싱 불가 -> 직접 해결
+        # A relative import depends on current_file, so it cannot be cached by module name.
         if level > 0:
             return self._resolve_import_path(module_name, level, current_file)
 
-        # 3. 절대 경로(import A.B)는 캐시 확인
         if module_name in self.resolve_cache:
             return self.resolve_cache[module_name]
 
-        # 4. 캐시에 없으면 파일 시스템 조회 수행
         result = self._resolve_import_path(module_name, level, current_file)
 
-        # 5. 결과 캐싱 (찾았든 못 찾았든)
+        # Misses are cached too.
         self.resolve_cache[module_name] = result
         return result
 
@@ -154,9 +151,9 @@ class DependencyResolver:
         else:
             # Absolute Import Priorities
             candidates = [
-                current_file.parent.joinpath(*parts),  # 1. Sibling (같은 폴더)
-                self.root_path.joinpath(*parts),  # 2. Project Root
-                self.root_path.joinpath("src", *parts),  # 3. Project Root/src
+                current_file.parent.joinpath(*parts),
+                self.root_path.joinpath(*parts),
+                self.root_path.joinpath("src", *parts),
             ]
 
         # Check existence

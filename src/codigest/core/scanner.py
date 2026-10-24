@@ -72,7 +72,6 @@ class ProjectScanner:
         return self.ignore_spec.match_file(rel_path + "/" if is_dir else rel_path)
 
     def _is_included(self, entry: Path) -> bool:
-        """파일이 지정된 include_paths 범위 안에 있는지 확인"""
         if not self.include_paths:
             return True
         return any(entry.is_relative_to(path) for path in self.include_paths)

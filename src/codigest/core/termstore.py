@@ -42,11 +42,6 @@ _ANSI_RE = re.compile(
 )
 
 
-# --------------------------------------------------------------------------
-# Paths
-# --------------------------------------------------------------------------
-
-
 def get_data_dir() -> Path:
     """
     Resolves the machine-global Codigest data directory.
@@ -72,11 +67,6 @@ def get_history_path() -> Path:
     return get_term_dir() / "history.jsonl"
 
 
-# --------------------------------------------------------------------------
-# Entry model
-# --------------------------------------------------------------------------
-
-
 @dataclass(slots=True)
 class Entry:
     command: str
@@ -95,11 +85,6 @@ class Entry:
     def from_dict(cls, data: dict[str, Any]) -> Self:
         known = {f.name for f in fields(cls)}
         return cls(**{k: v for k, v in data.items() if k in known})
-
-
-# --------------------------------------------------------------------------
-# Output normalization
-# --------------------------------------------------------------------------
 
 
 def strip_ansi(text: str) -> str:
@@ -132,11 +117,6 @@ def _truncate(text: str) -> tuple[str, bool]:
     elided = len(encoded) - _HEAD_BYTES - _TAIL_BYTES
     marker = f"\n\n... [{elided} bytes elided by codigest] ...\n\n"
     return head + marker + tail, True
-
-
-# --------------------------------------------------------------------------
-# Read / write
-# --------------------------------------------------------------------------
 
 
 def _inside(path: str, root: Path) -> bool:
@@ -238,11 +218,6 @@ def clear() -> int:
     count = len(load_entries())
     path.unlink()
     return count
-
-
-# --------------------------------------------------------------------------
-# Rendering
-# --------------------------------------------------------------------------
 
 
 def _fmt_duration(ms: int) -> str:
