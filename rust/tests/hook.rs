@@ -314,10 +314,6 @@ fn the_installed_posix_hook_parses() {
     assert!(status.success());
 }
 
-// --------------------------------------------------------------------------
-// Parity with the Python build
-// --------------------------------------------------------------------------
-
 /// The hook path and the sandbox differ by design; everything else must match.
 fn scrub(sandbox: &Sandbox, text: &str) -> String {
     let text = text.replace("\r\n", "\n");

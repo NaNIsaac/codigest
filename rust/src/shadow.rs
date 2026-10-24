@@ -361,10 +361,6 @@ impl ContextAnchor {
     }
 }
 
-// --------------------------------------------------------------------------
-// Helpers
-// --------------------------------------------------------------------------
-
 /// Index of the quote that closes the quoted token `text` starts with.
 fn quoted_end(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();

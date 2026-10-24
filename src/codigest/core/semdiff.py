@@ -172,12 +172,10 @@ def compare(old_code: str, new_code: str) -> list[SemanticChange]:
                 changes.append(SemanticChange("ADDED", new))
             case old, None:
                 changes.append(SemanticChange("REMOVED", old))
-            # 1. Signature Change? (API Breakage)
             case old, new if old.signature != new.signature:
                 changes.append(
                     SemanticChange("MODIFIED", new, f"{old.signature} -> {new.signature}")
                 )
-            # 2. Logic Change? (Internal Implementation)
             # Only check if signature didn't change (to avoid double reporting)
             case old, new if old.content_hash != new.content_hash:
                 changes.append(SemanticChange("LOGIC_CHANGED", new, "Implementation changed"))
