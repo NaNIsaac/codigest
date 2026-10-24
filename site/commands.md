@@ -86,6 +86,13 @@ A target is a file, a folder, or a file with a line range: `src/app.py:40-80` fo
 | `-y`, `--yes` | Skip the size confirmation. |
 | `-r`, `--resolve` | Recursively resolve imports of the targets. |
 | `--format` | `xml` (default), `markdown` or `json`. See [Formats](#formats). |
+| `--github` | Read the target `OWNER/REPO` from GitHub (implied by a github.com URL). |
+| `--ref` | GitHub: branch, tag or commit (default: the repository's default branch). |
+| `--path` | GitHub: only this path of the repository; repeat for more, `FILE:40-60` for lines. |
+| `--auth` | GitHub: send your token (`GH_TOKEN`, `GITHUB_TOKEN` or `gh`) to read private repositories. |
+| `--max-file-size` | GitHub: list larger files as skipped, without downloading (default: `1MB`). |
+
+A GitHub repository (`OWNER/REPO --github`, or its URL) is read the same way, without cloning.
 
 Above 30,000 estimated tokens or 100 files, `scan` asks before continuing. When nobody can answer (no terminal on stdin), it stops with exit code 1 and a hint instead of waiting; `-y` takes everything. A line names any credential files that were withheld.
 
@@ -95,6 +102,7 @@ cdg scan src/app.py -r        # one file and the local files it imports
 cdg scan src/billing/ docs/   # folders, files, or both
 cdg scan src/app.py -l        # with line numbers
 cdg scan src/app.py:40-80     # only lines 40 to 80
+cdg scan OWNER/REPO --github --ref v1.2 --path src/app.py:40-60   # lines of a file in a GitHub repository
 ```
 
 ## `cdg digest`
