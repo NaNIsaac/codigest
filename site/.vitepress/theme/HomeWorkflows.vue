@@ -76,4 +76,9 @@ const workflows = computed<Workflow[]>(() => frontmatter.value.workflows ?? [])
   font-weight: 500;
   text-decoration: none;
 }
+@media (max-width: 640px) {
+  .workflow { padding: 16px; }
+  .vp-doc .workflow pre code { font-size: 14px; }
+  .vp-doc .workflow a { display: inline-block; padding-block: 8px; }
+}
 </style>
