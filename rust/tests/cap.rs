@@ -16,6 +16,21 @@ fn history(home: &Path) -> Vec<Value> {
 }
 
 #[test]
+fn a_command_that_took_under_a_millisecond_compares_equal_to_one_that_took_longer() {
+    let quick = r#"<command index="1" exit_code="1" at="2026-10-17T01:58:14+09:00">"#;
+    let slower =
+        r#"<command index="1" exit_code="1" duration="1ms" at="2026-10-17T02:00:00+09:00">"#;
+    let longer =
+        r#"<command index="1" exit_code="1" duration="1.5s" at="2026-10-17T02:00:00+09:00">"#;
+    assert_eq!(normalise(quick), normalise(slower));
+    assert_eq!(normalise(quick), normalise(longer));
+    assert_eq!(
+        normalise(quick),
+        r#"<command index="1" exit_code="1" at="<TIME>">"#
+    );
+}
+
+#[test]
 fn output_from_both_streams_is_shown_and_stored_and_the_exit_code_passes_through() {
     let home = tempfile::tempdir().unwrap();
     let program = script(3);
