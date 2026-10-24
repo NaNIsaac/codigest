@@ -86,6 +86,13 @@ cdg scan [OPTIONS] [targets]...
 | `-y`, `--yes` | 크기 확인을 건너뜁니다. |
 | `-r`, `--resolve` | 대상이 import하는 파일을 재귀적으로 담습니다. |
 | `--format` | `xml`(기본), `markdown`, `json`. [출력 형식](#formats)을 참고하세요. |
+| `--github` | 대상 `OWNER/REPO`를 GitHub에서 읽습니다 (github.com URL이면 자동으로 켜짐). |
+| `--ref` | GitHub: 브랜치, 태그 또는 커밋 (기본: 저장소의 기본 브랜치). |
+| `--path` | GitHub: 저장소의 이 경로만 읽습니다. 여러 번 줄 수 있고, 줄 범위는 `FILE:40-60`입니다. |
+| `--auth` | GitHub: 토큰(`GH_TOKEN`, `GITHUB_TOKEN` 또는 `gh`)을 보내 비공개 저장소를 읽습니다. |
+| `--max-file-size` | GitHub: 이보다 큰 파일은 내려받지 않고 건너뛴 파일로 표시합니다 (기본: `1MB`). |
+
+GitHub 저장소(`OWNER/REPO --github` 또는 그 URL)도 복제하지 않고 같은 방식으로 읽습니다.
 
 추정 토큰이 3만을 넘거나 파일이 100개를 넘으면 `scan`은 계속할지 묻습니다. 대답할 사람이 없을 때(stdin이 터미널이 아닐 때)는 기다리지 않고 힌트와 함께 종료 코드 1로 멈춥니다. 전부 가져오려면 `-y`를 붙입니다. 빼 놓은 인증 정보 파일이 있으면 그 이름을 알려 주는 줄이 나옵니다.
 
@@ -95,6 +102,7 @@ cdg scan src/app.py -r        # 파일 하나와, 그 파일이 import하는 프
 cdg scan src/billing/ docs/   # 폴더나 파일 여러 개
 cdg scan src/app.py -l        # 줄 번호를 붙여서
 cdg scan src/app.py:40-80     # 40~80번째 줄만
+cdg scan OWNER/REPO --github --ref v1.2 --path src/app.py:40-60   # GitHub 저장소 파일의 일부 줄
 ```
 
 ## `cdg digest`
