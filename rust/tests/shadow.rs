@@ -233,10 +233,6 @@ fn the_project_is_not_touched_and_git_status_ignores_the_anchor() {
     assert_eq!(fs::read(a.root.join("bin.dat")).unwrap(), [0, 1, 2, 3, 255]);
 }
 
-// --------------------------------------------------------------------------
-// Parity with the Python build
-// --------------------------------------------------------------------------
-
 const SCRIPT: &str = r#"
 import json, sys
 from pathlib import Path

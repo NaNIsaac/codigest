@@ -22,10 +22,8 @@ type Targets = list[Path] | Path
 
 
 class ProjectContext:
-    # [수정] targets 타입을 list[Path] | Path로 확장
     def __init__(self, targets: Targets | None = None, root: Path | None = None):
 
-        # [추가] 단일 Path가 들어오면 리스트로 감싸기 (Safety)
         if isinstance(targets, Path):
             targets = [targets]
 
@@ -34,7 +32,6 @@ class ProjectContext:
             # above it for a project marker.
             self.start_path = self.root_path = root
         else:
-            # 1. 탐색 시작점 결정
             # Paths in different folders of the same project (aps/a.m Auto_run/b.m) share the
             # project you are in; starting from the first path alone made its folder the root.
             cwd = Path.cwd().resolve()
@@ -44,7 +41,6 @@ class ProjectContext:
             else:
                 self.start_path = Path(os.path.commonpath(resolved))
 
-            # 2. 루트 찾기
             self.root_path = self._find_project_root(self.start_path)
         self.withheld: list[Path] = []
         self.config_extensions, self.config_ignores = self._load_config_filters()
@@ -87,47 +83,35 @@ class ProjectContext:
         ignore_config: bool = False,
         resolve_deps: bool = False,
     ) -> list[Path]:
-        """
-        The Master Method:
-        """
-        # [핵심 수정] 입력된 경로를 무조건 '절대 경로'로 변환 (Resolve)
-        # 이걸 안 하면 'src' 같은 상대 경로 입력 시 root_path(절대 경로)와 비교 실패함
-        # 단일 Path면 리스트로 변환
         if isinstance(targets, Path):
             targets = [targets]
-        # 리스트 내부의 모든 경로를 resolve()
+        # Resolve first: a relative target would not compare with the absolute root_path.
         resolved_targets = [t.resolve() for t in targets or []]
 
-        # 이후 로직에서는 변환된 resolved_targets를 사용
         scan_scope = resolved_targets or None
 
-        # 1. Determine Filters
         exts, ignores = (None, [])
         if not ignore_config:
             exts, ignores = self.config_extensions, self.config_ignores
 
-        # 2. Scope Warning UI (이제 정상 작동함)
         for p in scan_scope or []:
             if not p.is_relative_to(self.root_path):
                 console.print(
                     f"[yellow][Warning] {p.name} is outside detected root {self.root_path}[/yellow]"
                 )
 
-        # 3. Scan
         files = scanner.scan_project(
             self.root_path, extensions=exts, extra_ignores=ignores, include_paths=scan_scope
         )
 
-        # 4. Resolve Dependencies
         if resolve_deps:
             files = resolver.resolve_dependencies(self.root_path, files)
 
-        # 5. Never hand out credential files, but remember them so commands can say so.
+        # Never hand out credential files, but remember them so commands can say so.
         self.withheld = sorted({f for f in files if is_secret_file(f.name)} | set(self.withheld))
         return [f for f in files if not is_secret_file(f.name)]
 
 
-# Helper for quick access
 def get_context(targets: Targets | None = None, root: Path | None = None) -> ProjectContext:
     return ProjectContext(targets, root)
 

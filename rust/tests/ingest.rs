@@ -164,10 +164,6 @@ fn long_output_keeps_its_head_and_tail() {
     assert!(stored.contains("bytes elided by codigest"));
 }
 
-// --------------------------------------------------------------------------
-// Parity with the Python build
-// --------------------------------------------------------------------------
-
 /// Runs one ingest through both builds and compares everything they stored: the timestamps
 /// come from the input, and the host name is the same machine's.
 fn compare(args: &[String], stdin: &[u8], file: Option<&[u8]>) {
@@ -280,10 +276,6 @@ fn parity_failures() {
     compare(&[], br#"{"output": "no command"}"#, None);
     compare(&args(&["--start=oops"]), b"", Some(b"ls\0out"));
 }
-
-// --------------------------------------------------------------------------
-// Secrets in realistic output (cases shared with the Python tests)
-// --------------------------------------------------------------------------
 
 const SECRET_CASES: &str = include_str!("../../tests/fixtures/capture_secrets.json");
 const KEY_LINES: [&str; 3] = [

@@ -36,7 +36,6 @@ structure = "toon"
 
 @app.callback(invoke_without_command=True)
 def handle(
-    # target 인자 추가 (기본값: 현재 위치)
     target: Path = typer.Argument(
         Path("."),
         help="Target directory to initialize",
@@ -50,7 +49,7 @@ def handle(
     """
     Create .codigest/config.toml (file filters). `cdg mark` sets a baseline.
     """
-    root_path = target  # Typer가 이미 resolve_path=True로 절대경로 변환해줌
+    root_path = target  # Typer already resolved it (resolve_path=True)
 
     config_dir = root_path / ".codigest"
     config_file = config_dir / "config.toml"

@@ -306,7 +306,7 @@ class ContextAnchor:
                 [
                     "git",
                     "--git-dir",
-                    str(self.git_dir),  # [변경] .shadow_git 경로 사용
+                    str(self.git_dir),
                     "--work-tree",
                     str(temp_baseline),
                     "checkout",
@@ -386,7 +386,7 @@ class ContextAnchor:
             [
                 "git",
                 "--git-dir",
-                str(self.git_dir),  # [변경]
+                str(self.git_dir),
                 "--work-tree",
                 str(self.anchor_dir),
                 "show",

@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def generate_toon(paths: list[Path], root_dir: Path) -> str:
-    """(Phase 2: Digest용) TOON 포맷 생성기 (Placeholder)"""
+    """Placeholder: TOON output is not implemented yet."""
     return "# TOON generation logic here"
 
 
@@ -17,12 +17,10 @@ def generate_ascii_tree(paths: list[Path], root_dir: Path, depth: int | None = N
 
     def _walk(current_path: Path, prefix: str = "", level: int = 1):
         try:
-            # 현재 디렉토리의 모든 항목 가져오기
             all_items = sorted(current_path.iterdir(), key=lambda x: x.name)
         except PermissionError:
             return
 
-        # 필터링: 스캔된 파일이거나, 스캔된 파일을 포함하는 디렉토리여야 함
         filtered_items = []
         for item in all_items:
             if item.is_file():
