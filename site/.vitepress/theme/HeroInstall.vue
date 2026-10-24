@@ -90,4 +90,11 @@ async function copy() {
 .installer-copy:hover { color: var(--vp-c-brand-1); border-color: var(--vp-c-brand-1); }
 .installer-more { display: inline-block; margin-top: 9px; font-size: 12px; color: var(--vp-c-brand-1); }
 @media (max-width: 959px) { .installer { margin-left: auto; margin-right: auto; } }
+@media (max-width: 640px) {
+  .installer-heading, .installer-more { font-size: 14px; }
+  .installer-tab { padding-block: 8px; font-size: 14px; }
+  .installer-command code { font-size: 14px; }
+  .installer-copy { min-height: 40px; font-size: 14px; }
+  .installer-more { padding-block: 8px; }
+}
 </style>

@@ -167,3 +167,63 @@
     margin: 32px 0 0;
   }
 }
+
+/* Phones: code and menu text at 14px, 40px touch rows, and long inline code that wraps inside table cells */
+@media (max-width: 640px) {
+  .vp-doc [class*='language-'] code,
+  .vp-doc :not(pre) > code {
+    font-size: 14px;
+  }
+
+  .vp-doc [class*='language-'] > span.lang,
+  .VPLocalNav .menu-text,
+  .VPLocalNavOutlineDropdown button {
+    font-size: 14px;
+  }
+
+  .vp-doc td code,
+  .vp-doc th code {
+    overflow-wrap: anywhere;
+  }
+
+  .vp-doc p,
+  .vp-doc li {
+    line-height: 26px;
+  }
+
+  .vp-doc p {
+    margin: 12px 0;
+  }
+
+  .vp-doc li + li {
+    margin-top: 4px;
+  }
+
+  .vp-doc h2 {
+    margin: 32px 0 12px;
+    padding-top: 16px;
+  }
+
+  .vp-doc h3 {
+    margin: 24px 0 8px;
+  }
+
+  .VPHomeHero {
+    padding-bottom: 32px;
+  }
+
+  .VPHero .image {
+    margin-top: 20px;
+  }
+
+  .VPLocalNav .menu,
+  .VPLocalNavOutlineDropdown button {
+    min-height: 40px;
+  }
+
+  .VPSidebarItem .link,
+  .VPNavScreenMenuLink,
+  .VPNavScreenMenuGroupLink {
+    padding-block: 8px;
+  }
+}
