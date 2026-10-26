@@ -2,7 +2,8 @@
 #
 # The line you type is run as `. __cdg { <line> }`. The wrapping happens in
 # PSConsoleHostReadLine, after PSReadLine has returned the line, so the screen and
-# the history keep the line as typed. Dot-sourcing runs it in the caller's scope,
+# the PSReadLine history keep the line as typed; the engine history entry is put back
+# before the next prompt. Dot-sourcing runs it in the caller's scope,
 # so `cd`, variable assignments and function definitions behave exactly as typed.
 # Output is teed into a buffer and handed to `cdg term ingest` in a background
 # process (redaction happens there, before anything touches disk).
@@ -130,6 +131,23 @@ $global:__cdgSkip = '^\s*(vim?|nvim|nano|emacs|less|more|ssh|htop|btop|top|fzf|l
     '|^\s*(gh\s+auth\s+login|az\s+login|gcloud\s+(auth\s+login|init)|aws\s+configure|ssh-keygen|ssh-copy-id|sudo|runas)\b' +
     '|^\s*(mysql|psql|sqlite3|redis-cli|mongosh|duckdb|julia|irb|ghci|ollama\s+run)(\.exe)?\b' 
 
+# The engine history (`history`, `r`) records the line handed to the engine, the wrapped
+# one. Before the next prompt the last entry is put back as typed, with its status and
+# times; its new entry takes the next id, so ids skip one after each captured line.
+function global:__cdgRestoreHistory {
+    $line = $global:__cdgLine
+    $global:__cdgLine = $null
+    $last = Get-History -Count 1
+    if (-not $line -or -not $last -or -not $last.CommandLine.StartsWith('. __cdg { ')) { return }
+    Clear-History -Id $last.Id
+    [pscustomobject]@{
+        CommandLine        = $line
+        ExecutionStatus    = $last.ExecutionStatus
+        StartExecutionTime = $last.StartExecutionTime
+        EndExecutionTime   = $last.EndExecutionTime
+    } | Add-History
+}
+
 # Replaces PSReadLine's own PSConsoleHostReadLine, which the host calls for every prompt.
 # PSReadLine draws and stores the line as typed; only the string returned to the engine
 # is wrapped, so nothing changes on screen.
@@ -137,6 +155,7 @@ function global:PSConsoleHostReadLine {
     # First statement: any script run resets $?, and PSReadLine shows it in the prompt.
     $__cdgOk = $?
     Microsoft.PowerShell.Core\Set-StrictMode -Off
+    __cdgRestoreHistory
     $line = try { [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $__cdgOk) }
             catch [Management.Automation.MethodException] {  # PSReadLine < 2.2 has no status argument
                 [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext) }
