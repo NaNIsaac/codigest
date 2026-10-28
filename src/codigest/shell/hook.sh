@@ -60,6 +60,11 @@ __cdg_wants() {
     [[ $1 =~ $__cdg_skip ]] && return 1
     [[ -n ${CODIGEST_CAP_SKIP-} && $1 =~ $CODIGEST_CAP_SKIP ]] && return 1
     [[ $1 =~ $__cdg_commit && ! $1 =~ $__cdg_msg ]] && return 1
+    # A program that runs other command lines (hanfix's hf) lists its names in
+    # CODIGEST_RUNNERS: its own line is not captured, so it keeps the terminal, and it
+    # hands each line it runs to __cdg_run, which decides for that line.
+    local first=${1%%[[:space:]]*}
+    [[ " ${CODIGEST_RUNNERS-} " == *" $first "* ]] && return 1
     # The recorded line would show `!!`-style history expansion unexpanded.
     if [ "$__cdg_shell" = zsh ]; then [[ -o banghist && $1 == *!* ]] && return 1
     else [[ $- == *H* && $1 == *!* ]] && return 1; fi
@@ -125,6 +130,17 @@ __cdg_post() {
         --shell="$__cdg_shell" --start="$__cdg_t0" --end="$__cdg_t" </dev/null >/dev/null 2>&1 & )
     __cdg_file=
     return $s
+}
+
+# Runs a command line for a runner, captured as if it had been typed. The DEBUG trap and
+# preexec do not run for the commands inside a function, so the capture starts here; the
+# next prompt ends it as usual.
+__cdg_run() {
+    if [ -z "$__cdg_file" ] && __cdg_wants "$1"; then
+        __cdg_open "$1"
+        __cdg_start
+    fi
+    eval "$1"
 }
 
 __cdg_file= __cdg_w= __cdg_busy=
