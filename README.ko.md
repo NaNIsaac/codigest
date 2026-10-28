@@ -477,6 +477,25 @@ cdg term clear        # 기록 모두 지우기
 명령은 터미널을 받고 기록되지 않습니다. [thefuck](https://github.com/nvbn/thefuck)이 그런 예입니다:
 `$global:CODIGEST_RUNNERS += 'fuck'` (bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} fuck"`).
 
+입력한 줄을 실행 전에 바꾸는 방법도 있습니다. Enter를 누르면 훅이 `CODIGEST_REWRITERS`에 있는 함수에
+그 줄을 차례로 넘기고, 처음으로 맡은 함수가 돌려준 줄을 실행합니다. 그 줄은 직접 입력한 줄과 똑같이
+다뤄집니다. 셸 히스토리(PowerShell에서는 PSReadLine과 엔진 히스토리)에 남는 것도 그 줄이고, 기록할지는
+훅의 규칙이 정하며, `$?`도 그 줄의 것입니다. `hf`만 입력한 줄은 이렇게 동작할 수 있고, 더 긴 줄 안의
+`hf`는 위의 두 단계를 씁니다.
+
+- PowerShell: `$global:CODIGEST_REWRITERS += 'name'`. 함수는 줄을 받아 `$null`(맡지 않음), 새 줄,
+  또는 먼저 묻는 `@{ Line = <새 줄>; Confirm = $true }`를 돌려줍니다.
+- bash/zsh: `CODIGEST_REWRITERS="${CODIGEST_REWRITERS-} name"`. 함수는 줄을 받아 `REPLY`에 새 줄을
+  넣고 0(먼저 물으려면 2)을 돌려주거나, 맡지 않으면 1을 돌려줍니다.
+- 물을 때는 새 줄과 `[Enter / Ctrl+C]`를 보여 줍니다. Enter면 실행하고, 다른 키면 버립니다(아무것도
+  실행하지 않고 히스토리에도 넣지 않음).
+- 함수가 실패하거나, 다른 값을 돌려주거나, 문법이 틀린 줄을 주면 입력한 줄을 그대로 실행하고 메시지도
+  내지 않습니다. 200 ms가 지나서 나온 결과도 버리고 입력한 줄을 실행합니다. 시간 제한은 아닙니다. 훅은
+  함수가 끝날 때까지 기다리므로, 멈춘 함수는 Enter를 막습니다.
+- 함수가 히스토리에 직접 넣으면 안 됩니다.
+- 앞에 공백을 두고 입력한 줄은 새 줄에도 공백이 붙어 기록되지 않습니다.
+- PowerShell 원격 세션, 중첩 프롬프트, 디버거에서는 쓰지 않습니다.
+
 PowerShell에서는 다른 `PSConsoleHostReadLine`(VS Code의 셸 통합, atuin)과 함께 동작합니다. 줄을 읽을
 때 그것을 불러 입력한 그대로의 줄을 보게 하고, 돌려받은 줄만 감쌉니다. 그런 프로그램이 훅보다 나중에
 불러와지면, 그것이 줄을 직접 읽더라도(atuin처럼) 훅은 셸이 입력을 기다리는 동안 다시 앞에 섭니다.

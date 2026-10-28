@@ -507,6 +507,25 @@ A program that does not do step 2 can still be listed in `CODIGEST_RUNNERS`: wha
 the terminal and is not captured. [thefuck](https://github.com/nvbn/thefuck) is one:
 `$global:CODIGEST_RUNNERS += 'fuck'` (bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} fuck"`).
 
+A program can instead replace the typed line before it runs: when Enter is pressed, the hook calls
+each function listed in `CODIGEST_REWRITERS` with the line, and the first one that claims it gives
+the line to run. That line then goes on as if typed: it is the one in the shell history (PSReadLine's
+and the engine's in PowerShell), the hook's rules decide whether it is captured, and `$?` is its own.
+`hf` typed alone can work this way; `hf` inside a longer line still uses the steps above.
+
+- PowerShell: `$global:CODIGEST_REWRITERS += 'name'`. The function gets the line and returns
+  `$null` (not its line), the new line, or `@{ Line = <new>; Confirm = $true }` to ask first.
+- bash/zsh: `CODIGEST_REWRITERS="${CODIGEST_REWRITERS-} name"`. The function gets the line, sets
+  `REPLY` to the new line and returns 0, or 2 to ask first, or returns 1 when it is not its line.
+- When asked, the hook shows the new line with `[Enter / Ctrl+C]`: Enter runs it, any other key
+  drops it (nothing runs, nothing is added to history).
+- A function that fails, returns anything else, or gives a line that does not parse leaves the line
+  as typed, without a message. So does a result that comes after more than 200 ms: it is discarded.
+  This is not a timeout: the hook waits for the function to return, so one that hangs blocks Enter.
+- The function should not add to history itself.
+- A line typed with a leading space keeps it, so it stays out of the capture.
+- Not in a PowerShell remote session, nested prompt or the debugger.
+
 In PowerShell the hook works with another `PSConsoleHostReadLine` (VS Code's shell integration,
 atuin): it calls that one for the line, so it sees the line as typed, and only wraps what it
 returns. When one is loaded after the hook, the hook puts itself back on top while the shell

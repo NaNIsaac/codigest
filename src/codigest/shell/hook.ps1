@@ -35,6 +35,15 @@ filter global:__cdgRecord {
     }
 }
 
+# Sets $? to false without printing anything or touching $Error.
+function global:__cdgFalse {
+    [CmdletBinding()]
+    param()
+    $ErrorActionPreference = 'Ignore'
+    $PSCmdlet.WriteError([Management.Automation.ErrorRecord]::new(
+        [Exception]::new('previous command failed'), 'CodigestStatus', 'NotSpecified', $null))
+}
+
 function global:__cdg {
     # Advanced function so a failed command can surface as `$? -eq $false` for prompt themes.
     [CmdletBinding()]
@@ -57,7 +66,11 @@ function global:__cdg {
     $global:__cdgTail = [Collections.Generic.Queue[object]]::new()
     $global:__cdgDropped = 0
     $global:__cdgFailed = $false
+    # The statements above reset $?; a typed line that reads it must see the previous command's.
+    $__cdgFailedBefore = $global:__cdgLastOk -eq $false
+    $global:__cdgLastOk = $null
     try {
+        if ($__cdgFailedBefore) { __cdgFalse }
         . $__cdgBlock *>&1 | __cdgRecord
     }
     catch {
@@ -105,7 +118,7 @@ function global:__cdg {
                 [Exception]::new("exit $__cdgExit"), 'CodigestExit', 'NotSpecified', $null))
             $ErrorActionPreference = $__cdgPref
         }
-        Remove-Variable __cdgPref, __cdgBlock, __cdgCommand, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
+        Remove-Variable __cdgFailedBefore, __cdgPref, __cdgBlock, __cdgCommand, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
     }
 }
 
@@ -168,6 +181,72 @@ function global:__cdg_run([string]$__cdgRunLine) {
     else { . $__cdgRunBlock }
 }
 
+# A program that turns a typed line into another one before it runs (hanfix's hf: the previous
+# command, fixed) lists a function in $global:CODIGEST_REWRITERS. It gets the line and returns $null
+# (not its line), the new line, or @{ Line = <new>; Confirm = $true } to ask first. The new line then
+# goes on as if typed: histories, capture rules, $?. A rewriter that fails, returns anything else or
+# answers after more than 200 ms leaves the line as typed (not a timeout: it is waited for), and it
+# does not touch history itself.
+function global:__cdgRewrite([string]$line) {
+    # Also turns a rewriter's non-terminating error into one the catch sees.
+    $ErrorActionPreference = 'Stop'
+    foreach ($name in @($global:CODIGEST_REWRITERS).Where({ $_ })) {
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        try { $new = & $name $line } catch { return $line }
+        if ($clock.ElapsedMilliseconds -gt 200) { return $line }
+        if ($null -eq $new) { continue }
+        $ask = $new -is [Collections.IDictionary] -and $new.Confirm
+        if ($new -is [Collections.IDictionary]) { $new = $new.Line }
+        if ($new -isnot [string] -or -not $new.Trim()) { return $line }
+        $tokens = $null; $errs = $null
+        [void][Management.Automation.Language.Parser]::ParseInput($new, [ref]$tokens, [ref]$errs)
+        if ($errs) { return $line }
+        # A line typed with a leading space stays out of the capture.
+        if ($line -match '^\s' -and $new -notmatch '^\s') { $new = " $new" }
+        if ($ask -and -not (__cdgAsk $new)) { return '' }
+        return $new
+    }
+    $line
+}
+
+# Enter runs the line; any other key, Ctrl+C included, drops it.
+function global:__cdgAsk([string]$line) {
+    Write-Host "$line  [Enter / Ctrl+C] " -ForegroundColor Green -NoNewline
+    $ctrlC = [Console]::TreatControlCAsInput
+    try {
+        [Console]::TreatControlCAsInput = $true
+        $key = [Console]::ReadKey($true)
+    }
+    finally {
+        [Console]::TreatControlCAsInput = $ctrlC
+        Write-Host ''
+    }
+    $key.Key -eq 'Enter' -and -not $key.Modifiers
+}
+
+# PSReadLine adds a line to its history before it returns it, while a rewriter may still replace it.
+# So while the read-line below reads, the handler holds the line back, and the read-line adds the line
+# that runs. The handler set before (PSReadLine's own leaves out lines that look like secrets) still
+# decides for that line. Loading the hook again keeps the chain as it is.
+if (-not $global:__cdgHistory) {
+    $global:__cdgHistory = $true
+    $global:__cdgHistoryPrev = (Get-PSReadLineOption).AddToHistoryHandler
+    Set-PSReadLineOption -AddToHistoryHandler {
+        param([string]$line)
+        if ($global:__cdgDefer) {
+            $global:__cdgDeferred = $true
+            return $false
+        }
+        $prev = $global:__cdgHistoryPrev
+        # PSReadLine's own is a Func<string, object>, one set by a profile a script block. An error
+        # here would bring PSReadLine down, so a failing one keeps the line, as no handler would.
+        try {
+            if ($prev -is [Delegate]) { $prev.Invoke($line) } elseif ($prev) { & $prev $line } else { $true }
+        }
+        catch { $true }
+    }
+}
+
 function global:__cdgReadLine([bool]$ok) {
     try { [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $ok) }
     catch [Management.Automation.MethodException] {  # PSReadLine < 2.2 has no status argument
@@ -202,15 +281,27 @@ function global:PSConsoleHostReadLine {
         Set-Item function:global:PSConsoleHostReadLine $global:__cdgSelf
         return __cdgReadLine $__cdgOk
     }
-    $line = if ($global:__cdgPrev) {
-        $global:__cdgOk = $__cdgOk
-        $global:__cdgReading = $true
-        try { & $global:__cdgPrev } finally { $global:__cdgReading = $false }
-    }
-    else { __cdgReadLine $__cdgOk }
     # Not in a remote session, a nested prompt or the debugger: there the line is for
     # another runspace or is a debugger command (c, s, v), and must reach it as typed.
     $local = -not $host.Runspace.RunspaceIsRemote -and -not $NestedPromptLevel -and -not $PSDebugContext
+    $rewrite = $local -and @($global:CODIGEST_REWRITERS).Where({ $_ }).Count
+    $global:__cdgDeferred = $false
+    $global:__cdgDefer = $rewrite
+    try {
+        $line = if ($global:__cdgPrev) {
+            $global:__cdgOk = $__cdgOk
+            $global:__cdgReading = $true
+            try { & $global:__cdgPrev } finally { $global:__cdgReading = $false }
+        }
+        else { __cdgReadLine $__cdgOk }
+    }
+    finally { $global:__cdgDefer = $false }
+    if ($rewrite) {
+        $line = __cdgRewrite $line
+        if ($global:__cdgDeferred -and $line) {
+            try { [Microsoft.PowerShell.PSConsoleReadLine]::AddToHistory($line) } catch { }
+        }
+    }
     $wrap = $local -and (__cdgWants $line)
     if ($wrap) {
         $tokens = $null; $errs = $null
@@ -220,6 +311,7 @@ function global:PSConsoleHostReadLine {
             [void][Management.Automation.Language.Parser]::ParseInput($w, [ref]$tokens, [ref]$errs)
             if (-not $errs) {
                 $global:__cdgLine = $line
+                $global:__cdgLastOk = $__cdgOk
                 return $w
             }
         }
