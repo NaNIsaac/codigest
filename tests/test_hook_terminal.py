@@ -48,12 +48,16 @@ class Pty:
             self._write = self.proc.write
             self._read = lambda: self.proc.read(4096)
         else:
+            import fcntl
             import pty
+            import struct
+            import termios
 
             pid, self.fd = pty.fork()
             if pid == 0:
                 os.execvpe(argv[0], argv, env)
             self.pid = pid
+            fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 50, 250, 0, 0))
             self._write = lambda text: os.write(self.fd, text.encode())
             self._read = lambda: os.read(self.fd, 4096).decode(errors="replace")
         threading.Thread(target=self._pump, daemon=True).start()
@@ -67,6 +71,10 @@ class Pty:
             if not chunk:
                 return
             self.output.append(chunk)
+            # PSReadLine on POSIX waits for the cursor position report a terminal sends; ConPTY answers itself
+            if not WINDOWS:
+                for _ in range(chunk.count("\x1b[6n")):
+                    self._write("\x1b[1;1R")
 
     def type_lines(self, lines, pause):
         for line in lines:
