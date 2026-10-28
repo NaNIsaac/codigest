@@ -519,8 +519,10 @@ and the engine's in PowerShell), the hook's rules decide whether it is captured,
   `REPLY` to the new line and returns 0, or 2 to ask first, or returns 1 when it is not its line.
 - When asked, the hook shows the new line with `[Enter / Ctrl+C]`: Enter runs it, any other key
   drops it (nothing runs, nothing is added to history).
-- A function that fails, returns anything else, gives a line that does not parse, or takes more
-  than 200 ms leaves the line as typed, without a message. It should not add to history itself.
+- A function that fails, returns anything else, or gives a line that does not parse leaves the line
+  as typed, without a message. So does a result that comes after more than 200 ms: it is discarded.
+  This is not a timeout: the hook waits for the function to return, so one that hangs blocks Enter.
+- The function should not add to history itself.
 - A line typed with a leading space keeps it, so it stays out of the capture.
 - Not in a PowerShell remote session, nested prompt or the debugger.
 

@@ -185,7 +185,8 @@ function global:__cdg_run([string]$__cdgRunLine) {
 # command, fixed) lists a function in $global:CODIGEST_REWRITERS. It gets the line and returns $null
 # (not its line), the new line, or @{ Line = <new>; Confirm = $true } to ask first. The new line then
 # goes on as if typed: histories, capture rules, $?. A rewriter that fails, returns anything else or
-# takes more than 200 ms leaves the line as typed, and it does not touch history itself.
+# answers after more than 200 ms leaves the line as typed (not a timeout: it is waited for), and it
+# does not touch history itself.
 function global:__cdgRewrite([string]$line) {
     # Also turns a rewriter's non-terminating error into one the catch sees.
     $ErrorActionPreference = 'Stop'

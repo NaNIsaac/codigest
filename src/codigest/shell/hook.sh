@@ -81,7 +81,8 @@ __cdg_parses() {
 # command, fixed) lists a function in CODIGEST_REWRITERS. It is called with the line, sets REPLY to
 # the new line and returns 0 (run it) or 2 (ask first), or returns 1 (not its line). The new line then
 # goes on as if typed: history, capture rules, $?. A rewriter that fails, returns anything else or
-# takes more than 200 ms leaves the line as typed, and it does not touch history itself.
+# answers after more than 200 ms leaves the line as typed (not a timeout: it is waited for), and it
+# does not touch history itself.
 # Returns 0 with the line to run in __cdg_new (empty: dropped at the question).
 __cdg_rewrite() {
     local name REPLY s t0
