@@ -244,6 +244,25 @@ def test_pwsh_hook_loaded_twice_chains_nothing(tmp_path):
     assert lines.count("wrapped") == 2 and lines[-1] == "prev=True", lines
 
 
+def test_pwsh_readline_replaced_later_without_calling_codigest(tmp_path):
+    pwsh = need("pwsh")
+    s = Session(tmp_path)
+    hist, report = history_lines(s)
+    *setup, wrapped, runit = pwsh_lines(s, True)
+    # atuin's PSConsoleHostReadLine reads the line itself and never calls the one it replaced
+    other = (
+        "function global:PSConsoleHostReadLine { "
+        "[Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $true) }"
+    )
+    lines = [*setup, other, "$null", wrapped, runit, *report, "exit"]
+    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    assert s.ttys() == ALL_TTYS, screen[-2000:]
+    assert "wrapped" in [c["command"] for c in s.captured()]
+    lines = hist.read_text(encoding="utf-8").splitlines()
+    assert not any(line.startswith(". __cdg") for line in lines), lines
+    assert lines.count("wrapped") == 2 and lines[-1] == "prev=False", lines
+
+
 def test_pwsh_vscode_integration_sees_the_typed_line(tmp_path):
     pwsh = need("pwsh")
     script = vscode_script("pwsh")

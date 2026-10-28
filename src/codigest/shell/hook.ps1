@@ -228,5 +228,21 @@ function global:PSConsoleHostReadLine {
 }
 $global:__cdgSelf = (Get-Item function:PSConsoleHostReadLine).ScriptBlock
 
+# A program that loads later and never calls the function it replaced (atuin reads the line
+# itself) would stop the capture for good. While PSReadLine waits for a line, put this one back
+# on top around that one; from the next prompt on, codigest is called again. -SupportEvent
+# keeps the subscription out of Get-Job, and the flag keeps a reload from adding a second one.
+if (-not $global:__cdgIdle) {
+    $global:__cdgIdle = $true
+    Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -SupportEvent -Action {
+        $top = Get-Item function:PSConsoleHostReadLine -ErrorAction Ignore
+        if ($top -and $top.Module.Name -ne 'PSReadLine' -and $top.Definition -notmatch 'codigest-readline') {
+            __cdgRestoreHistory
+            $global:__cdgPrev = $top.ScriptBlock
+            Set-Item function:global:PSConsoleHostReadLine $global:__cdgSelf
+        }
+    }
+}
+
 # Lets `cdg term` tell whether this shell is hooked.
 $env:CODIGEST_HOOK = '1'

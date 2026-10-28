@@ -509,7 +509,9 @@ the terminal and is not captured. [thefuck](https://github.com/nvbn/thefuck) is 
 
 In PowerShell the hook works with another `PSConsoleHostReadLine` (VS Code's shell integration,
 atuin): it calls that one for the line, so it sees the line as typed, and only wraps what it
-returns. When one is loaded after the hook, the first line after it is not captured.
+returns. When one is loaded after the hook, the hook puts itself back on top while the shell
+waits for input, also when that one reads the line itself (atuin does); the first line after it
+is not captured.
 
 The profile loads a copy of the hook that `cdg term install` puts in the data folder (`shell/` next to the captures), not the file inside the package. After updating codigest, run `cdg term install` again to refresh it.
 
