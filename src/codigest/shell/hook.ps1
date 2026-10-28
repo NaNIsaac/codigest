@@ -46,7 +46,7 @@ function global:__cdg {
         return
     }
     # Dot-sourced: these locals live in the caller's scope, hence the prefix and cleanup.
-    $__cdgLine = $global:__cdgLine
+    $__cdgCommand = $global:__cdgLine
     # Left as is so the line can read it; a native command stores a new boxed int,
     # so a reference change means one ran, even with the same exit code.
     $__cdgPrevExit = $global:LASTEXITCODE
@@ -76,7 +76,7 @@ function global:__cdg {
         if ($global:__cdgTail.Count) { $__cdgText += $global:__cdgTail | Out-String }
         try {
             $__cdgJson = @{
-                command     = $__cdgLine
+                command     = $__cdgCommand
                 output      = $__cdgText
                 exit_code   = $__cdgExit
                 cwd         = $PWD.ProviderPath
@@ -105,7 +105,7 @@ function global:__cdg {
                 [Exception]::new("exit $__cdgExit"), 'CodigestExit', 'NotSpecified', $null))
             $ErrorActionPreference = $__cdgPref
         }
-        Remove-Variable __cdgPref, __cdgBlock, __cdgLine, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
+        Remove-Variable __cdgPref, __cdgBlock, __cdgCommand, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
     }
 }
 
