@@ -457,6 +457,31 @@ cdg term clear        # 기록 모두 지우기
   마지막 줄바꿈 포함) 돌아가고, install이 만든 파일은 그때 만든 폴더와 함께 지워집니다. 데이터 폴더의
   훅 사본도 지워집니다. 기록된 명령은 `cdg term clear`로 지울 때까지 남습니다.
 
+##### 다른 명령을 실행하는 프로그램
+
+[hanfix](https://github.com/NaNIsaac/hanfix)의 `hf`(한글 자판으로 친 직전 명령을 고쳐 다시 실행)처럼
+명령 줄을 대신 실행하는 프로그램은, 그대로 두면 통째로 기록되고 그 안에서 실행한 명령이 터미널 대신
+기록용 파이프를 받게 됩니다. 이런 프로그램은 두 단계로 훅과 함께 쓸 수 있습니다.
+
+1. 불러올 때 자기 명령 이름을 `CODIGEST_RUNNERS`에 더합니다. 이 이름으로 시작하는 줄은 기록하지
+   않습니다. 덮어쓰지 말고 더해야 시작 파일에서 codigest와 어느 쪽을 먼저 불러와도 됩니다.
+   - PowerShell: `$global:CODIGEST_RUNNERS += 'hf'`
+   - bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} hf"` (공백으로 나눈 셸 변수)
+2. 명령 줄을 실행할 때 `__cdg_run`이 정의되어 있으면 그것으로 실행합니다(실행하는 그때 찾습니다).
+   그 줄에 훅의 규칙을 그대로 적용하므로, 터미널이 필요한 프로그램은 터미널을 받고 나머지는 그 줄로
+   기록됩니다.
+   - PowerShell: `if (Get-Command __cdg_run -CommandType Function -ErrorAction Ignore) { . __cdg_run $line } else { Invoke-Expression $line }`
+   - bash/zsh: `if typeset -f __cdg_run >/dev/null; then __cdg_run "$line"; else eval "$line"; fi`
+
+2단계를 하지 않는 프로그램도 `CODIGEST_RUNNERS`에 넣을 수 있습니다. 그러면 그 프로그램이 실행하는
+명령은 터미널을 받고 기록되지 않습니다. [thefuck](https://github.com/nvbn/thefuck)이 그런 예입니다:
+`$global:CODIGEST_RUNNERS += 'fuck'` (bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} fuck"`).
+
+PowerShell에서는 다른 `PSConsoleHostReadLine`(VS Code의 셸 통합, atuin)과 함께 동작합니다. 줄을 읽을
+때 그것을 불러 입력한 그대로의 줄을 보게 하고, 돌려받은 줄만 감쌉니다. 그런 프로그램이 훅보다 나중에
+불러와지면, 그것이 줄을 직접 읽더라도(atuin처럼) 훅은 셸이 입력을 기다리는 동안 다시 앞에 섭니다.
+그 직후의 첫 줄은 기록되지 않습니다.
+
 프로필은 패키지 안의 파일이 아니라, `cdg term install`이 데이터 폴더(기록 옆의 `shell/`)에 둔 훅 사본을 불러옵니다. codigest를 업데이트한 뒤에는 `cdg term install`을 다시 실행해 사본을 갱신하세요.
 
 알아 둘 점:
@@ -471,6 +496,8 @@ cdg term clear        # 기록 모두 지우기
 - PowerShell 훅은 원격 세션, 중첩 프롬프트, 디버거에서는 줄을 감싸지 않습니다.
 - bash 훅은 DEBUG 트랩을 씁니다. 첫 프롬프트 전에 설정된 트랩(starship, bash-preexec)은 그대로
   두지만, 그 뒤에 새로 설정한 DEBUG 트랩은 훅을 덮어씁니다.
+- bash에서 VS Code의 셸 통합을 훅보다 나중에 불러오면 기록되지 않습니다
+  ([#52](https://github.com/NaNIsaac/codigest/issues/52)).
 
 ### MCP 도구
 

@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0
       - run: uv python install 3.15
+      # the terminal tests drive bash, zsh and pwsh on a pseudo-terminal; the runner has no zsh
+      - run: sudo apt-get install -y -qq zsh
       - run: uv run --with pytest pytest -q
 
   powershell-help:

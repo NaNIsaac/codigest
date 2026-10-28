@@ -485,6 +485,34 @@ normally) and appear in your history as typed. Programs that need a real termina
   any folder made for it, as are the hook copies in the data folder. Captured commands stay
   until `cdg term clear`.
 
+##### Programs that run other commands
+
+A program that runs a command line for you, such as `hf` from
+[hanfix](https://github.com/NaNIsaac/hanfix) (it re-runs the previous command typed with the Korean
+layout on), would otherwise be captured as a whole, and the command it runs would get the capture
+pipe instead of the terminal. Such a program can work with the hook in two steps:
+
+1. Add its command names to `CODIGEST_RUNNERS` when it loads; the hook does not capture a line that
+   starts with one of them. Append, so the order in which the startup file loads it and codigest
+   does not matter:
+   - PowerShell: `$global:CODIGEST_RUNNERS += 'hf'`
+   - bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} hf"` (a shell variable, space-separated)
+2. Run each command line through `__cdg_run` when it is defined, looked up when the line runs. It
+   applies the hook's own rules to that line: a program that needs the terminal keeps it, anything
+   else is captured under that line.
+   - PowerShell: `if (Get-Command __cdg_run -CommandType Function -ErrorAction Ignore) { . __cdg_run $line } else { Invoke-Expression $line }`
+   - bash/zsh: `if typeset -f __cdg_run >/dev/null; then __cdg_run "$line"; else eval "$line"; fi`
+
+A program that does not do step 2 can still be listed in `CODIGEST_RUNNERS`: what it runs then keeps
+the terminal and is not captured. [thefuck](https://github.com/nvbn/thefuck) is one:
+`$global:CODIGEST_RUNNERS += 'fuck'` (bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} fuck"`).
+
+In PowerShell the hook works with another `PSConsoleHostReadLine` (VS Code's shell integration,
+atuin): it calls that one for the line, so it sees the line as typed, and only wraps what it
+returns. When one is loaded after the hook, the hook puts itself back on top while the shell
+waits for input, also when that one reads the line itself (atuin does); the first line after it
+is not captured.
+
 The profile loads a copy of the hook that `cdg term install` puts in the data folder (`shell/` next to the captures), not the file inside the package. After updating codigest, run `cdg term install` again to refresh it.
 
 Limitations:
@@ -495,6 +523,8 @@ Limitations:
   normally. In bash, neither are lines that start with a subshell `( ... )`.
 - In bash the hook uses the DEBUG trap and keeps one set before the first prompt (starship,
   bash-preexec); a DEBUG trap set later replaces it.
+- In bash, VS Code's shell integration loaded after the hook stops the capture
+  ([#52](https://github.com/NaNIsaac/codigest/issues/52)).
 - Long output is bounded: the PowerShell hook keeps the first and last 2,000 lines, and a bash or
   zsh capture file over 4 MB is read 1 MB from each end. The store then keeps 64 KB.
 - In PowerShell, a command counts as failed when its exit code is non-zero or an error reached

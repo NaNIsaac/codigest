@@ -46,7 +46,7 @@ function global:__cdg {
         return
     }
     # Dot-sourced: these locals live in the caller's scope, hence the prefix and cleanup.
-    $__cdgLine = $global:__cdgLine
+    $__cdgCommand = $global:__cdgLine
     # Left as is so the line can read it; a native command stores a new boxed int,
     # so a reference change means one ran, even with the same exit code.
     $__cdgPrevExit = $global:LASTEXITCODE
@@ -76,7 +76,7 @@ function global:__cdg {
         if ($global:__cdgTail.Count) { $__cdgText += $global:__cdgTail | Out-String }
         try {
             $__cdgJson = @{
-                command     = $__cdgLine
+                command     = $__cdgCommand
                 output      = $__cdgText
                 exit_code   = $__cdgExit
                 cwd         = $PWD.ProviderPath
@@ -105,7 +105,7 @@ function global:__cdg {
                 [Exception]::new("exit $__cdgExit"), 'CodigestExit', 'NotSpecified', $null))
             $ErrorActionPreference = $__cdgPref
         }
-        Remove-Variable __cdgPref, __cdgBlock, __cdgLine, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
+        Remove-Variable __cdgPref, __cdgBlock, __cdgCommand, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
     }
 }
 
@@ -148,22 +148,70 @@ function global:__cdgRestoreHistory {
     } | Add-History
 }
 
-# Replaces PSReadLine's own PSConsoleHostReadLine, which the host calls for every prompt.
-# PSReadLine draws and stores the line as typed; only the string returned to the engine
-# is wrapped, so nothing changes on screen.
+# Whether a line is captured. A program that runs other command lines (hanfix's hf) lists
+# its names in $global:CODIGEST_RUNNERS: its own line is not captured, so it keeps the
+# terminal, and it hands each line it runs to __cdg_run, which decides for that line.
+function global:__cdgWants([string]$line) {
+    $line.Trim() -and $line -notmatch '^\s' -and $line -notmatch $global:__cdgSkip -and
+        -not ($env:CODIGEST_CAP_SKIP -and $line -match $env:CODIGEST_CAP_SKIP) -and -not $env:CODIGEST_NOCAP -and
+        ($line.Trim() -split '\s+', 2)[0] -notin @($global:CODIGEST_RUNNERS)
+}
+
+# Runs a command line for a runner, captured as if it had been typed. Dot-source it
+# (`. __cdg_run $line`) so the line runs in the runner's scope, as Invoke-Expression would.
+function global:__cdg_run([string]$__cdgRunLine) {
+    $__cdgRunBlock = [scriptblock]::Create($__cdgRunLine)
+    if ($null -eq $global:__cdgHead -and (__cdgWants $__cdgRunLine)) {
+        $global:__cdgLine = $__cdgRunLine
+        . __cdg $__cdgRunBlock
+    }
+    else { . $__cdgRunBlock }
+}
+
+function global:__cdgReadLine([bool]$ok) {
+    try { [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $ok) }
+    catch [Management.Automation.MethodException] {  # PSReadLine < 2.2 has no status argument
+        [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext) }
+}
+
+# Another PSConsoleHostReadLine (atuin, a terminal's shell integration) is called for the line
+# and gets it as typed; codigest wraps only what it returns. PSReadLine's own is not one: it
+# would lose the last status. Loading the hook again keeps the one found the first time.
+$__cdgTop = Get-Item function:PSConsoleHostReadLine -ErrorAction Ignore
+if ($__cdgTop -and $__cdgTop.Module.Name -ne 'PSReadLine' -and $__cdgTop.Definition -notmatch 'codigest-readline') {
+    $global:__cdgPrev = $__cdgTop.ScriptBlock
+}
+Remove-Variable __cdgTop
+
+# Replaces PSConsoleHostReadLine, which the host calls for every prompt. PSReadLine draws and
+# stores the line as typed; only the string returned to the engine is wrapped, so nothing
+# changes on screen.
 function global:PSConsoleHostReadLine {
+    # codigest-readline (marks this function as codigest's)
     # First statement: any script run resets $?, and PSReadLine shows it in the prompt.
     $__cdgOk = $?
     Microsoft.PowerShell.Core\Set-StrictMode -Off
+    # Called back by the function this one calls: read the line and nothing more.
+    if ($global:__cdgReading) { return __cdgReadLine $global:__cdgOk }
     __cdgRestoreHistory
-    $line = try { [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $__cdgOk) }
-            catch [Management.Automation.MethodException] {  # PSReadLine < 2.2 has no status argument
-                [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext) }
+    # A program that loaded later (VS Code's shell integration) wrapped this function and calls
+    # it for the line. Put this one back on top, around that one, for the next line; this line
+    # goes to it as typed and is not captured.
+    if ((Get-Item function:PSConsoleHostReadLine).Definition -notmatch 'codigest-readline') {
+        $global:__cdgPrev = (Get-Item function:PSConsoleHostReadLine).ScriptBlock
+        Set-Item function:global:PSConsoleHostReadLine $global:__cdgSelf
+        return __cdgReadLine $__cdgOk
+    }
+    $line = if ($global:__cdgPrev) {
+        $global:__cdgOk = $__cdgOk
+        $global:__cdgReading = $true
+        try { & $global:__cdgPrev } finally { $global:__cdgReading = $false }
+    }
+    else { __cdgReadLine $__cdgOk }
     # Not in a remote session, a nested prompt or the debugger: there the line is for
     # another runspace or is a debugger command (c, s, v), and must reach it as typed.
     $local = -not $host.Runspace.RunspaceIsRemote -and -not $NestedPromptLevel -and -not $PSDebugContext
-    $wrap = $local -and $line.Trim() -and $line -notmatch '^\s' -and $line -notmatch $global:__cdgSkip -and
-            -not ($env:CODIGEST_CAP_SKIP -and $line -match $env:CODIGEST_CAP_SKIP) -and -not $env:CODIGEST_NOCAP
+    $wrap = $local -and (__cdgWants $line)
     if ($wrap) {
         $tokens = $null; $errs = $null
         # Single-line form first; the newline form survives a trailing `# comment`.
@@ -177,6 +225,23 @@ function global:PSConsoleHostReadLine {
         }
     }
     $line
+}
+$global:__cdgSelf = (Get-Item function:PSConsoleHostReadLine).ScriptBlock
+
+# A program that loads later and never calls the function it replaced (atuin reads the line
+# itself) would stop the capture for good. While PSReadLine waits for a line, put this one back
+# on top around that one; from the next prompt on, codigest is called again. -SupportEvent
+# keeps the subscription out of Get-Job, and the flag keeps a reload from adding a second one.
+if (-not $global:__cdgIdle) {
+    $global:__cdgIdle = $true
+    Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -SupportEvent -Action {
+        $top = Get-Item function:PSConsoleHostReadLine -ErrorAction Ignore
+        if ($top -and $top.Module.Name -ne 'PSReadLine' -and $top.Definition -notmatch 'codigest-readline') {
+            __cdgRestoreHistory
+            $global:__cdgPrev = $top.ScriptBlock
+            Set-Item function:global:PSConsoleHostReadLine $global:__cdgSelf
+        }
+    }
 }
 
 # Lets `cdg term` tell whether this shell is hooked.
