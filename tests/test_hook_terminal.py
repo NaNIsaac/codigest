@@ -458,3 +458,31 @@ def test_sh_rewriter_replaces_the_line_before_it_runs(tmp_path, shell, hook_firs
     assert not any(line.endswith(("fixme", "askme", "askno", "refused")) for line in history), (
         history
     )
+
+
+def test_pwsh_captured_line_sees_the_previous_status(tmp_path):
+    """#55: the wrapper's own statements used to reset $? before the typed line ran."""
+    pwsh = need("pwsh")
+    s = Session(tmp_path)
+    state = tmp_path / "state.txt"
+    fail = 'pwsh -NoProfile -Command "exit {}"'
+    lines = [
+        f". '{SHELL_DIR / 'hook.ps1'}'",
+        # a rewriter that turns `failme` into a failing command, as hanfix's hf does with a fix
+        f"function global:rw([string]$l) {{ if ($l -eq 'failme') {{ '{fail.format(4)}' }} }}",
+        "$global:CODIGEST_REWRITERS += 'rw'",
+        fail.format(3),
+        f"\"typed $? $LASTEXITCODE\" | Add-Content '{state}'",
+        f"\"next $?\" | Add-Content '{state}'",
+        "failme",
+        f"\"rewritten $? $LASTEXITCODE\" | Add-Content '{state}'",
+        "exit",
+    ]
+    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    assert state.read_text(encoding="utf-8").splitlines() == [
+        "typed False 3",
+        "next True",
+        "rewritten False 4",
+    ], screen[-2000:]
+    commands = [c["command"] for c in s.captured()]
+    assert fail.format(4) in commands and "failme" not in commands, commands

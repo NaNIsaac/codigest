@@ -35,6 +35,15 @@ filter global:__cdgRecord {
     }
 }
 
+# Sets $? to false without printing anything or touching $Error.
+function global:__cdgFalse {
+    [CmdletBinding()]
+    param()
+    $ErrorActionPreference = 'Ignore'
+    $PSCmdlet.WriteError([Management.Automation.ErrorRecord]::new(
+        [Exception]::new('previous command failed'), 'CodigestStatus', 'NotSpecified', $null))
+}
+
 function global:__cdg {
     # Advanced function so a failed command can surface as `$? -eq $false` for prompt themes.
     [CmdletBinding()]
@@ -57,7 +66,11 @@ function global:__cdg {
     $global:__cdgTail = [Collections.Generic.Queue[object]]::new()
     $global:__cdgDropped = 0
     $global:__cdgFailed = $false
+    # The statements above reset $?; a typed line that reads it must see the previous command's.
+    $__cdgFailedBefore = $global:__cdgLastOk -eq $false
+    $global:__cdgLastOk = $null
     try {
+        if ($__cdgFailedBefore) { __cdgFalse }
         . $__cdgBlock *>&1 | __cdgRecord
     }
     catch {
@@ -105,7 +118,7 @@ function global:__cdg {
                 [Exception]::new("exit $__cdgExit"), 'CodigestExit', 'NotSpecified', $null))
             $ErrorActionPreference = $__cdgPref
         }
-        Remove-Variable __cdgPref, __cdgBlock, __cdgCommand, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
+        Remove-Variable __cdgFailedBefore, __cdgPref, __cdgBlock, __cdgCommand, __cdgPrevExit, __cdgUnbuf, __cdgStart, __cdgText, __cdgExit, __cdgJson, __cdgBytes, __cdgPsi, __cdgProc -ErrorAction Ignore
     }
 }
 
@@ -297,6 +310,7 @@ function global:PSConsoleHostReadLine {
             [void][Management.Automation.Language.Parser]::ParseInput($w, [ref]$tokens, [ref]$errs)
             if (-not $errs) {
                 $global:__cdgLine = $line
+                $global:__cdgLastOk = $__cdgOk
                 return $w
             }
         }
