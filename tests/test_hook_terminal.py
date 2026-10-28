@@ -348,3 +348,113 @@ def test_bash_vscode_integration_sees_the_typed_line(tmp_path):
     assert "wrapped" in reported_lines(screen), reported_lines(screen)
     assert s.ttys() == {"wrapped": "False"}
     assert "wrapped" in [c["command"] for c in s.captured()]
+
+
+# A rewriter turns the typed line `<probe> <tag>` into another one; each tag tests one rule.
+REWRITTEN_TTYS = {
+    "fixed": "False",
+    "keeptty": "True",
+    "asked": "False",
+    "boom": "False",
+    "slow": "False",
+    "bad": "False",
+    "noisy": "False",
+}
+REWRITER_TAGS = ["fixme", "tofix-tty", "askme", "", "askno", "n", "boom", "slow", "bad", "noisy"]
+
+
+def rewriter_lines(prefix):
+    # askme is answered with Enter, askno with `n` (its Enter then runs an empty line)
+    return [tag if tag in ("", "n") else f"{prefix} {tag}" for tag in REWRITER_TAGS]
+
+
+PWSH_REWRITER = """function global:rw([string]$l) {
+    switch -regex ($l) {
+        'fixme$' { "__P__ fixed" }
+        'tofix-tty$' { "__P__ keeptty" }
+        'askme$' { @{ Line = "__P__ asked"; Confirm = $true } }
+        'askno$' { @{ Line = "__P__ refused"; Confirm = $true } }
+        'boom$' { throw 'rewriter-boom' }
+        'slow$' { Start-Sleep -Milliseconds 300; "__P__ late" }
+        'bad$' { 'if (' }
+        'noisy$' { Write-Error 'rewriter-noise'; "__P__ late" }
+    }
+}
+$global:CODIGEST_REWRITERS += 'rw'
+"""
+
+
+@pytest.mark.parametrize(
+    "hook_first", [True, False], ids=["hook-then-rewriter", "rewriter-then-hook"]
+)
+def test_pwsh_rewriter_replaces_the_line_before_it_runs(tmp_path, hook_first):
+    pwsh = need("pwsh")
+    s = Session(tmp_path)
+    probe = f"& {s.probe}"
+    # From a file, so its messages are not on the screen as typed text
+    script = tmp_path / "rw.ps1"
+    script.write_text(PWSH_REWRITER.replace("__P__", probe), encoding="utf-8")
+    hook, rw = f". '{SHELL_DIR / 'hook.ps1'}'", f". '{script}'"
+    hist, report = history_lines(s)
+    lines = [*([hook, rw] if hook_first else [rw, hook]), *rewriter_lines(probe), *report, "exit"]
+    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    assert s.ttys() == REWRITTEN_TTYS, screen[-2000:]
+    records = {c["command"]: c["output"] for c in s.captured()}
+    assert "out-fixed" in records.get(f"{probe} fixed", ""), records
+    assert f"{probe} keeptty" not in records and f"{probe} fixme" not in records, records
+    assert "rewriter-boom" not in screen and "rewriter-noise" not in screen
+    lines = hist.read_text(encoding="utf-8").splitlines()
+    # PSReadLine and the engine history hold the line that ran, once each, and not the typed one
+    assert lines.count(f"{probe} fixed") == 2 and lines.count(f"{probe} asked") == 2, lines
+    assert lines.count(f"{probe} boom") == 2, lines
+    assert not any(line.endswith(("fixme", "askme", "askno", "refused")) for line in lines), lines
+
+
+SH_REWRITER = """rw() {
+    case $1 in
+        *' fixme') REPLY="$P fixed" ;;
+        *' tofix-tty') REPLY="$P keeptty" ;;
+        *' askme') REPLY="$P asked"; return 2 ;;
+        *' askno') REPLY="$P refused"; return 2 ;;
+        *' boom') echo rewriter-boom >&2; return 7 ;;
+        *' slow') sleep 0.3; REPLY="$P late" ;;
+        *' bad') REPLY='if (' ;;
+        *' noisy') echo rewriter-noise; return 1 ;;
+        *) return 1 ;;
+    esac
+}
+CODIGEST_REWRITERS="${CODIGEST_REWRITERS-} rw"
+"""
+
+
+@pytest.mark.parametrize(
+    "hook_first", [True, False], ids=["hook-then-rewriter", "rewriter-then-hook"]
+)
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_sh_rewriter_replaces_the_line_before_it_runs(tmp_path, shell, hook_first):
+    argv, to_path = posix_shell(shell)
+    s = Session(tmp_path, to_path)
+    script = tmp_path / "rw.sh"
+    script.write_text(f'P="{s.probe}"\n{SH_REWRITER}', encoding="utf-8", newline="\n")
+    hook, rw = f". '{to_path(SHELL_DIR / 'hook.sh')}'", f". '{to_path(script)}'"
+    hist = tmp_path / "hist.txt"
+    lines = [
+        *([hook, rw] if hook_first else [rw, hook]),
+        "true",
+        *rewriter_lines(s.probe),
+        f"fc -ln 1 > '{to_path(hist)}'",
+        "exit",
+    ]
+    screen = s.run(argv, lines, pause=1.5)
+    assert s.ttys() == REWRITTEN_TTYS, screen[-2000:]
+    records = {c["command"]: c["output"] for c in s.captured()}
+    assert "out-fixed" in records.get(f"{s.probe} fixed", ""), records
+    assert f"{s.probe} keeptty" not in records and f"{s.probe} fixme" not in records, records
+    assert "rewriter-boom" not in screen and "rewriter-noise" not in screen
+    history = [line.strip() for line in hist.read_text(encoding="utf-8").splitlines()]
+    assert history.count(f"{s.probe} fixed") == 1 and history.count(f"{s.probe} asked") == 1, (
+        history
+    )
+    assert not any(line.endswith(("fixme", "askme", "askno", "refused")) for line in history), (
+        history
+    )
