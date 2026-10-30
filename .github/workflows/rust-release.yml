@@ -66,6 +66,11 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, ubuntu-24.04-arm, macos-latest]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      # Shared macOS runner IPs may exhaust GitHub's unauthenticated API limit.
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
       - if: runner.os == 'Windows'
