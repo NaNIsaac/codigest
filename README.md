@@ -19,15 +19,15 @@
   <a href="https://mcprush.com/trust">How ratings work</a>.</sub>
 </p>
 
-Codigest is a command-line tool for the moment you ask ChatGPT, Claude or a coding agent about
-your code. It turns the part of your project you pick into one block of text you can paste into
-any chat.
+Suppose a test fails and you want a coding assistant to help. Pasting the
+error alone may omit the function under test; pasting the whole repository
+buries the problem in unrelated files.
 
-A model only knows what you show it. Copying files by hand is slow, it is easy to miss the one
-file that matters, and it is just as easy to paste far more than the question needs. Codigest
-lets you decide what to share and then collects it for you: the whole project, a file and the
-files it imports, what changed since a point you marked, or a failing test with the code it points
-at.
+**Codigest lets you choose what context to send.** From the terminal, it can
+collect selected files, their local imports, recent changes, or a failed
+command and the files mentioned in its output. It packages the selection
+as text for you to inspect and paste into ChatGPT, Claude, or another tool.
+It does not choose a fix or call a model on its own.
 
 ## What it does
 
@@ -39,8 +39,9 @@ at.
   together with the files its error points at.
 - **Says what it included.** Every bundle reports its size, and `pack` gives the reason for each
   file and names the ones it left out.
-- **Keeps secrets out.** `.env` files and keys are never included, and tokens in code or output
-  are masked.
+- **Filters common secrets.** It excludes `.env` files and known key patterns and
+  attempts to mask tokens in code or output. Review a bundle before sharing
+  it; automated filtering cannot guarantee that every sensitive value is caught.
 - **Works with agents.** Claude Code, Cursor and other MCP clients can request the same output.
 
 Codigest does not call any AI model; it only prepares what you send to one. Everything runs on
