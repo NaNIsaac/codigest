@@ -16,6 +16,8 @@ exactly what a human would paste, and stdout stays clean for the protocol.
 import json
 import subprocess
 import sys
+
+import typer
 from pathlib import Path
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
@@ -136,6 +138,75 @@ TOOLS: list[JSON] = [
 ]
 
 
+REMOTE_TOOL: JSON = {
+    "name": "scan_github",
+    "description": (
+        "Read a GitHub repository or selected paths without cloning. Returns a snapshot "
+        "with the resolved commit and omitted files. Public repositories only unless the "
+        "server operator explicitly enabled authentication. Never executes repository code."
+    ),
+    "annotations": {"readOnlyHint": True, "openWorldHint": True},
+    "inputSchema": {
+        "type": "object",
+        "required": ["repository"],
+        "additionalProperties": False,
+        "properties": {
+            "repository": {"type": "string", "description": "OWNER/REPO or github.com URL"},
+            "ref": {"type": "string", "description": "Branch, tag or commit"},
+            "paths": {"type": "array", "items": {"type": "string"}},
+            "format": {"type": "string", "enum": ["xml", "markdown", "json"]},
+        },
+    },
+}
+
+
+def _scan_github(args: JSON, *, auth: bool = False) -> str:
+    from ..core import remote
+
+    unknown = set(args) - {"repository", "ref", "paths", "format"}
+    if unknown:
+        raise ValueError("Unknown scan_github arguments: " + ", ".join(sorted(unknown)))
+    repository = args.get("repository")
+    if not isinstance(repository, str) or not repository:
+        raise ValueError("repository must be OWNER/REPO or a github.com URL")
+    # Validate before starting the CLI; URLs cannot choose arbitrary hosts.
+    remote.parse_target(repository)
+    paths = args.get("paths", [])
+    if not isinstance(paths, list) or any(not isinstance(p, str) for p in paths):
+        raise ValueError("paths must be a list of repository paths")
+    for path in paths:
+        remote.repo_target(path)
+    output_format = args.get("format", "xml")
+    if output_format not in {"xml", "markdown", "json"}:
+        raise ValueError("format must be xml, markdown or json")
+    ref = args.get("ref")
+    if ref is not None and (not isinstance(ref, str) or not ref):
+        raise ValueError("ref must be a non-empty string")
+    argv = [
+        sys.executable,
+        "-m",
+        "codigest",
+        "scan",
+        repository,
+        "--github",
+        "-y",
+        "-s",
+        "--no-copy",
+        "--format=" + output_format,
+    ]
+    if ref is not None:
+        argv.append("--ref=" + ref)
+    argv.extend("--path=" + path for path in paths)
+    if auth:
+        argv.append("--auth")
+    result = subprocess.run(
+        argv, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=110
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+    return result.stdout
+
+
 def _terminal_history(args: JSON) -> str:
     count = int(args.get("count", 1))
     if not (entries := termstore.load_entries()):
@@ -194,9 +265,13 @@ def _cli(command: str, args: JSON) -> str:
     return result.stdout
 
 
-def _call_tool(name: str, args: JSON) -> JSON:
+def _call_tool(name: str, args: JSON, *, allow_remote: bool = False, auth: bool = False) -> JSON:
     try:
         match name:
+            case "scan_github":
+                if not allow_remote:
+                    raise ValueError("remote scan is off; start with cdg mcp --allow-remote")
+                text = _scan_github(args, auth=auth)
             case "terminal_history":
                 text = _terminal_history(args)
             case "pack" | "scan" | "diff" | "semdiff" | "digest" | "tree":
@@ -215,7 +290,7 @@ def _server_version() -> str:
         return "dev"
 
 
-def handle_message(msg: JSON) -> JSON | None:
+def handle_message(msg: JSON, *, allow_remote: bool = False, auth: bool = False) -> JSON | None:
     """Returns the JSON-RPC response for a request, or None for notifications."""
     msg_id = msg.get("id")
     params = msg.get("params") or {}
@@ -228,9 +303,14 @@ def handle_message(msg: JSON) -> JSON | None:
                 "serverInfo": {"name": "codigest", "version": _server_version()},
             }
         case "tools/list":
-            result = {"tools": TOOLS}
+            result = {"tools": TOOLS + ([REMOTE_TOOL] if allow_remote else [])}
         case "tools/call":
-            result = _call_tool(params.get("name", ""), params.get("arguments") or {})
+            result = _call_tool(
+                params.get("name", ""),
+                params.get("arguments") or {},
+                allow_remote=allow_remote,
+                auth=auth,
+            )
         case "ping":
             result = {}
         case _ if msg_id is None:
@@ -245,8 +325,15 @@ def handle_message(msg: JSON) -> JSON | None:
     return None if msg_id is None else {"jsonrpc": "2.0", "id": msg_id, "result": result}
 
 
-def handle() -> None:
+def handle(
+    allow_remote: bool = typer.Option(False, "--allow-remote", help="Enable GitHub scans"),
+    auth: bool = typer.Option(
+        False, "--auth", help="Allow remote scans to use local GitHub credentials"
+    ),
+) -> None:
     """Serve these tools to AI agents over MCP (stdio)."""
+    if auth and not allow_remote:
+        raise typer.BadParameter("--auth requires --allow-remote")
     stdin = open(sys.stdin.fileno(), encoding="utf-8", closefd=False)
     stdout = open(sys.stdout.fileno(), "w", encoding="utf-8", newline="\n", closefd=False)
     for line in stdin:
@@ -261,7 +348,7 @@ def handle() -> None:
                 "error": {"code": -32700, "message": "Parse error"},
             }
         else:
-            response = handle_message(msg)
+            response = handle_message(msg, allow_remote=allow_remote, auth=auth)
         if response is not None:
             stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
             stdout.flush()

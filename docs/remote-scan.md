@@ -1,7 +1,6 @@
 # Remote scan: `cdg scan` on a GitHub repository
 
-Status: implemented in the Python build (`src/codigest/core/remote.py`); the Rust build and MCP
-are not. Written against `c1c4d11` (0.12.2) as the plan for the pull requests that follow it, and
+Status: implemented in the Python CLI and opt-in MCP `scan_github`; the Rust build is not. Written against `c1c4d11` (0.12.2) as the plan for the pull requests that follow it, and
 corrected where the implementation turned out different.
 
 ## Goal
@@ -319,20 +318,16 @@ complete would be worse than none.
 
 ## MCP
 
-The `scan` tool and the output of `tools/list` stay exactly as they are by default. Remote scan
-is exposed only when the server is started with `cdg mcp --allow-remote`:
+The local `scan` tool and the default `tools/list` remain unchanged. In the Python build,
+`cdg mcp --allow-remote` adds a separate `scan_github` tool taking `repository`, optional
+`ref`, `paths` and `format`. An unenabled call is refused. Authentication is controlled
+only by the operator's additional `--auth` startup flag, not tool arguments. GitHub content
+is untrusted input, not agent instructions. The CLI's download bounds and secret masking
+apply unchanged, and each remote CLI process has a 110-second timeout.
 
-- the `scan` tool then also takes `github` (`OWNER/REPO` or URL) and `ref`; `targets` names
-  paths inside the repository, as `--path` does;
-- the tool description says that the content is from a third-party repository and may contain
-  instructions that are not the user's;
-- the server passes `--auth` only when it was itself started with `--allow-remote --auth`; an
-  agent cannot ask for a token;
-- `-y` is passed as for local scans, so the hard ceiling above is what bounds an agent's
-  request.
-
-Without `--allow-remote`, a `scan` call with `github` set is refused with
-`remote scan is off; start the server with cdg mcp --allow-remote`.
+This source change is not in the Rust build. Tests cover tool discovery, denied remote
+access, unchanged local path boundaries, argument validation, credential opt-in, and an
+actual stdio-to-CLI-to-fake-GitHub scan. See `site/chatgpt-mcp.md` for private connectivity.
 
 ## Tests
 
