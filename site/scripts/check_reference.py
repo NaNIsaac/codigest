@@ -55,16 +55,23 @@ def cli_options() -> dict[str, set[str]]:
     return found
 
 
-def documented_options(page: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+def documented_options(
+    page: Path,
+) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, set[str]]]:
     """Options in each command's table, and options under its binary-only headings."""
     table: dict[str, set[str]] = {}
     binary: dict[str, set[str]] = {}
+    python_only: dict[str, set[str]] = {}
     current: str | None = None
     for line in page.read_text(encoding="utf-8").splitlines():
         if m := HEADING.match(line):
             current = m[1].strip()
             table.setdefault(current, set())
             binary.setdefault(current, set())
+            python_only.setdefault(current, set())
+        elif current and line.startswith("#### Python-only:"):
+            for span in re.findall(r"`([^`]+)`", line):
+                python_only[current].update(OPTION.findall(span))
         elif current and BINARY_ONLY.match(line):
             for span in re.findall(r"`([^`]+)`", line):
                 binary[current].update(OPTION.findall(span))
@@ -72,7 +79,7 @@ def documented_options(page: Path) -> tuple[dict[str, set[str]], dict[str, set[s
             first_cell = line.split("|")[1]
             for span in re.findall(r"`([^`]+)`", first_cell):
                 table[current].update(OPTION.findall(span))
-    return table, binary
+    return table, binary, python_only
 
 
 def compare(
@@ -117,9 +124,11 @@ def main() -> int:
     )
     problems: list[str] = []
     for page in PAGES:
-        table, binary = documented_options(page)
+        table, binary, python_only = documented_options(page)
         label = page.relative_to(SITE).as_posix()
-        problems += compare(label, "Python build", table, python)
+        problems += compare(
+            label, "Python build", {k: v | python_only[k] for k, v in table.items()}, python
+        )
         for command, options in binary.items():
             for option in sorted(options & python.get(command, set())):
                 problems.append(

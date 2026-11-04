@@ -73,3 +73,28 @@ printf '%s\n' \
 ```
 
 The second response lists, in this order: `terminal_history`, `pack`, `scan`, `diff`, `semdiff`, `digest`, `tree`.
+
+
+## GitHub repositories (Python build)
+
+Start the Python server with explicit remote access to expose `scan_github`:
+
+```sh
+uvx --python 3.15 codigest mcp --allow-remote
+```
+
+This is unreleased source functionality until a release containing this change is published.
+The default `cdg mcp` tool list and local project boundary are unchanged. The Rust build does
+not yet implement this option. A GitHub scan never executes the repository's code.
+
+`scan_github` accepts `repository` (OWNER/REPO or a github.com URL), optional `ref`,
+`paths` (a list, including FILE:START-END ranges), and `format` (xml, markdown, json).
+It returns the CLI snapshot with the resolved commit and omitted files. Remote digest, tree,
+diff and pack are not provided. Each remote child process has a 110-second timeout.
+
+Public scans do not use GitHub credentials. To let the server use the operator's existing
+GitHub credentials for private repositories, start with both `--allow-remote --auth`.
+A tool caller cannot enable authentication or change that startup policy.
+
+For ChatGPT cloud, connect this stdio command through Secure MCP Tunnel; starting the command
+alone does not register a ChatGPT plugin. See [private ChatGPT setup](chatgpt-mcp).

@@ -414,7 +414,13 @@ Serve these tools to AI agents over MCP (stdio).
 cdg mcp
 ```
 
-It takes no options and speaks newline-delimited JSON-RPC on stdin and stdout. See [MCP Integration](/mcp) for registering it and for the tools it offers.
+It speaks newline-delimited JSON-RPC on stdin and stdout. See [MCP Integration](/mcp) for registering it and for the tools it offers.
+
+#### Python-only: `--allow-remote`, `--auth`
+
+The Python build can add `scan_github` with `--allow-remote`. Add `--auth` only to
+allow the server to use existing GitHub credentials. The Rust build does not yet
+support these options. See [MCP Integration](/mcp).
 
 ## `cdg status`
 
