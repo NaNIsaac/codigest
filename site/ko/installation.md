@@ -2,10 +2,10 @@
 
 ## 빌드된 바이너리 (권장)
 
-네이티브 바이너리 하나이고 Python이 필요 없습니다. Windows (PowerShell):
+네이티브 바이너리 하나이고 Python이 필요 없습니다. Windows (cmd 또는 PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS, Termux:

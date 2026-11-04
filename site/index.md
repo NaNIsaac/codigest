@@ -20,7 +20,7 @@ install:
   windowsLabel: Windows
   unixLabel: Linux / macOS / Termux
   pythonLabel: Python (uv)
-  windows: 'irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex'
+  windows: 'powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"'
   unix: 'curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh | sh'
   python: 'uv tool install codigest'
   copy: Copy

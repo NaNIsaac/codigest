@@ -13,7 +13,7 @@ Python 빌드의 모든 명령을 Rust로 옮겼고, 빌드된 바이너리가 C
 Windows(PowerShell)에서는 설치 스크립트가 `cdg.exe`를 `%LOCALAPPDATA%\Programs\codigest`에 넣고 그 폴더를 사용자 `PATH`에 추가합니다.
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS, Termux에서는 `cdg`를 `~/.local/bin`(Termux는 `$PREFIX/bin`)에 설치합니다.

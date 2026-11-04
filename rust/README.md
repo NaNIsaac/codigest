@@ -13,7 +13,7 @@ programs that read and write the same data: the terminal capture store, `.codige
 Windows (PowerShell), to `%LOCALAPPDATA%\Programs\codigest` and your user `PATH`:
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS and Termux, to `~/.local/bin` (`$PREFIX/bin` in Termux):

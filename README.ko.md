@@ -50,11 +50,11 @@ Codigest는 AI 모델을 호출하지 않습니다. 모델에게 보낼 자료�
 
 ## 설치
 
-빌드된 바이너리를 설치합니다. Python이 필요 없습니다. Windows (PowerShell):
+빌드된 바이너리를 설치합니다. Python이 필요 없습니다. Windows (cmd 또는 PowerShell):
 
 <!-- test windows -->
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS, Termux:

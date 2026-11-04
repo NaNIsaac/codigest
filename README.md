@@ -55,11 +55,11 @@ your machine.
 
 ## Install
 
-Prebuilt binary, no Python needed. Windows (PowerShell):
+Prebuilt binary, no Python needed. Windows (cmd or PowerShell):
 
 <!-- test windows -->
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS and Termux:
