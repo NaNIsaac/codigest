@@ -2,10 +2,10 @@
 
 ## Prebuilt binary (recommended)
 
-One native binary, no Python needed. Windows (PowerShell):
+One native binary, no Python needed. Windows (cmd or PowerShell):
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS and Termux:

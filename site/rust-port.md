@@ -13,7 +13,7 @@ Both builds install a command called `cdg`, so keep one of them on `PATH`. They 
 On Windows (PowerShell), the installer puts `cdg.exe` in `%LOCALAPPDATA%\Programs\codigest` and adds that folder to your user `PATH`:
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 On Linux, macOS and Termux, it installs `cdg` to `~/.local/bin` (`$PREFIX/bin` in Termux):

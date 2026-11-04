@@ -1,6 +1,6 @@
 # Installs cdg, the Codigest binary, from a GitHub release.
 #
-#   irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+#   powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 #
 # CDG_VERSION=0.12.1 picks a release instead of the latest one. CDG_INSTALL_DIR picks the
 # folder; the default one is added to the user PATH, a chosen one is left to you.

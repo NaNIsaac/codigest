@@ -30,7 +30,7 @@ else
         Darwin-x86_64) target=x86_64-apple-darwin ;;
         Darwin-arm64) target=aarch64-apple-darwin ;;
         MINGW* | MSYS* | CYGWIN*)
-            echo "On Windows, run in PowerShell: irm https://raw.githubusercontent.com/$repo/main/install.ps1 | iex" >&2
+            echo "On Windows, run in cmd or PowerShell: powershell -ExecutionPolicy Bypass -c \"irm -useb https://raw.githubusercontent.com/$repo/main/install.ps1 | iex\"" >&2
             exit 1
             ;;
         *)
