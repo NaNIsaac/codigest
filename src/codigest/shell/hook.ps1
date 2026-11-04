@@ -66,6 +66,13 @@ function global:__cdg {
     $global:__cdgTail = [Collections.Generic.Queue[object]]::new()
     $global:__cdgDropped = 0
     $global:__cdgFailed = $false
+    # The engine set $^ and $$ from the line it parsed before this one; when that was a wrapped
+    # line they hold `.` and `}`. Put back the first and last token of that line as typed.
+    if ($global:__cdgEnds) {
+        Set-Variable -Name '^' -Value $global:__cdgEnds[0] -Scope Global
+        Set-Variable -Name '$' -Value $global:__cdgEnds[1] -Scope Global
+        $global:__cdgEnds = $null
+    }
     # The statements above reset $?; a typed line that reads it must see the previous command's.
     $__cdgFailedBefore = $global:__cdgLastOk -eq $false
     $global:__cdgLastOk = $null
@@ -159,6 +166,17 @@ function global:__cdgRestoreHistory {
         StartExecutionTime = $last.StartExecutionTime
         EndExecutionTime   = $last.EndExecutionTime
     } | Add-History
+}
+
+# The first and last token of a line as the engine keeps them for $^ and $$: comments and
+# line breaks left out, a string as its value (`"C:\x\"` gives C:\x\).
+function global:__cdgTokenEnds([string]$line) {
+    $tokens = $null; $errs = $null
+    [void][Management.Automation.Language.Parser]::ParseInput($line, [ref]$tokens, [ref]$errs)
+    $kept = @($tokens.Where({ $_.Kind -notin 'NewLine', 'EndOfInput', 'Comment', 'LineContinuation' }).ForEach({
+        if ($_ -is [Management.Automation.Language.StringToken]) { $_.Value } else { $_.Text }
+    }))
+    if ($kept) { , @($kept[0], $kept[-1]) }
 }
 
 # Whether a line is captured. A program that runs other command lines (hanfix's hf) lists
@@ -273,6 +291,10 @@ function global:PSConsoleHostReadLine {
     # Called back by the function this one calls: read the line and nothing more.
     if ($global:__cdgReading) { return __cdgReadLine $global:__cdgOk }
     __cdgRestoreHistory
+    # $^ and $$ for the line about to be read come from the previous one; when that one was
+    # wrapped, the engine has the wrapper's tokens, and __cdg puts the typed line's back.
+    $__cdgEndsPrev = $global:__cdgLastEnds
+    $global:__cdgLastEnds = $null
     # A program that loaded later (VS Code's shell integration) wrapped this function and calls
     # it for the line. Put this one back on top, around that one, for the next line; this line
     # goes to it as typed and is not captured.
@@ -312,6 +334,8 @@ function global:PSConsoleHostReadLine {
             if (-not $errs) {
                 $global:__cdgLine = $line
                 $global:__cdgLastOk = $__cdgOk
+                $global:__cdgEnds = $__cdgEndsPrev
+                $global:__cdgLastEnds = __cdgTokenEnds $line
                 return $w
             }
         }
@@ -330,6 +354,7 @@ if (-not $global:__cdgIdle) {
         $top = Get-Item function:PSConsoleHostReadLine -ErrorAction Ignore
         if ($top -and $top.Module.Name -ne 'PSReadLine' -and $top.Definition -notmatch 'codigest-readline') {
             __cdgRestoreHistory
+            $global:__cdgLastEnds = $null
             $global:__cdgPrev = $top.ScriptBlock
             Set-Item function:global:PSConsoleHostReadLine $global:__cdgSelf
         }
