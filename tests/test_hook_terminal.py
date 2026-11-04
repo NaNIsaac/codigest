@@ -486,3 +486,34 @@ def test_pwsh_captured_line_sees_the_previous_status(tmp_path):
     ], screen[-2000:]
     commands = [c["command"] for c in s.captured()]
     assert fail.format(4) in commands and "failme" not in commands, commands
+
+
+def test_pwsh_captured_line_sees_the_typed_first_and_last_token(tmp_path):
+    """$^ and $$ hold the previous line's first and last token as plain pwsh gives them, not the
+    wrapper's `.` and `}`; $?, $LASTEXITCODE and $Error stay as they were."""
+    pwsh = need("pwsh")
+    results = []
+    for hooked in (False, True):
+        home = tmp_path / ("hooked" if hooked else "plain")
+        home.mkdir()
+        s = Session(home)
+        state = home / "state.txt"
+        report = f"\"[$?] [$LASTEXITCODE] [$($Error.Count)] [$^] [$$]\" | Add-Content '{state}'"
+        lines = [
+            *([f". '{SHELL_DIR / 'hook.ps1'}'"] if hooked else []),
+            r'test-path "C:\x\"',
+            report,
+            "echo a 'b c' # note",
+            report,
+            'pwsh -NoProfile -Command "exit 3"',
+            report,
+            "Get-Item nothing-here",
+            report,
+            "exit",
+        ]
+        screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+        assert state.exists(), screen[-2000:]
+        results.append(state.read_text(encoding="utf-8").splitlines())
+    plain, hooked = results
+    assert plain[0].endswith(r"[test-path] [C:\x\]"), plain
+    assert hooked == plain
