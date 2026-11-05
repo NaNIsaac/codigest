@@ -44,6 +44,43 @@ function global:__cdgFalse {
         [Exception]::new('previous command failed'), 'CodigestStatus', 'NotSpecified', $null))
 }
 
+# Whether a captured line failed only because its program could not be started with a pipe for
+# its output. PowerShell then tries once more through the shell with no pipe, but leaves the
+# pipe's output encoding set, so that try fails with "StandardOutputEncoding is only supported
+# when standard output is redirected" and the real reason is lost (PowerShell/PowerShell#28225).
+# Nothing in the line ran when it is that one program alone, with no expression in its
+# arguments that runs code, so running the line again repeats nothing.
+function global:__cdgNeverStarted([Management.Automation.ErrorRecord]$err, [string]$line) {
+    $inner = $err.Exception.InnerException
+    if ($err.Exception -isnot [Management.Automation.ApplicationFailedException] -or
+        $inner -isnot [InvalidOperationException] -or
+        $inner.TargetSite.DeclaringType -ne [Diagnostics.Process]) { return $false }
+    $tokens = $null; $errs = $null
+    $ast = [Management.Automation.Language.Parser]::ParseInput($line, [ref]$tokens, [ref]$errs)
+    $statements = $ast.EndBlock.Statements
+    if ($errs -or $ast.ParamBlock -or $ast.BeginBlock -or $ast.ProcessBlock -or $ast.DynamicParamBlock -or
+        $statements.Count -ne 1 -or $statements[0] -isnot [Management.Automation.Language.PipelineAst] -or
+        $statements[0].PipelineElements.Count -ne 1 -or
+        $statements[0].PipelineElements[0] -isnot [Management.Automation.Language.CommandAst]) { return $false }
+    $command = $statements[0].PipelineElements[0]
+    # The program that failed is the one the line names, not one run by a function it calls:
+    # the error points at the line itself, as typed (wrapped) or as handed to __cdg_run.
+    $at = $err.InvocationInfo
+    if ($at.ScriptName -or $at.ScriptLineNumber -ne 1 -or
+        $at.Line.TrimEnd() -notin @(". __cdg { $line }", ". __cdg { $line", $line.TrimEnd()) -or
+        -not $at.Line.Substring($at.OffsetInLine - 1).StartsWith($command.Extent.Text)) { return $false }
+    # Arguments that are plain values: no command, method call or increment in them. Script
+    # block literals are passed on, not run, so their contents do not count.
+    $runsCode = $command.Find({
+            param($node)
+            $node -is [Management.Automation.Language.PipelineAst] -or
+            $node -is [Management.Automation.Language.InvokeMemberExpressionAst] -or
+            $node -is [Management.Automation.Language.AssignmentStatementAst] -or
+            ($node -is [Management.Automation.Language.UnaryExpressionAst] -and $node.TokenKind -match 'PlusPlus|MinusMinus')
+        }, $false)
+    -not $runsCode
+}
+
 function global:__cdg {
     # Advanced function so a failed command can surface as `$? -eq $false` for prompt themes.
     [CmdletBinding()]
@@ -83,7 +120,11 @@ function global:__cdg {
     catch {
         # A terminating error: still shown by the host, and the command failed.
         $global:__cdgFailed = $true
-        throw
+        if (-not (__cdgNeverStarted $_ $__cdgCommand)) { throw }
+        # Not captured: the program gets the start it would get without the hook. It either
+        # runs, or fails with the real reason.
+        . $__cdgBlock
+        $global:__cdgFailed = $false
     }
     finally {
         $env:PYTHONUNBUFFERED = $__cdgUnbuf
