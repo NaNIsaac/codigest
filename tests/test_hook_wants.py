@@ -27,7 +27,10 @@ $global:CODIGEST_RUNNERS = @()
 """
     out = subprocess.run(
         [
-            shell, "-NoProfile", "-NonInteractive", "-Command",
+            shell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
             skip.group(0) + "\n" + wants.group(0) + "\n" + script,
         ],
         capture_output=True,
