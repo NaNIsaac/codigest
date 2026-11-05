@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uv python install 3.15
       # the terminal tests drive bash, zsh and pwsh on a pseudo-terminal; the runner has no zsh
       - run: sudo apt-get install -y -qq zsh
@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Check Get-Help and native CLI forwarding
         shell: pwsh
         run: |

@@ -43,7 +43,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uv python install 3.15 && uv sync --python 3.15
         working-directory: .
         shell: bash
