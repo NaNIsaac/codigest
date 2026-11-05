@@ -517,3 +517,81 @@ def test_pwsh_captured_line_sees_the_typed_first_and_last_token(tmp_path):
     plain, hooked = results
     assert plain[0].endswith(r"[test-path] [C:\x\]"), plain
     assert hooked == plain
+
+
+# Shaped like a `irm <url> | iex` installer: one script block, Stop on errors, native commands
+# whose exit codes it checks.
+INSTALLER = """# installer
+& {
+    $ErrorActionPreference = 'Stop'
+    $name = 'multi'
+    if ($name) {
+        Write-Host "$name-host"
+        "$name-out"
+    }
+    cmd /c echo native-out
+    if ($LASTEXITCODE) { throw "cmd failed ($LASTEXITCODE)" }
+}
+"""
+
+
+def test_pwsh_captured_line_starts_windows_powershell_and_pwsh(tmp_path):
+    """pwsh hands powershell.exe its own environment block; both shells start and are captured,
+    as is an installer piped to iex in this shell or in a child one."""
+    pwsh = need("pwsh")
+    need("powershell")
+    s = Session(tmp_path)
+    script = tmp_path / "install.ps1"
+    script.write_text(INSTALLER, encoding="utf-8")
+    run_script = f"Get-Content -Raw '{script}' | iex"
+    lines = [
+        f". '{SHELL_DIR / 'hook.ps1'}'",
+        "powershell.exe -NoProfile -c \"'ps51-ok'\"",
+        "pwsh -NoProfile -c \"'pwsh-ok'\"",
+        f'powershell -NoProfile -ExecutionPolicy Bypass -c "{run_script}"',
+        f'pwsh -NoProfile -c "{run_script}"',
+        run_script,
+        "exit",
+    ]
+    screen = s.run(pwsh_argv(pwsh, s), lines, pause=3)
+    assert "StandardOutputEncoding" not in screen, screen[-2000:]
+    records = {c["command"]: c["output"] for c in s.captured()}
+    assert "ps51-ok" in records.get(lines[1], ""), records
+    assert "pwsh-ok" in records.get(lines[2], ""), records
+    for line in lines[3:6]:
+        assert "multi-out" in records.get(line, "") and "native-out" in records[line], (
+            line,
+            records,
+        )
+
+
+def test_pwsh_program_that_cannot_start_says_why(tmp_path):
+    """PowerShell/PowerShell#28225: a program that fails to start with its output piped reports
+    "StandardOutputEncoding is only supported when standard output is redirected" instead of the
+    reason. The hook starts such a line again without the pipe, as the shell would without it."""
+    pwsh = need("pwsh")
+    if not WINDOWS:
+        pytest.skip("the start fallback that loses the reason is Windows only")
+    screens = []
+    for hooked in (False, True):
+        home = tmp_path / ("hooked" if hooked else "plain")
+        home.mkdir()
+        s = Session(home)
+        bad = home / "notpe.exe"
+        bad.write_text("not a program\n", encoding="utf-8")
+        count = home / "count.txt"
+        lines = [
+            *([f". '{SHELL_DIR / 'hook.ps1'}'"] if hooked else []),
+            f"& '{bad}' -c 'irm u | iex'",
+            # not run again: the line did more than start the program
+            f"Add-Content '{count}' x; & '{bad}'",
+            f"\"[$?]\" | Add-Content '{count}'",
+            "exit",
+        ]
+        screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+        screens.append(screen)
+        assert count.read_text(encoding="utf-8").splitlines() == ["x", "[False]"], screen[-2000:]
+    for screen in screens:
+        # the first line's error gives the reason (the second line's, hooked, still does not)
+        _, found, reason = screen.partition("notpe.exe' failed to run: ")
+        assert found and not reason.startswith("StandardOutputEncoding"), screen[-2000:]
