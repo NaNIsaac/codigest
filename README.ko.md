@@ -447,7 +447,7 @@ cdg term clear        # 기록 모두 지우기
 `cdg term install`은 설치되어 있는 셸에 맞춰 PowerShell 프로필, `~/.bashrc`, `~/.zshrc`에 훅을
 추가합니다. `--shell powershell|bash|zsh|all`로 고를 수 있고, Windows의 Git Bash는 bash로 칩니다.
 명령은 원래 세션에서 그대로 실행되므로 `cd`, 변수, 함수가 모두 평소처럼 동작하고, 히스토리에도
-입력한 그대로 남습니다. 실제 터미널이 필요한 프로그램은 기록하지 않습니다. 편집기, 페이저, `ssh`, 전체 화면 도구(`tmux`, `zellij`, `herdr`, `k9s`, `yazi` 등), `-it`가 붙은 `docker`/`podman`/`kubectl`, `npm`/`pnpm`/`yarn`/`bun`의 `init`·`create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login`·`gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, 데이터베이스 셸(`psql`, `mysql`, `sqlite3` 등)이 해당합니다. 줄바꿈으로 끝나지 않는 질문은 기록용 파이프 안에서 다음 줄바꿈이 올 때까지 화면에 나타나지 않아, 명령이 멈춘 것처럼 보이기 때문입니다.
+입력한 그대로 남습니다. PowerShell에서는 색상과 페이저를 유지하도록 `bat`, `batcat`, `delta`, `glow`, `man`, `git diff`/`log`/`show`/`blame`과 `git -p`/`--paginate`를 기록하지 않습니다. 다른 도구는 `CODIGEST_CAP_SKIP`으로 추가합니다. 실제 터미널이 필요한 프로그램은 기록하지 않습니다. 편집기, 페이저, `ssh`, 전체 화면 도구(`tmux`, `zellij`, `herdr`, `k9s`, `yazi` 등), `-it`가 붙은 `docker`/`podman`/`kubectl`, `npm`/`pnpm`/`yarn`/`bun`의 `init`·`create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login`·`gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, 데이터베이스 셸(`psql`, `mysql`, `sqlite3` 등)이 해당합니다. 줄바꿈으로 끝나지 않는 질문은 기록용 파이프 안에서 다음 줄바꿈이 올 때까지 화면에 나타나지 않아, 명령이 멈춘 것처럼 보이기 때문입니다.
 
 - 명령 하나만 기록하지 않으려면 맨 앞에 공백을 넣습니다.
 - 기록하지 않을 프로그램을 더 지정하려면: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`
