@@ -73,3 +73,19 @@ printf '%s\n' \
 ```
 
 두 번째 응답에는 `terminal_history`, `pack`, `scan`, `diff`, `semdiff`, `digest`, `tree`가 이 순서로 들어 있습니다.
+
+## GitHub 저장소 (Python 빌드)
+
+`scan_github`를 쓰려면 Python 서버를 원격 접근을 명시해 시작합니다.
+
+```sh
+uvx --python 3.15 codigest mcp --allow-remote
+```
+
+이 기능이 들어간 릴리스가 나오기 전까지는 소스에만 있는 기능입니다. 기본 `cdg mcp`의 도구 목록과 로컬 프로젝트 경계는 그대로입니다. Rust 빌드는 이 옵션을 아직 구현하지 않았습니다. GitHub 스캔은 저장소의 코드를 실행하지 않습니다.
+
+`scan_github`는 `repository`(OWNER/REPO 또는 github.com URL), 선택 항목 `ref`, `paths`(FILE:START-END 범위를 포함한 목록), `format`(xml, markdown, json)을 받습니다. 확정된 커밋과 빠진 파일을 담은 CLI 스냅샷을 돌려줍니다. 원격 digest, tree, diff, pack은 없습니다. 원격 하위 프로세스마다 제한 시간은 110초입니다.
+
+공개 스캔은 GitHub 자격 증명을 쓰지 않습니다. 비공개 저장소에 운영자의 기존 GitHub 자격 증명을 쓰게 하려면 `--allow-remote --auth`를 함께 주고 시작합니다. 도구를 호출하는 쪽은 인증을 켜거나 이 시작 정책을 바꿀 수 없습니다.
+
+ChatGPT 클라우드에서는 이 stdio 명령을 Secure MCP Tunnel로 연결합니다. 명령을 시작하는 것만으로 ChatGPT 플러그인이 등록되지는 않습니다. [ChatGPT 비공개 연결](/ko/chatgpt-mcp)을 보십시오.
