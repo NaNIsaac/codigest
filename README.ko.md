@@ -50,11 +50,11 @@ Codigest는 AI 모델을 호출하지 않습니다. 모델에게 보낼 자료�
 
 ## 설치
 
-빌드된 바이너리를 설치합니다. Python이 필요 없습니다. Windows (PowerShell):
+빌드된 바이너리를 설치합니다. Python이 필요 없습니다. Windows (cmd 또는 PowerShell):
 
 <!-- test windows -->
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS, Termux:
@@ -447,7 +447,7 @@ cdg term clear        # 기록 모두 지우기
 `cdg term install`은 설치되어 있는 셸에 맞춰 PowerShell 프로필, `~/.bashrc`, `~/.zshrc`에 훅을
 추가합니다. `--shell powershell|bash|zsh|all`로 고를 수 있고, Windows의 Git Bash는 bash로 칩니다.
 명령은 원래 세션에서 그대로 실행되므로 `cd`, 변수, 함수가 모두 평소처럼 동작하고, 히스토리에도
-입력한 그대로 남습니다. 실제 터미널이 필요한 프로그램은 기록하지 않습니다. 편집기, 페이저, `ssh`, 전체 화면 도구(`tmux`, `zellij`, `herdr`, `k9s`, `yazi` 등), `-it`가 붙은 `docker`/`podman`/`kubectl`, `npm`/`pnpm`/`yarn`/`bun`의 `init`·`create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login`·`gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, 데이터베이스 셸(`psql`, `mysql`, `sqlite3` 등)이 해당합니다. 줄바꿈으로 끝나지 않는 질문은 기록용 파이프 안에서 다음 줄바꿈이 올 때까지 화면에 나타나지 않아, 명령이 멈춘 것처럼 보이기 때문입니다.
+입력한 그대로 남습니다. PowerShell에서는 색상과 페이저를 유지하도록 `bat`, `batcat`, `delta`, `glow`, `man`, `git diff`/`log`/`show`/`blame`과 `git -p`/`--paginate`를 기록하지 않습니다. 다른 도구는 `CODIGEST_CAP_SKIP`으로 추가합니다. 실제 터미널이 필요한 프로그램은 기록하지 않습니다. 편집기, 페이저, `ssh`, 전체 화면 도구(`tmux`, `zellij`, `herdr`, `k9s`, `yazi` 등), `-it`가 붙은 `docker`/`podman`/`kubectl`, `npm`/`pnpm`/`yarn`/`bun`의 `init`·`create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login`·`gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, 데이터베이스 셸(`psql`, `mysql`, `sqlite3` 등)이 해당합니다. 줄바꿈으로 끝나지 않는 질문은 기록용 파이프 안에서 다음 줄바꿈이 올 때까지 화면에 나타나지 않아, 명령이 멈춘 것처럼 보이기 때문입니다.
 
 - 명령 하나만 기록하지 않으려면 맨 앞에 공백을 넣습니다.
 - 기록하지 않을 프로그램을 더 지정하려면: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'`
@@ -456,6 +456,50 @@ cdg term clear        # 기록 모두 지우기
 - 훅을 없애려면: `cdg term uninstall`. 각 시작 파일은 install 전의 바이트 그대로(줄바꿈, BOM,
   마지막 줄바꿈 포함) 돌아가고, install이 만든 파일은 그때 만든 폴더와 함께 지워집니다. 데이터 폴더의
   훅 사본도 지워집니다. 기록된 명령은 `cdg term clear`로 지울 때까지 남습니다.
+
+##### 다른 명령을 실행하는 프로그램
+
+[hanfix](https://github.com/NaNIsaac/hanfix)의 `hf`(한글 자판으로 친 직전 명령을 고쳐 다시 실행)처럼
+명령 줄을 대신 실행하는 프로그램은, 그대로 두면 통째로 기록되고 그 안에서 실행한 명령이 터미널 대신
+기록용 파이프를 받게 됩니다. 이런 프로그램은 두 단계로 훅과 함께 쓸 수 있습니다.
+
+1. 불러올 때 자기 명령 이름을 `CODIGEST_RUNNERS`에 더합니다. 이 이름으로 시작하는 줄은 기록하지
+   않습니다. 덮어쓰지 말고 더해야 시작 파일에서 codigest와 어느 쪽을 먼저 불러와도 됩니다.
+   - PowerShell: `$global:CODIGEST_RUNNERS += 'hf'`
+   - bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} hf"` (공백으로 나눈 셸 변수)
+2. 명령 줄을 실행할 때 `__cdg_run`이 정의되어 있으면 그것으로 실행합니다(실행하는 그때 찾습니다).
+   그 줄에 훅의 규칙을 그대로 적용하므로, 터미널이 필요한 프로그램은 터미널을 받고 나머지는 그 줄로
+   기록됩니다.
+   - PowerShell: `if (Get-Command __cdg_run -CommandType Function -ErrorAction Ignore) { . __cdg_run $line } else { Invoke-Expression $line }`
+   - bash/zsh: `if typeset -f __cdg_run >/dev/null; then __cdg_run "$line"; else eval "$line"; fi`
+
+2단계를 하지 않는 프로그램도 `CODIGEST_RUNNERS`에 넣을 수 있습니다. 그러면 그 프로그램이 실행하는
+명령은 터미널을 받고 기록되지 않습니다. [thefuck](https://github.com/nvbn/thefuck)이 그런 예입니다:
+`$global:CODIGEST_RUNNERS += 'fuck'` (bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} fuck"`).
+
+입력한 줄을 실행 전에 바꾸는 방법도 있습니다. Enter를 누르면 훅이 `CODIGEST_REWRITERS`에 있는 함수에
+그 줄을 차례로 넘기고, 처음으로 맡은 함수가 돌려준 줄을 실행합니다. 그 줄은 직접 입력한 줄과 똑같이
+다뤄집니다. 셸 히스토리(PowerShell에서는 PSReadLine과 엔진 히스토리)에 남는 것도 그 줄이고, 기록할지는
+훅의 규칙이 정하며, `$?`도 그 줄의 것입니다. `hf`만 입력한 줄은 이렇게 동작할 수 있고, 더 긴 줄 안의
+`hf`는 위의 두 단계를 씁니다.
+
+- PowerShell: `$global:CODIGEST_REWRITERS += 'name'`. 함수는 줄을 받아 `$null`(맡지 않음), 새 줄,
+  또는 먼저 묻는 `@{ Line = <새 줄>; Confirm = $true }`를 돌려줍니다.
+- bash/zsh: `CODIGEST_REWRITERS="${CODIGEST_REWRITERS-} name"`. 함수는 줄을 받아 `REPLY`에 새 줄을
+  넣고 0(먼저 물으려면 2)을 돌려주거나, 맡지 않으면 1을 돌려줍니다.
+- 물을 때는 새 줄과 `[Enter / Ctrl+C]`를 보여 줍니다. Enter면 실행하고, 다른 키면 버립니다(아무것도
+  실행하지 않고 히스토리에도 넣지 않음).
+- 함수가 실패하거나, 다른 값을 돌려주거나, 문법이 틀린 줄을 주면 입력한 줄을 그대로 실행하고 메시지도
+  내지 않습니다. 200 ms가 지나서 나온 결과도 버리고 입력한 줄을 실행합니다. 시간 제한은 아닙니다. 훅은
+  함수가 끝날 때까지 기다리므로, 멈춘 함수는 Enter를 막습니다.
+- 함수가 히스토리에 직접 넣으면 안 됩니다.
+- 앞에 공백을 두고 입력한 줄은 새 줄에도 공백이 붙어 기록되지 않습니다.
+- PowerShell 원격 세션, 중첩 프롬프트, 디버거에서는 쓰지 않습니다.
+
+PowerShell에서는 다른 `PSConsoleHostReadLine`(VS Code의 셸 통합, atuin)과 함께 동작합니다. 줄을 읽을
+때 그것을 불러 입력한 그대로의 줄을 보게 하고, 돌려받은 줄만 감쌉니다. 그런 프로그램이 훅보다 나중에
+불러와지면, 그것이 줄을 직접 읽더라도(atuin처럼) 훅은 셸이 입력을 기다리는 동안 다시 앞에 섭니다.
+그 직후의 첫 줄은 기록되지 않습니다.
 
 프로필은 패키지 안의 파일이 아니라, `cdg term install`이 데이터 폴더(기록 옆의 `shell/`)에 둔 훅 사본을 불러옵니다. codigest를 업데이트한 뒤에는 `cdg term install`을 다시 실행해 사본을 갱신하세요.
 
@@ -471,6 +515,8 @@ cdg term clear        # 기록 모두 지우기
 - PowerShell 훅은 원격 세션, 중첩 프롬프트, 디버거에서는 줄을 감싸지 않습니다.
 - bash 훅은 DEBUG 트랩을 씁니다. 첫 프롬프트 전에 설정된 트랩(starship, bash-preexec)은 그대로
   두지만, 그 뒤에 새로 설정한 DEBUG 트랩은 훅을 덮어씁니다.
+- bash에서 VS Code의 셸 통합을 훅보다 나중에 불러오면 기록되지 않습니다
+  ([#52](https://github.com/NaNIsaac/codigest/issues/52)).
 
 ### MCP 도구
 

@@ -19,15 +19,15 @@
   <a href="https://mcprush.com/trust">How ratings work</a>.</sub>
 </p>
 
-Codigest is a command-line tool for the moment you ask ChatGPT, Claude or a coding agent about
-your code. It turns the part of your project you pick into one block of text you can paste into
-any chat.
+Suppose a test fails and you want a coding assistant to help. Pasting the
+error alone may omit the function under test; pasting the whole repository
+buries the problem in unrelated files.
 
-A model only knows what you show it. Copying files by hand is slow, it is easy to miss the one
-file that matters, and it is just as easy to paste far more than the question needs. Codigest
-lets you decide what to share and then collects it for you: the whole project, a file and the
-files it imports, what changed since a point you marked, or a failing test with the code it points
-at.
+**Codigest lets you choose what context to send.** From the terminal, it can
+collect selected files, their local imports, recent changes, or a failed
+command and the files mentioned in its output. It packages the selection
+as text for you to inspect and paste into ChatGPT, Claude, or another tool.
+It does not choose a fix or call a model on its own.
 
 ## What it does
 
@@ -39,8 +39,9 @@ at.
   together with the files its error points at.
 - **Says what it included.** Every bundle reports its size, and `pack` gives the reason for each
   file and names the ones it left out.
-- **Keeps secrets out.** `.env` files and keys are never included, and tokens in code or output
-  are masked.
+- **Filters common secrets.** It excludes `.env` files and known key patterns and
+  attempts to mask tokens in code or output. Review a bundle before sharing
+  it; automated filtering cannot guarantee that every sensitive value is caught.
 - **Works with agents.** Claude Code, Cursor and other MCP clients can request the same output.
 
 Codigest does not call any AI model; it only prepares what you send to one. Everything runs on
@@ -54,11 +55,11 @@ your machine.
 
 ## Install
 
-Prebuilt binary, no Python needed. Windows (PowerShell):
+Prebuilt binary, no Python needed. Windows (cmd or PowerShell):
 
 <!-- test windows -->
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS and Termux:
@@ -474,7 +475,7 @@ fish), without their output.
 `cdg term install` edits your PowerShell profile, `~/.bashrc` and `~/.zshrc` for whichever of
 these shells is installed; choose with `--shell powershell|bash|zsh|all`. On Windows, Git Bash
 counts as bash. Commands still run in your current session (`cd`, variables and functions work
-normally) and appear in your history as typed. Programs that need a real terminal are skipped: editors, pagers, `ssh`, full-screen tools (`tmux`, `zellij`, `herdr`, `k9s`, `yazi`, ...), `docker`/`podman`/`kubectl` with `-it`, `npm`/`pnpm`/`yarn`/`bun` `init` or `create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login` and `gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, and database shells (`psql`, `mysql`, `sqlite3`, ...). A prompt that does not end its line stays invisible in the capture pipe until the next newline, so the command would look stuck.
+normally) and appear in your history as typed. In PowerShell, `bat`, `batcat`, `delta`, `glow`, `man`, and `git diff`/`log`/`show`/`blame` or `git -p`/`--paginate` bypass capture to preserve colour and pagers; use `CODIGEST_CAP_SKIP` for other tools. Programs that need a real terminal are skipped: editors, pagers, `ssh`, full-screen tools (`tmux`, `zellij`, `herdr`, `k9s`, `yazi`, ...), `docker`/`podman`/`kubectl` with `-it`, `npm`/`pnpm`/`yarn`/`bun` `init` or `create`, `npx create-*`, `pip uninstall`, `gh auth login`, `az login`, `gcloud auth login` and `gcloud init`, `aws configure`, `ssh-keygen`, `sudo`, and database shells (`psql`, `mysql`, `sqlite3`, ...). A prompt that does not end its line stays invisible in the capture pipe until the next newline, so the command would look stuck.
 
 - Skip one command: start the line with a space.
 - Skip more programs: `$env:CODIGEST_CAP_SKIP = '^\s*(myrepl|mytui)\b'` (bash/zsh:
@@ -484,6 +485,53 @@ normally) and appear in your history as typed. Programs that need a real termina
   before install (line endings, BOM, final newline); one that install created is deleted with
   any folder made for it, as are the hook copies in the data folder. Captured commands stay
   until `cdg term clear`.
+
+##### Programs that run other commands
+
+A program that runs a command line for you, such as `hf` from
+[hanfix](https://github.com/NaNIsaac/hanfix) (it re-runs the previous command typed with the Korean
+layout on), would otherwise be captured as a whole, and the command it runs would get the capture
+pipe instead of the terminal. Such a program can work with the hook in two steps:
+
+1. Add its command names to `CODIGEST_RUNNERS` when it loads; the hook does not capture a line that
+   starts with one of them. Append, so the order in which the startup file loads it and codigest
+   does not matter:
+   - PowerShell: `$global:CODIGEST_RUNNERS += 'hf'`
+   - bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} hf"` (a shell variable, space-separated)
+2. Run each command line through `__cdg_run` when it is defined, looked up when the line runs. It
+   applies the hook's own rules to that line: a program that needs the terminal keeps it, anything
+   else is captured under that line.
+   - PowerShell: `if (Get-Command __cdg_run -CommandType Function -ErrorAction Ignore) { . __cdg_run $line } else { Invoke-Expression $line }`
+   - bash/zsh: `if typeset -f __cdg_run >/dev/null; then __cdg_run "$line"; else eval "$line"; fi`
+
+A program that does not do step 2 can still be listed in `CODIGEST_RUNNERS`: what it runs then keeps
+the terminal and is not captured. [thefuck](https://github.com/nvbn/thefuck) is one:
+`$global:CODIGEST_RUNNERS += 'fuck'` (bash/zsh: `CODIGEST_RUNNERS="${CODIGEST_RUNNERS-} fuck"`).
+
+A program can instead replace the typed line before it runs: when Enter is pressed, the hook calls
+each function listed in `CODIGEST_REWRITERS` with the line, and the first one that claims it gives
+the line to run. That line then goes on as if typed: it is the one in the shell history (PSReadLine's
+and the engine's in PowerShell), the hook's rules decide whether it is captured, and `$?` is its own.
+`hf` typed alone can work this way; `hf` inside a longer line still uses the steps above.
+
+- PowerShell: `$global:CODIGEST_REWRITERS += 'name'`. The function gets the line and returns
+  `$null` (not its line), the new line, or `@{ Line = <new>; Confirm = $true }` to ask first.
+- bash/zsh: `CODIGEST_REWRITERS="${CODIGEST_REWRITERS-} name"`. The function gets the line, sets
+  `REPLY` to the new line and returns 0, or 2 to ask first, or returns 1 when it is not its line.
+- When asked, the hook shows the new line with `[Enter / Ctrl+C]`: Enter runs it, any other key
+  drops it (nothing runs, nothing is added to history).
+- A function that fails, returns anything else, or gives a line that does not parse leaves the line
+  as typed, without a message. So does a result that comes after more than 200 ms: it is discarded.
+  This is not a timeout: the hook waits for the function to return, so one that hangs blocks Enter.
+- The function should not add to history itself.
+- A line typed with a leading space keeps it, so it stays out of the capture.
+- Not in a PowerShell remote session, nested prompt or the debugger.
+
+In PowerShell the hook works with another `PSConsoleHostReadLine` (VS Code's shell integration,
+atuin): it calls that one for the line, so it sees the line as typed, and only wraps what it
+returns. When one is loaded after the hook, the hook puts itself back on top while the shell
+waits for input, also when that one reads the line itself (atuin does); the first line after it
+is not captured.
 
 The profile loads a copy of the hook that `cdg term install` puts in the data folder (`shell/` next to the captures), not the file inside the package. After updating codigest, run `cdg term install` again to refresh it.
 
@@ -495,6 +543,8 @@ Limitations:
   normally. In bash, neither are lines that start with a subshell `( ... )`.
 - In bash the hook uses the DEBUG trap and keeps one set before the first prompt (starship,
   bash-preexec); a DEBUG trap set later replaces it.
+- In bash, VS Code's shell integration loaded after the hook stops the capture
+  ([#52](https://github.com/NaNIsaac/codigest/issues/52)).
 - Long output is bounded: the PowerShell hook keeps the first and last 2,000 lines, and a bash or
   zsh capture file over 4 MB is read 1 MB from each end. The store then keeps 64 KB.
 - In PowerShell, a command counts as failed when its exit code is non-zero or an error reached

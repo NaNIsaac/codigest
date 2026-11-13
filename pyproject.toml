@@ -1,6 +1,6 @@
 [project]
 name = "codigest"
-version = "0.12.2"
+version = "0.13.0"
 description = "Human-Centered Codebase Context Manager for LLMs"
 authors = [{ name = "Isaac Yong", email = "isaacyong@naver.com" }]
 readme = "README.md"
@@ -78,3 +78,8 @@ extend-select = ["B", "I", "UP"]
 "src/codigest/main.py" = ["BLE001", "I001"]
 "src/codigest/options.py" = ["I001"]
 "tests/test_term_install.py" = ["PIE807", "UP012"]
+
+# Test command for merge tooling that runs the suite before landing a PR (pytest and
+# pywinpty are not project dependencies; the suite drives a real terminal on Windows).
+[tool.pr-land]
+test-command = "uv run --with pytest --with pywinpty pytest -q -p no:cacheprovider --basetemp {basetemp}"

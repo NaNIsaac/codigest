@@ -13,7 +13,7 @@ Both builds install a command called `cdg`, so keep one of them on `PATH`. They 
 On Windows (PowerShell), the installer puts `cdg.exe` in `%LOCALAPPDATA%\Programs\codigest` and adds that folder to your user `PATH`:
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 On Linux, macOS and Termux, it installs `cdg` to `~/.local/bin` (`$PREFIX/bin` in Termux):
@@ -31,7 +31,7 @@ To install by hand instead, download an archive.
 Windows (PowerShell):
 
 ```powershell
-$v = "0.12.2"; $t = "x86_64-pc-windows-msvc"
+$v = "0.13.0"; $t = "x86_64-pc-windows-msvc"
 Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.zip" -OutFile codigest.zip
 Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
 # then add $env:LOCALAPPDATA\Programs\codigest-$v-$t to PATH
@@ -40,12 +40,12 @@ Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
 Linux, macOS and Termux (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin` or `aarch64-linux-android`):
 
 ```bash
-v=0.12.2; t=x86_64-unknown-linux-musl
+v=0.13.0; t=x86_64-unknown-linux-musl
 curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.tar.gz" | tar xz
 install "codigest-$v-$t/cdg" ~/.local/bin/
 ```
 
-With the GitHub CLI: `gh release download rust-v0.12.2 -R NaNIsaac/codigest -p '*windows*'`.
+With the GitHub CLI: `gh release download rust-v0.13.0 -R NaNIsaac/codigest -p '*windows*'`.
 
 ## Build
 

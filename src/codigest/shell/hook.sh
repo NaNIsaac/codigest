@@ -60,12 +60,54 @@ __cdg_wants() {
     [[ $1 =~ $__cdg_skip ]] && return 1
     [[ -n ${CODIGEST_CAP_SKIP-} && $1 =~ $CODIGEST_CAP_SKIP ]] && return 1
     [[ $1 =~ $__cdg_commit && ! $1 =~ $__cdg_msg ]] && return 1
+    # A program that runs other command lines (hanfix's hf) lists its names in
+    # CODIGEST_RUNNERS: its own line is not captured, so it keeps the terminal, and it
+    # hands each line it runs to __cdg_run, which decides for that line.
+    local first=${1%%[[:space:]]*}
+    [[ " ${CODIGEST_RUNNERS-} " == *" $first "* ]] && return 1
     # The recorded line would show `!!`-style history expansion unexpanded.
     if [ "$__cdg_shell" = zsh ]; then [[ -o banghist && $1 == *!* ]] && return 1
     else [[ $- == *H* && $1 == *!* ]] && return 1; fi
     # Incomplete input (open loop, quote...) goes through untouched to the continuation prompt.
+    __cdg_parses "$1"
+}
+
+__cdg_parses() {
     if [ "$__cdg_shell" = zsh ]; then zsh -f -n -c "$1" 2>/dev/null
     else BASH_ENV= "$BASH" -n -c "$1" 2>/dev/null; fi
+}
+
+# A program that turns a typed line into another one before it runs (hanfix's hf: the previous
+# command, fixed) lists a function in CODIGEST_REWRITERS. It is called with the line, sets REPLY to
+# the new line and returns 0 (run it) or 2 (ask first), or returns 1 (not its line). The new line then
+# goes on as if typed: history, capture rules, $?. A rewriter that fails, returns anything else or
+# answers after more than 200 ms leaves the line as typed (not a timeout: it is waited for), and it
+# does not touch history itself.
+# Returns 0 with the line to run in __cdg_new (empty: dropped at the question).
+__cdg_rewrite() {
+    local name REPLY s t0
+    local -a names
+    [ -n "${CODIGEST_REWRITERS-}" ] && __cdg_parses "$1" || return 1
+    if [ "$__cdg_shell" = zsh ]; then eval 'names=(${=CODIGEST_REWRITERS})'
+    else read -ra names <<< "$CODIGEST_REWRITERS"; fi
+    for name in "${names[@]}"; do
+        REPLY=
+        __cdg_now; t0=$__cdg_t
+        "$name" "$1" </dev/null >/dev/null 2>&1
+        s=$?
+        __cdg_now
+        (( s == 1 )) && continue
+        (( s == 0 || s == 2 )) && [[ -n ${REPLY//[[:space:]]/} ]] || return 1
+        if [ "$__cdg_shell" = zsh ]; then (( (__cdg_t - t0) * 1000 > 200 )) && return 1
+        elif [ -n "${EPOCHREALTIME-}" ]; then (( ${__cdg_t/[.,]/} - ${t0/[.,]/} > 200000 )) && return 1; fi
+        __cdg_parses "$REPLY" || return 1
+        # A line typed with a leading space stays out of the capture.
+        [[ $1 == [[:space:]]* && $REPLY != [[:space:]]* ]] && REPLY=" $REPLY"
+        __cdg_new=$REPLY
+        (( s == 2 )) && ! __cdg_ask "$REPLY" && __cdg_new=
+        return 0
+    done
+    return 1
 }
 
 # Opens the private file and the tee that copies into it. bash calls this on Enter,
@@ -127,13 +169,35 @@ __cdg_post() {
     return $s
 }
 
+# Runs a command line for a runner, captured as if it had been typed. The DEBUG trap and
+# preexec do not run for the commands inside a function, so the capture starts here; the
+# next prompt ends it as usual.
+__cdg_run() {
+    if [ -z "$__cdg_file" ] && __cdg_wants "$1"; then
+        __cdg_open "$1"
+        __cdg_start
+    fi
+    eval "$1"
+}
+
 __cdg_file= __cdg_w= __cdg_busy=
 if [ "$__cdg_shell" = zsh ]; then
     zmodload zsh/zselect 2>/dev/null
     __cdg_accept() {
         __cdg_line=
-        [[ -z $PREBUFFER ]] && __cdg_wants "$BUFFER" && __cdg_line=$BUFFER
+        if [[ -z $PREBUFFER ]]; then
+            if __cdg_rewrite "$BUFFER"; then BUFFER=$__cdg_new; CURSOR=$#BUFFER; fi
+            __cdg_wants "$BUFFER" && __cdg_line=$BUFFER
+        fi
         zle __cdg_orig_accept
+    }
+    # Enter runs the line; any other key, Ctrl+C included, drops it.
+    __cdg_ask() {
+        local k
+        zle -M "$1  [Enter / Ctrl+C]"
+        read -k 1 k
+        zle -M ''
+        [[ $k == $'\n' || $k == $'\r' ]]
     }
     __cdg_preexec() {
         [ -n "$__cdg_line" ] || return 0
@@ -155,9 +219,22 @@ else
     # recorded without its output.
     __cdg_skip+='|^[[:space:]]*\(([^(]|$)'
     __cdg_mark() {
-        if [ -z "${__cdg_cont-}" ] && __cdg_wants "$READLINE_LINE"; then __cdg_open "$READLINE_LINE"; fi
+        if [ -z "${__cdg_cont-}" ]; then
+            # bash puts the accepted line, the new one, in its history.
+            if __cdg_rewrite "$READLINE_LINE"; then READLINE_LINE=$__cdg_new READLINE_POINT=${#__cdg_new}; fi
+            __cdg_wants "$READLINE_LINE" && __cdg_open "$READLINE_LINE"
+        fi
         # Any further Enter before the next prompt is a continuation line.
         __cdg_cont=1
+    }
+    # Enter runs the line; any other key drops it, and Ctrl+C makes readline drop it.
+    __cdg_ask() {
+        local k
+        printf '\n\033[32m%s\033[0m  [Enter / Ctrl+C] ' "$1"
+        IFS= read -rsn1 k
+        local s=$?
+        printf '\n'
+        (( s == 0 )) && [[ -z $k || $k == $'\r' ]]
     }
     # Runs before every simple command. The first one of a recorded line starts the
     # capture; reaching PROMPT_COMMAND first means the line had none.

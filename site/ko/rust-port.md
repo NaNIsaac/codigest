@@ -13,7 +13,7 @@ Python 빌드의 모든 명령을 Rust로 옮겼고, 빌드된 바이너리가 C
 Windows(PowerShell)에서는 설치 스크립트가 `cdg.exe`를 `%LOCALAPPDATA%\Programs\codigest`에 넣고 그 폴더를 사용자 `PATH`에 추가합니다.
 
 ```powershell
-irm https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex
+powershell -ExecutionPolicy Bypass -c "irm -useb https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.ps1 | iex"
 ```
 
 Linux, macOS, Termux에서는 `cdg`를 `~/.local/bin`(Termux는 `$PREFIX/bin`)에 설치합니다.
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/NaNIsaac/codigest/main/install.sh |
 Windows (PowerShell):
 
 ```powershell
-$v = "0.12.2"; $t = "x86_64-pc-windows-msvc"
+$v = "0.13.0"; $t = "x86_64-pc-windows-msvc"
 Invoke-WebRequest "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.zip" -OutFile codigest.zip
 Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
 # 그다음 $env:LOCALAPPDATA\Programs\codigest-$v-$t 를 PATH에 추가
@@ -40,12 +40,12 @@ Expand-Archive codigest.zip "$env:LOCALAPPDATA\Programs" -Force
 Linux, macOS, Termux (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin`, `aarch64-linux-android` 중 하나):
 
 ```bash
-v=0.12.2; t=x86_64-unknown-linux-musl
+v=0.13.0; t=x86_64-unknown-linux-musl
 curl -L "https://github.com/NaNIsaac/codigest/releases/download/rust-v$v/codigest-$v-$t.tar.gz" | tar xz
 install "codigest-$v-$t/cdg" ~/.local/bin/
 ```
 
-GitHub CLI로는 `gh release download rust-v0.12.2 -R NaNIsaac/codigest -p '*windows*'`.
+GitHub CLI로는 `gh release download rust-v0.13.0 -R NaNIsaac/codigest -p '*windows*'`.
 
 ## 빌드
 

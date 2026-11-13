@@ -77,11 +77,13 @@ pub fn require_parity() {
 }
 
 /// What a command printed, with the parts that legitimately differ between two runs
-/// replaced: timestamps, durations, relative times.
+/// replaced: timestamps, durations, relative times. A `duration` attribute is dropped, not
+/// masked, because both builds store whole milliseconds and omit the attribute at 0, so two
+/// runs of a command that takes about a millisecond can differ in whether it is there at all.
 pub fn normalise(text: &str) -> String {
     let patterns = [
         (r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d", "<TIME>"),
-        (r#"duration="[^"]*""#, r#"duration="<D>""#),
+        (r#" duration="[^"]*""#, ""),
         (r"\(\d+ \w+ ago\)", "(<AGO>)"),
     ];
     let mut out = text.replace("\r\n", "\n");
