@@ -97,4 +97,4 @@ GitHub credentials for private repositories, start with both `--allow-remote --a
 A tool caller cannot enable authentication or change that startup policy.
 
 For ChatGPT cloud, connect this stdio command through Secure MCP Tunnel; starting the command
-alone does not register a ChatGPT plugin. See [private ChatGPT setup](chatgpt-mcp).
+alone does not register a ChatGPT plugin. See [private ChatGPT setup](/chatgpt-mcp).
