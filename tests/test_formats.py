@@ -1,4 +1,6 @@
 import json
+from datetime import date
+from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -61,18 +63,58 @@ def test_term_markdown_notes_what_was_not_captured():
 
 
 def test_term_list_is_one_line_per_command_indexed_from_the_latest():
-    assert termstore.render_list(history()).splitlines() == [
-        "2. pytest -q (exit 1)",
-        "1. echo hi",
+    assert termstore.render_list(history(), today=date(2026, 1, 1)).splitlines() == [
+        "2. 10:00  exit 1  /w  pytest -q",
+        "1. 10:00  exit 0  /w  echo hi",
+    ]
+    assert termstore.render_list(history(), today=date(2026, 1, 2)).splitlines() == [
+        "2. 2026-01-01 10:00  exit 1  /w  pytest -q",
+        "1. 2026-01-01 10:00  exit 0  /w  echo hi",
     ]
 
 
-def test_term_list_marks_no_output_and_keeps_a_command_on_one_line():
-    [entry] = [Entry(command="ls\n-la", captured=False, shell="bash", hostname="PC")]
-    assert termstore.render_list([entry]) == "1. ls -la (no output)"
+def test_term_list_shortens_cwd_and_marks_no_output():
+    home = Path.home()
+    entries = [
+        Entry(
+            command="ls\n-la",
+            captured=False,
+            cwd=str(home / "a" / "b" / "c"),
+            shell="bash",
+            hostname="PC",
+        ),
+        Entry(command="pwd", exit_code=0, cwd="X:\\Dev\\NaNIsaac\\codigest"),
+        Entry(command="whoami", exit_code=0, cwd=str(home / "proj")),
+    ]
+    assert termstore.render_list(entries).splitlines() == [
+        "3. ~/.../b/c  ls -la (no output)",
+        "2. exit 0  .../NaNIsaac/codigest  pwd",
+        "1. exit 0  ~/proj  whoami",
+    ]
     assert (
-        termstore.render_list([entry], include_context=True) == "1. ls -la (no output) [bash on PC]"
+        termstore.render_list(entries[:1], include_context=True)
+        == "1. ~/.../b/c  ls -la (no output) [bash on PC]"
     )
+
+
+def test_term_list_json_has_row_fields_and_respects_start_index():
+    items = json.loads(termstore.render_list_json(history(), start_index=3, today=date(2026, 1, 1)))
+    assert items == [
+        {
+            "index": 4,
+            "time": "10:00",
+            "exit_code": 1,
+            "cwd": "/w",
+            "command": "pytest -q",
+        },
+        {
+            "index": 3,
+            "time": "10:00",
+            "exit_code": 0,
+            "cwd": "/w",
+            "command": "echo hi",
+        },
+    ]
 
 
 def test_term_json_is_an_array_indexed_from_the_latest():

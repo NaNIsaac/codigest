@@ -20,7 +20,7 @@ import re
 import socket
 import sys
 from dataclasses import asdict, dataclass, fields
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Self
 
@@ -226,7 +226,50 @@ def _fmt_duration(ms: int) -> str:
     return f"{ms / 1000:.1f}s"
 
 
-def render(entries: list[Entry], *, include_context: bool = False) -> str:
+def _entry_index(total: int, offset: int, start_index: int) -> int:
+    return start_index + (total - 1 - offset)
+
+
+def _format_time(started_at: str, *, today: date | None = None) -> str:
+    if not started_at:
+        return ""
+    try:
+        dt = datetime.fromisoformat(started_at)
+    except ValueError:
+        return ""
+    ref_today = today or (datetime.now(dt.tzinfo).date() if dt.tzinfo else date.today())
+    if dt.date() == ref_today:
+        return dt.strftime("%H:%M")
+    return dt.strftime("%Y-%m-%d %H:%M")
+
+
+def _short_cwd(cwd: str) -> str:
+    if not cwd:
+        return ""
+    clean = cwd.replace("\\", "/")
+    if clean == "/":
+        return "/"
+    if re.fullmatch(r"[A-Za-z]:/?", clean):
+        return f"{clean[0]}:/"
+    clean = clean.rstrip("/")
+    home = str(Path.home()).replace("\\", "/").rstrip("/")
+    norm = str.casefold if os.name == "nt" else str
+    if len(home) > 1:
+        if norm(clean) == norm(home):
+            return "~"
+        if norm(clean).startswith(norm(home) + "/"):
+            rel = clean[len(home) + 1 :]
+            parts = [p for p in rel.split("/") if p]
+            if len(parts) <= 2:
+                return "~/" + "/".join(parts)
+            return "~/.../" + "/".join(parts[-2:])
+    parts = [p for p in clean.split("/") if p]
+    if len(parts) <= 2:
+        return clean
+    return ".../" + "/".join(parts[-2:])
+
+
+def render(entries: list[Entry], *, include_context: bool = False, start_index: int = 1) -> str:
     """
     Renders entries as an XML block. `index` is 1-based counting backwards:
     index="1" is the most recent command, index="3" is three commands ago.
@@ -237,7 +280,7 @@ def render(entries: list[Entry], *, include_context: bool = False) -> str:
     blocks = []
     total = len(entries)
     for offset, entry in enumerate(entries):
-        index = total - offset
+        index = _entry_index(total, offset, start_index)
         attrs = [
             f'index="{index}"',
             f'command="{html.escape(entry.command)}"',
@@ -271,7 +314,9 @@ def render(entries: list[Entry], *, include_context: bool = False) -> str:
     return "<terminal_history>\n" + "\n".join(blocks) + "\n</terminal_history>"
 
 
-def render_markdown(entries: list[Entry], *, include_context: bool = False) -> str:
+def render_markdown(
+    entries: list[Entry], *, include_context: bool = False, start_index: int = 1
+) -> str:
     """A heading per command, its details as a list, and the command with its output in
     one console block, the way it looked in the terminal."""
     blocks = []
@@ -289,7 +334,7 @@ def render_markdown(entries: list[Entry], *, include_context: bool = False) -> s
         if not entry.captured:
             details.append(("output", "not stored (read from shell history)"))
         details.append(("note", entry.note))
-        lines = [f"## Command {total - offset}{status}", ""]
+        lines = [f"## Command {_entry_index(total, offset, start_index)}{status}", ""]
         lines += [f"- {name}: {value}" for name, value in details if value]
         if len(lines) > 2:
             lines.append("")
@@ -302,33 +347,71 @@ def render_markdown(entries: list[Entry], *, include_context: bool = False) -> s
     return "\n\n".join(blocks)
 
 
-def render_list(entries: list[Entry], *, include_context: bool = False) -> str:
+def render_list(
+    entries: list[Entry],
+    *,
+    include_context: bool = False,
+    start_index: int = 1,
+    today: date | None = None,
+) -> str:
     """
-    One line per entry for `cdg term --list`: `index`, the command, a non-zero exit code
-    and whether output was stored. `index` counts back from the latest (1 = last), the
-    same as the other renderers and `-i`. Meant for a terminal, not for an LLM.
+    One line per entry for `cdg term --list`: `index`, time, exit code, short cwd,
+    the command, and whether output was stored. `index` matches `-i` under the same
+    filters. Meant for a terminal, not for an LLM.
     """
     total = len(entries)
     lines = []
     for offset, entry in enumerate(entries):
+        index = _entry_index(total, offset, start_index)
         command = " ".join(entry.command.splitlines())
-        status = f" (exit {entry.exit_code})" if entry.exit_code not in (None, 0) else ""
+        when = _format_time(entry.started_at, today=today)
+        status = f"exit {entry.exit_code}" if entry.exit_code is not None else ""
+        where = _short_cwd(entry.cwd)
+        meta = "  ".join(part for part in (when, status, where) if part)
         marker = "" if entry.captured else " (no output)"
         context = ""
         if include_context:
             details = " on ".join(v for v in (entry.shell, entry.hostname) if v)
             context = f" [{details}]" if details else ""
-        lines.append(f"{total - offset}. {command}{status}{marker}{context}")
+        row = f"{index}. {meta}  {command}" if meta else f"{index}. {command}"
+        lines.append(f"{row}{marker}{context}")
     return "\n".join(lines)
 
 
-def render_json(entries: list[Entry], *, include_context: bool = False) -> str:
+def render_list_json(
+    entries: list[Entry],
+    *,
+    include_context: bool = False,
+    start_index: int = 1,
+    today: date | None = None,
+) -> str:
+    """JSON array of list rows, newest last, matching `render_list` indices."""
+    total = len(entries)
+    items = []
+    for offset, entry in enumerate(entries):
+        item: dict[str, Any] = {
+            "index": _entry_index(total, offset, start_index),
+            "time": _format_time(entry.started_at, today=today),
+            "exit_code": entry.exit_code,
+            "cwd": entry.cwd,
+            "command": entry.command,
+        }
+        if include_context:
+            item["hostname"] = entry.hostname
+            item["shell"] = entry.shell
+        items.append(item)
+    return json.dumps(items, indent=2, ensure_ascii=False)
+
+
+def render_json(
+    entries: list[Entry], *, include_context: bool = False, start_index: int = 1
+) -> str:
     """A JSON array, newest last, each item with its `index` counting back from the latest."""
     total = len(entries)
     items = []
     for offset, entry in enumerate(entries):
         item = {
-            "index": total - offset,
+            "index": _entry_index(total, offset, start_index),
             "command": entry.command,
             "exit_code": entry.exit_code,
             "cwd": entry.cwd,
