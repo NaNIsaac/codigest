@@ -434,6 +434,7 @@ cdg term -f           # 마지막으로 실패한 명령
 cdg term --context   # 복사 내용에 실행 PC 이름과 셸 정보 추가
 cdg term --here -n 3  # 이 프로젝트에서 실행한 최근 3개
 cdg term -i 2         # 두 번 전에 실행한 명령 하나만
+cdg term -n 10 -l     # 최근 10개를 출력 없이 목록으로
 cdg term -n 3 --format json  # 최근 3개를 JSON으로 (markdown도 가능)
 cdg term path         # 기록 파일 위치 (CODIGEST_HOME으로 바꿀 수 있음)
 cdg term clear        # 기록 모두 지우기

@@ -60,6 +60,21 @@ def test_term_markdown_notes_what_was_not_captured():
     )
 
 
+def test_term_list_is_one_line_per_command_indexed_from_the_latest():
+    assert termstore.render_list(history()).splitlines() == [
+        "2. pytest -q (exit 1)",
+        "1. echo hi",
+    ]
+
+
+def test_term_list_marks_no_output_and_keeps_a_command_on_one_line():
+    [entry] = [Entry(command="ls\n-la", captured=False, shell="bash", hostname="PC")]
+    assert termstore.render_list([entry]) == "1. ls -la (no output)"
+    assert (
+        termstore.render_list([entry], include_context=True) == "1. ls -la (no output) [bash on PC]"
+    )
+
+
 def test_term_json_is_an_array_indexed_from_the_latest():
     items = json.loads(termstore.render_json(history()))
     assert [i["index"] for i in items] == [2, 1]

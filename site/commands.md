@@ -360,8 +360,13 @@ cdg term -n 3         # last 3
 cdg term -f           # last failed one
 cdg term --here -n 3  # last 3 run in this project
 cdg term -i 2         # only the command from 2 runs ago
+cdg term -n 10 -l     # list the last 10 commands, without their output
 cdg term --context    # add hostname and shell
 ```
+
+#### Python-only: `--list`, `-l`
+
+The Python package can list the selected commands instead of their output: one line per command with the index from the latest, a non-zero exit code and a note when the output was not captured. It always prints and never copies, so `-i` can pick one afterwards. The prebuilt binary (the Rust build) does not have it.
 
 #### `--raw`, only in the binary {#term-raw}
 

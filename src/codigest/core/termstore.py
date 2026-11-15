@@ -302,6 +302,26 @@ def render_markdown(entries: list[Entry], *, include_context: bool = False) -> s
     return "\n\n".join(blocks)
 
 
+def render_list(entries: list[Entry], *, include_context: bool = False) -> str:
+    """
+    One line per entry for `cdg term --list`: `index`, the command, a non-zero exit code
+    and whether output was stored. `index` counts back from the latest (1 = last), the
+    same as the other renderers and `-i`. Meant for a terminal, not for an LLM.
+    """
+    total = len(entries)
+    lines = []
+    for offset, entry in enumerate(entries):
+        command = " ".join(entry.command.splitlines())
+        status = f" (exit {entry.exit_code})" if entry.exit_code not in (None, 0) else ""
+        marker = "" if entry.captured else " (no output)"
+        context = ""
+        if include_context:
+            details = " on ".join(v for v in (entry.shell, entry.hostname) if v)
+            context = f" [{details}]" if details else ""
+        lines.append(f"{total - offset}. {command}{status}{marker}{context}")
+    return "\n".join(lines)
+
+
 def render_json(entries: list[Entry], *, include_context: bool = False) -> str:
     """A JSON array, newest last, each item with its `index` counting back from the latest."""
     total = len(entries)

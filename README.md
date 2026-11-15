@@ -462,6 +462,7 @@ cdg term -f           # last failed one
 cdg term --context   # add the PC hostname and shell to the copied context (opt-in)
 cdg term --here -n 3  # last 3 run in this project
 cdg term -i 2         # only the command from 2 runs ago
+cdg term -n 10 -l     # list the last 10 commands, without their output
 cdg term -n 3 --format json  # the last 3 as JSON (markdown also works)
 cdg term path         # where captures are stored (override with CODIGEST_HOME)
 cdg term clear        # delete all captures

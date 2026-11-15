@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from click.core import ParameterSource
 from rich.console import Console
 from rich.markup import escape
 
@@ -64,6 +65,15 @@ HistoryOnlyOption = Annotated[
     ),
 ]
 
+ListOption = Annotated[
+    bool,
+    typer.Option(
+        "-l",
+        "--list",
+        help="List the selected commands without their output (all unless -n; never copies)",
+    ),
+]
+
 
 def _summarize(handler: OutputHandler, entries: list[termstore.Entry]) -> None:
     log = handler.log_console
@@ -89,6 +99,7 @@ def handle(
     failed: FailedOption = False,
     here: HereOption = False,
     history_only: HistoryOnlyOption = False,
+    list_mode: ListOption = False,
     context: ContextOption = False,
     format: FormatOption = Format.XML,
     copy: CopyOption = None,
@@ -105,6 +116,7 @@ def handle(
         cdg term -n 3         # the last 3 commands
         cdg term -i 3         # only the command from 3 runs ago
         cdg term -f           # the last failed command
+        cdg term -n 10 -l     # list the last 10 commands, without their output
         cdg term --context    # include host + shell when copying for AI
         cdg term --here -n 3  # the last 3 commands run in this project
         cdg term --format json  # for scripts; markdown for a chat
@@ -115,8 +127,13 @@ def handle(
     handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log = handler.log_console
 
+    # --list without -n shows everything that matches; -n still narrows it.
+    list_all = (
+        list_mode and index is None and ctx.get_parameter_source("count") is ParameterSource.DEFAULT
+    )
+
     # -i N needs N entries loaded so the Nth-from-last exists.
-    depth = index or count
+    depth = index or (termstore.MAX_ENTRIES if list_all else count)
 
     entries: list[termstore.Entry] = []
     if not history_only:
@@ -153,7 +170,17 @@ def handle(
             raise typer.Exit(code=1)
         selected = [entries[-index]]
     else:
-        selected = entries[-count:]
+        selected = entries if list_all else entries[-count:]
+
+    if list_mode:
+        # A list is for scanning and picking an index, so it always prints and never
+        # replaces the clipboard with something that only resembles the command.
+        content = termstore.render_list(selected, include_context=context)
+        OutputHandler(stdout=True, copy=False, output=output).handle_output(
+            content,
+            item_name=f"{len(selected)} terminal entr{'y' if len(selected) == 1 else 'ies'}",
+        )
+        return
 
     render = {
         Format.XML: termstore.render,
