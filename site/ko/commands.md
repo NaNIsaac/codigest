@@ -343,7 +343,7 @@ cdg term [OPTIONS] [COMMAND]
 
 | 옵션 | 뜻 |
 | --- | --- |
-| `-n`, `--count` | 가져올 최근 명령의 수. 기본값 1. |
+| `-n`, `--count` | 가져올 최근 명령의 수 또는 범위 (예: `5`, `3-5`). 기본값 1. |
 | `-i`, `--index` | 가장 최근부터 거꾸로 세어 정확히 하나만 고릅니다 (1 = 마지막). |
 | `-f`, `--failed` | 종료 코드가 0이 아닌 명령만. |
 | `--here` | 현재 폴더 또는 그 아래에서 실행한 명령만. |
@@ -357,11 +357,18 @@ cdg term [OPTIONS] [COMMAND]
 ```bash
 cdg term              # 마지막 명령과 출력
 cdg term -n 3         # 최근 3개
+cdg term -n 3-5       # 3~5번째 전 명령 (오래된 것부터)
 cdg term -f           # 마지막으로 실패한 명령
 cdg term --here -n 3  # 이 프로젝트에서 실행한 최근 3개
 cdg term -i 2         # 두 번 전에 실행한 명령 하나만
+cdg term -n 10 -l     # 최근 10개를 출력 없이 목록으로
+cdg term -l --format json  # 목록을 JSON으로 (index, time, exit_code, cwd, command)
 cdg term --context    # PC 이름과 셸 정보 추가
 ```
+
+#### Python-only: `--list`, `-l`
+
+Python 패키지는 출력 대신 선택한 명령을 목록으로 보여 줍니다. 한 줄에 명령 하나씩, 같은 필터에서 `-i`가 고르는 것과 같은 인덱스, 시각, 종료 코드, 짧은 작업 폴더, 출력이 기록되지 않았을 때의 표시가 붙습니다. `--format json`을 쓰면 목록을 JSON(`index`, `time`, `exit_code`, `cwd`, `command`)으로 내보냅니다. 항상 출력하고 클립보드에는 복사하지 않으므로, 목록을 본 뒤 `-i`나 `-n A-B`로 고를 수 있습니다. 빌드된 바이너리(Rust 빌드)에는 없습니다.
 
 #### `--raw`, 바이너리에만 있음 {#term-raw}
 

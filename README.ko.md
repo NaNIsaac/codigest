@@ -430,10 +430,13 @@ Markdown은 이를 렌더링하는 채팅용, JSON은 스크립트용입니다. 
 cdg cap "npm run build | tail -20"  # 파이프가 있으면 따옴표로 감싸기
 cdg term              # 마지막 명령과 출력
 cdg term -n 3         # 최근 3개
+cdg term -n 3-5       # 3~5번째 전 명령 (오래된 것부터)
 cdg term -f           # 마지막으로 실패한 명령
 cdg term --context   # 복사 내용에 실행 PC 이름과 셸 정보 추가
 cdg term --here -n 3  # 이 프로젝트에서 실행한 최근 3개
 cdg term -i 2         # 두 번 전에 실행한 명령 하나만
+cdg term -n 10 -l     # 최근 10개를 출력 없이 목록으로
+cdg term -l --format json  # 목록을 JSON으로 (index, time, exit_code, cwd, command)
 cdg term -n 3 --format json  # 최근 3개를 JSON으로 (markdown도 가능)
 cdg term path         # 기록 파일 위치 (CODIGEST_HOME으로 바꿀 수 있음)
 cdg term clear        # 기록 모두 지우기

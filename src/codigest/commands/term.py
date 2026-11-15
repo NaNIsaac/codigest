@@ -4,6 +4,7 @@
 
 import codecs
 import os
+import re
 import sys
 import traceback
 from contextlib import suppress
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from click.core import ParameterSource
 from rich.console import Console
 from rich.markup import escape
 
@@ -27,8 +29,12 @@ lazy from ..core.output import OutputHandler
 app = typer.Typer()
 
 CountOption = Annotated[
-    int,
-    typer.Option("-n", "--count", min=1, help="Number of recent commands to include"),
+    str,
+    typer.Option(
+        "-n",
+        "--count",
+        help="Number or range of recent commands to include (e.g. 5 or 3-5)",
+    ),
 ]
 
 IndexOption = Annotated[
@@ -64,12 +70,46 @@ HistoryOnlyOption = Annotated[
     ),
 ]
 
+ListOption = Annotated[
+    bool,
+    typer.Option(
+        "-l",
+        "--list",
+        help="List the selected commands without their output (all unless -n; never copies)",
+    ),
+]
 
-def _summarize(handler: OutputHandler, entries: list[termstore.Entry]) -> None:
+
+_COUNT_RE = re.compile(r"^\s*(\d+)(?:\s*-\s*(\d+))?\s*$")
+
+
+def _parse_count(raw: str) -> tuple[int, int, bool]:
+    """Parses `N` or `A-B` into `(lo, hi, is_range)`, 1-based counting back from latest."""
+    m = _COUNT_RE.fullmatch(raw)
+    if not m:
+        raise typer.BadParameter(
+            f"invalid count or range {raw!r}; expected a positive integer (e.g. 5) or range (e.g. 3-5)",
+            param_hint="'-n' / '--count'",
+        )
+    a = int(m.group(1))
+    b = int(m.group(2)) if m.group(2) is not None else None
+    if a < 1 or (b is not None and b < 1):
+        raise typer.BadParameter(
+            "count and range indices must be at least 1",
+            param_hint="'-n' / '--count'",
+        )
+    if b is None:
+        return 1, a, False
+    return min(a, b), max(a, b), True
+
+
+def _summarize(
+    handler: OutputHandler, entries: list[termstore.Entry], *, start_index: int = 1
+) -> None:
     log = handler.log_console
     total = len(entries)
     for offset, entry in enumerate(entries):
-        index = total - offset
+        index = start_index + total - 1 - offset
         match entry.exit_code:
             case None:
                 status = ""
@@ -84,11 +124,12 @@ def _summarize(handler: OutputHandler, entries: list[termstore.Entry]) -> None:
 @app.callback(invoke_without_command=True)
 def handle(
     ctx: typer.Context,
-    count: CountOption = 1,
+    count: CountOption = "1",
     index: IndexOption = None,
     failed: FailedOption = False,
     here: HereOption = False,
     history_only: HistoryOnlyOption = False,
+    list_mode: ListOption = False,
     context: ContextOption = False,
     format: FormatOption = Format.XML,
     copy: CopyOption = None,
@@ -103,8 +144,11 @@ def handle(
     \b
         cdg term              # the last command
         cdg term -n 3         # the last 3 commands
+        cdg term -n 3-5       # commands 3 to 5 back, oldest first
         cdg term -i 3         # only the command from 3 runs ago
         cdg term -f           # the last failed command
+        cdg term -n 10 -l     # list the last 10 commands, without their output
+        cdg term -l --format json  # list as JSON (index, time, exit_code, cwd, command)
         cdg term --context    # include host + shell when copying for AI
         cdg term --here -n 3  # the last 3 commands run in this project
         cdg term --format json  # for scripts; markdown for a chat
@@ -112,11 +156,17 @@ def handle(
     if ctx.invoked_subcommand:
         return
 
+    lo, hi, is_range = _parse_count(count)
     handler = OutputHandler(stdout=stdout, copy=copy, output=output)
     log = handler.log_console
 
-    # -i N needs N entries loaded so the Nth-from-last exists.
-    depth = index or count
+    # --list without -n shows everything that matches; -n still narrows it.
+    list_all = (
+        list_mode and index is None and ctx.get_parameter_source("count") is ParameterSource.DEFAULT
+    )
+
+    # -i N needs N entries loaded so the Nth-from-last exists; a range needs `hi`.
+    depth = index or (termstore.MAX_ENTRIES if list_all else hi)
 
     entries: list[termstore.Entry] = []
     if not history_only:
@@ -144,7 +194,7 @@ def handle(
             log.print(f"[yellow]No captured commands match ({what}).[/yellow]")
             raise typer.Exit(code=1)
 
-    if index:
+    if index is not None:
         if index > len(entries):
             log.print(
                 f"[red][Error][/red] Only {len(entries)} entries available; "
@@ -152,18 +202,43 @@ def handle(
             )
             raise typer.Exit(code=1)
         selected = [entries[-index]]
+        start_index = index if list_mode else 1
+    elif list_all:
+        selected = entries
+        start_index = 1
+    elif is_range:
+        if lo > len(entries):
+            log.print(
+                f"[red][Error][/red] Only {len(entries)} entries available; "
+                f"cannot reach range {lo}-{hi}."
+            )
+            raise typer.Exit(code=1)
+        selected = entries[max(0, len(entries) - hi) : len(entries) - (lo - 1)]
+        start_index = lo
     else:
-        selected = entries[-count:]
+        selected = entries[-hi:]
+        start_index = 1
+
+    if list_mode:
+        # A list is for scanning and picking an index, so it always prints and never
+        # replaces the clipboard with something that only resembles the command.
+        list_render = termstore.render_list_json if format is Format.JSON else termstore.render_list
+        content = list_render(selected, include_context=context, start_index=start_index)
+        OutputHandler(stdout=True, copy=False, output=output).handle_output(
+            content,
+            item_name=f"{len(selected)} terminal entr{'y' if len(selected) == 1 else 'ies'}",
+        )
+        return
 
     render = {
         Format.XML: termstore.render,
         Format.MARKDOWN: termstore.render_markdown,
         Format.JSON: termstore.render_json,
     }[format]
-    content = render(selected, include_context=context)
+    content = render(selected, include_context=context, start_index=start_index)
     handler.handle_output(
         content,
-        summary=lambda: _summarize(handler, selected),
+        summary=lambda: _summarize(handler, selected, start_index=start_index),
         item_name=f"{len(selected)} terminal entr{'y' if len(selected) == 1 else 'ies'}",
     )
 
