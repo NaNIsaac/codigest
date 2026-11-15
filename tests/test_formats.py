@@ -83,12 +83,12 @@ def test_term_list_shortens_cwd_and_marks_no_output():
             shell="bash",
             hostname="PC",
         ),
-        Entry(command="pwd", exit_code=0, cwd="X:\\Dev\\NaNIsaac\\codigest"),
+        Entry(command="pwd", exit_code=0, cwd="/work/org/proj"),
         Entry(command="whoami", exit_code=0, cwd=str(home / "proj")),
     ]
     assert termstore.render_list(entries).splitlines() == [
         "3. ~/.../b/c  ls -la (no output)",
-        "2. exit 0  .../NaNIsaac/codigest  pwd",
+        "2. exit 0  .../org/proj  pwd",
         "1. exit 0  ~/proj  whoami",
     ]
     assert (
