@@ -202,7 +202,7 @@ def handle(
             )
             raise typer.Exit(code=1)
         selected = [entries[-index]]
-        start_index = index
+        start_index = index if list_mode else 1
     elif list_all:
         selected = entries
         start_index = 1
