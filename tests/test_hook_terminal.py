@@ -7,6 +7,7 @@ the terminal, and each line it hands to __cdg_run is captured or not by the hook
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,23 @@ with open(sys.argv[0] + ".log", "a", encoding="utf-8") as f:
     f.write(json.dumps({"command": command, "output": output}) + "\\n")
 """
 WINDOWS = os.name == "nt"
+# ConPTY often repositions the cursor instead of emitting CRLF, so turn cursor moves into newlines
+# before stripping the rest of the VT escapes.
+CURSOR_MOVE_RE = re.compile(r"\x1b\[\d*(?:;\d*)?[HfG]")
+ANSI_RE = re.compile(
+    r"\x1b[\]P][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?>=]*[A-Za-z@]|\x1b[()#=>].?"
+)
+PROMPT_RE = re.compile(r"(?:(?:^|[\r\n])(?:PS [^\r\n]*> *|[^\r\n]*[$#%] *)|\[Enter / Ctrl\+C\] *)$")
+
+
+def wait_until(predicate, timeout=40.0, message="timed out"):
+    """Polls `predicate` until it is truthy or raises `TimeoutError` after `timeout` seconds."""
+    deadline = time.monotonic() + timeout
+    while not (value := predicate()):
+        if time.monotonic() >= deadline:
+            raise TimeoutError(message() if callable(message) else message)
+        time.sleep(0.05)
+    return value
 
 
 class Pty:
@@ -76,10 +94,29 @@ class Pty:
                 for _ in range(chunk.count("\x1b[6n")):
                     self._write("\x1b[1;1R")
 
-    def type_lines(self, lines, pause):
-        for line in lines:
-            time.sleep(pause)
-            self._write(line + "\r")
+    def visible(self, start=0):
+        raw = "".join(self.output[start:])
+        return ANSI_RE.sub("", CURSOR_MOVE_RE.sub("\n", raw))
+
+    def wait_prompt(self, start, timeout=40.0):
+        wait_until(
+            lambda: PROMPT_RE.search(self.visible(start)),
+            timeout=timeout,
+            message=lambda: (
+                f"timed out waiting for shell prompt; tail:\n{self.visible(start)[-500:]}"
+            ),
+        )
+
+    def type_lines(self, lines, timeout=40.0):
+        self.wait_prompt(0, timeout=timeout)
+        for idx, item in enumerate(lines):
+            if callable(item):
+                item()
+                continue
+            since = len(self.output)
+            self._write(item + "\r")
+            if idx < len(lines) - 1:
+                self.wait_prompt(since, timeout=timeout)
 
     def wait(self, timeout):
         deadline = time.time() + timeout
@@ -129,10 +166,18 @@ class Session:
         for name in ("CODIGEST_NOCAP", "CODIGEST_RUNNERS", "CODIGEST_HOOK", "TERM_PROGRAM"):
             self.env.pop(name, None)
 
-    def run(self, argv, lines, pause):
+    def run(self, argv, lines, wait_for=(), timeout=40.0):
         term = Pty(argv, self.env)
-        term.type_lines(lines, pause)
-        term.wait(40)
+        term.type_lines(lines, timeout=timeout)
+        term.wait(60)
+        for path in wait_for:
+            wait_until(
+                path.exists,
+                timeout=timeout,
+                message=lambda p=path: (
+                    f"timed out waiting for {p}; tail:\n{''.join(term.output)[-500:]}"
+                ),
+            )
         time.sleep(1)  # ingest runs in the background
         return "".join(term.output)
 
@@ -220,7 +265,11 @@ def test_pwsh_runner_keeps_the_terminal_and_hands_lines_to_cdg_run(tmp_path, hoo
     pwsh = need("pwsh")
     s = Session(tmp_path)
     hist, report = history_lines(s)
-    screen = s.run(pwsh_argv(pwsh, s), [*pwsh_lines(s, hook_first), *report, "exit"], pause=2)
+    screen = s.run(
+        pwsh_argv(pwsh, s),
+        [*pwsh_lines(s, hook_first), *report, "exit"],
+        wait_for=(hist, s.probe_out, s.ingest_log),
+    )
     assert s.ttys() == ALL_TTYS, screen[-2000:]
     commands = [c["command"] for c in s.captured()]
     assert "wrapped" in commands and f"& {s.probe} captured" in commands, commands
@@ -237,7 +286,11 @@ def test_pwsh_hook_loaded_twice_chains_nothing(tmp_path):
     pwsh = need("pwsh")
     s = Session(tmp_path)
     hist, report = history_lines(s)
-    s.run(pwsh_argv(pwsh, s), [*pwsh_lines(s, True, hook_times=2), *report, "exit"], pause=2)
+    s.run(
+        pwsh_argv(pwsh, s),
+        [*pwsh_lines(s, True, hook_times=2), *report, "exit"],
+        wait_for=(hist, s.probe_out, s.ingest_log),
+    )
     assert s.ttys() == ALL_TTYS
     assert [c["command"] for c in s.captured()].count("wrapped") == 1
     lines = hist.read_text(encoding="utf-8").splitlines()
@@ -254,8 +307,23 @@ def test_pwsh_readline_replaced_later_without_calling_codigest(tmp_path):
         "function global:PSConsoleHostReadLine { "
         "[Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $true) }"
     )
-    lines = [*setup, other, "$null", wrapped, runit, *report, "exit"]
-    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    idle = tmp_path / "idle.txt"
+    watch = (
+        "Register-EngineEvent PowerShell.OnIdle -SupportEvent "
+        f"-Action {{ if ($global:__cdgPrev) {{ Set-Content '{idle}' 1 }} }} | Out-Null"
+    )
+    lines = [
+        *setup,
+        watch,
+        other,
+        lambda: wait_until(idle.exists, timeout=40),
+        "$null",
+        wrapped,
+        runit,
+        *report,
+        "exit",
+    ]
+    screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(hist, s.probe_out, s.ingest_log))
     assert s.ttys() == ALL_TTYS, screen[-2000:]
     assert "wrapped" in [c["command"] for c in s.captured()]
     lines = hist.read_text(encoding="utf-8").splitlines()
@@ -275,7 +343,7 @@ def test_pwsh_vscode_integration_sees_the_typed_line(tmp_path):
         "wrapped",
         "exit",
     ]
-    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(s.probe_out, s.ingest_log))
     reported = reported_lines(screen)
     assert "wrapped" in reported, reported
     assert not any(r.startswith(". __cdg") for r in reported), reported
@@ -321,7 +389,7 @@ def test_sh_runner_keeps_the_terminal_and_hands_lines_to_cdg_run(tmp_path, shell
         f"{s.probe} after",
         "exit",
     ]
-    screen = s.run(argv, lines, pause=1.5)
+    screen = s.run(argv, lines, wait_for=(jobs, s.probe_out, s.ingest_log))
     assert s.ttys() == {**ALL_TTYS, "after": "False"}, screen[-2000:]
     records = {c["command"]: c["output"] for c in s.captured()}
     assert "out-captured" in records.get(f"{s.probe} captured", ""), records
@@ -344,7 +412,7 @@ def test_bash_vscode_integration_sees_the_typed_line(tmp_path):
         "wrapped",
         "exit",
     ]
-    screen = s.run(argv, lines, pause=1.5)
+    screen = s.run(argv, lines)
     assert "wrapped" in reported_lines(screen), reported_lines(screen)
     assert s.ttys() == {"wrapped": "False"}
     assert "wrapped" in [c["command"] for c in s.captured()]
@@ -397,7 +465,7 @@ def test_pwsh_rewriter_replaces_the_line_before_it_runs(tmp_path, hook_first):
     hook, rw = f". '{SHELL_DIR / 'hook.ps1'}'", f". '{script}'"
     hist, report = history_lines(s)
     lines = [*([hook, rw] if hook_first else [rw, hook]), *rewriter_lines(probe), *report, "exit"]
-    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(hist, s.probe_out, s.ingest_log))
     assert s.ttys() == REWRITTEN_TTYS, screen[-2000:]
     records = {c["command"]: c["output"] for c in s.captured()}
     assert "out-fixed" in records.get(f"{probe} fixed", ""), records
@@ -445,7 +513,7 @@ def test_sh_rewriter_replaces_the_line_before_it_runs(tmp_path, shell, hook_firs
         f"fc -ln 1 > '{to_path(hist)}'",
         "exit",
     ]
-    screen = s.run(argv, lines, pause=1.5)
+    screen = s.run(argv, lines, wait_for=(hist, s.probe_out, s.ingest_log))
     assert s.ttys() == REWRITTEN_TTYS, screen[-2000:]
     records = {c["command"]: c["output"] for c in s.captured()}
     assert "out-fixed" in records.get(f"{s.probe} fixed", ""), records
@@ -478,7 +546,7 @@ def test_pwsh_captured_line_sees_the_previous_status(tmp_path):
         f"\"rewritten $? $LASTEXITCODE\" | Add-Content '{state}'",
         "exit",
     ]
-    screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+    screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(state, s.ingest_log))
     assert state.read_text(encoding="utf-8").splitlines() == [
         "typed False 3",
         "next True",
@@ -511,7 +579,7 @@ def test_pwsh_captured_line_sees_the_typed_first_and_last_token(tmp_path):
             report,
             "exit",
         ]
-        screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+        screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(state,))
         assert state.exists(), screen[-2000:]
         results.append(state.read_text(encoding="utf-8").splitlines())
     plain, hooked = results
@@ -553,7 +621,7 @@ def test_pwsh_captured_line_starts_windows_powershell_and_pwsh(tmp_path):
         run_script,
         "exit",
     ]
-    screen = s.run(pwsh_argv(pwsh, s), lines, pause=3)
+    screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(s.ingest_log,))
     assert "StandardOutputEncoding" not in screen, screen[-2000:]
     records = {c["command"]: c["output"] for c in s.captured()}
     assert "ps51-ok" in records.get(lines[1], ""), records
@@ -588,7 +656,7 @@ def test_pwsh_program_that_cannot_start_says_why(tmp_path):
             f"\"[$?]\" | Add-Content '{count}'",
             "exit",
         ]
-        screen = s.run(pwsh_argv(pwsh, s), lines, pause=2)
+        screen = s.run(pwsh_argv(pwsh, s), lines, wait_for=(count,))
         screens.append(screen)
         assert count.read_text(encoding="utf-8").splitlines() == ["x", "[False]"], screen[-2000:]
     for screen in screens:
