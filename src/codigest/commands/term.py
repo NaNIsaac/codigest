@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from click.core import ParameterSource
 from rich.console import Console
 from rich.markup import escape
 
@@ -162,7 +161,9 @@ def handle(
 
     # --list without -n shows everything that matches; -n still narrows it.
     list_all = (
-        list_mode and index is None and ctx.get_parameter_source("count") is ParameterSource.DEFAULT
+        list_mode
+        and index is None
+        and getattr(ctx.get_parameter_source("count"), "name", None) == "DEFAULT"
     )
 
     # -i N needs N entries loaded so the Nth-from-last exists; a range needs `hi`.
