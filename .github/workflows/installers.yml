@@ -3,15 +3,39 @@ name: Installers
 # Runs install.sh / install.ps1 against the published rust-v* releases, so a change to
 # either script is tested before a tag instead of after it.
 on:
+  push:
+    tags: ["v*"]
   pull_request:
     paths: ["install.sh", "install.ps1", ".github/workflows/installers.yml"]
+  workflow_dispatch:
+
+# A newer push to a pull request replaces the run that is still going
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      os: ${{ steps.pick.outputs.os }}
+    steps:
+      - id: pick
+        shell: bash
+        # macOS runs only on release tags or manual dispatch; Linux runs on every pull request
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* || "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            echo 'os=["ubuntu-latest","macos-latest"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'os=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"
+          fi
+
   sh:
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ github.token }}
