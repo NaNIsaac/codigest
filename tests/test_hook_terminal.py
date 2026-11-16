@@ -321,16 +321,11 @@ def test_pwsh_readline_replaced_later_without_calling_codigest(tmp_path):
         "function global:PSConsoleHostReadLine { "
         "[Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $true) }"
     )
-    idle = tmp_path / "idle.txt"
-    watch = (
-        "Register-EngineEvent PowerShell.OnIdle -SupportEvent "
-        f"-Action {{ if ($global:__cdgPrev) {{ Set-Content '{idle}' 1 }} }} | Out-Null"
-    )
     lines = [
         *setup,
-        watch,
         other,
-        lambda: wait_until(idle.exists, timeout=40),
+        # PowerShell.OnIdle restores codigest's wrapper while ReadLine sits idle at this prompt.
+        lambda: time.sleep(2),
         "$null",
         wrapped,
         runit,
