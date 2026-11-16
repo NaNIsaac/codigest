@@ -40,7 +40,7 @@ WINDOWS = os.name == "nt"
 # before stripping the rest of the VT escapes.
 CURSOR_MOVE_RE = re.compile(r"\x1b\[\d*(?:;\d*)?[HfG]")
 ANSI_RE = re.compile(
-    r"\x1b[\]P][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?>=]*[A-Za-z@]|\x1b[()#=>].?"
+    r"\x1b[\]P][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?>=]*[A-Za-z@]|\x1b[()][A-Za-z0-9]|\x1b[=>]"
 )
 PROMPT_RE = re.compile(r"(?:(?:^|[\r\n])(?:PS [^\r\n]*> *|[^\r\n]*[$#%] *)|\[Enter / Ctrl\+C\] *)$")
 
@@ -60,6 +60,7 @@ class Pty:
 
     def __init__(self, argv, env):
         self.output = []
+        self.shell = Path(argv[0]).stem.lower()
         if WINDOWS:
             winpty = pytest.importorskip("winpty", reason="pywinpty is needed for a ConPTY")
             self.proc = winpty.PtyProcess.spawn(argv, env=env, dimensions=(50, 250))
@@ -116,7 +117,20 @@ class Pty:
             since = len(self.output)
             self._write(item + "\r")
             if idx < len(lines) - 1:
-                self.wait_prompt(since, timeout=timeout)
+                next_item = lines[idx + 1]
+                # zsh `zle -M` stays unrendered while `read -k 1` blocks inside accept-line
+                if self.shell == "zsh" and isinstance(next_item, str) and next_item in ("", "n"):
+                    token = item.rsplit(None, 1)[-1]
+                    wait_until(
+                        lambda tok=token, s=since: tok in self.visible(s),
+                        timeout=timeout,
+                        message=lambda tok=token, s=since: (
+                            f"timed out waiting for {tok!r}; tail:\n{self.visible(s)[-500:]}"
+                        ),
+                    )
+                    time.sleep(0.3)
+                else:
+                    self.wait_prompt(since, timeout=timeout)
 
     def wait(self, timeout):
         deadline = time.time() + timeout
