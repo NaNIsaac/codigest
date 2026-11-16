@@ -25,6 +25,7 @@ jobs:
       os: ${{ steps.pick.outputs.os }}
     steps:
       - id: pick
+        working-directory: .
         shell: bash
         # macOS runs only on release tags or manual dispatch; Linux and Windows run on every push
         run: |
