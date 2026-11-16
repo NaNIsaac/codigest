@@ -15,6 +15,13 @@ jobs:
       # the terminal tests drive bash, zsh and pwsh on a pseudo-terminal; the runner has no zsh
       - run: sudo apt-get install -y -qq zsh
       - run: uv run --with pytest pytest -q
+      - name: Fresh resolve CLI smoke check
+        run: |
+          tmp=$(mktemp -d)
+          mkdir -p "$tmp/term"
+          printf '{"command":"echo ok","output":"ok","exit_code":0,"cwd":".","started_at":"2026-01-01T00:00:00+00:00"}\n' > "$tmp/term/history.jsonl"
+          CODIGEST_HOME="$tmp" uv run --python 3.15 --no-project --with . cdg --version
+          CODIGEST_HOME="$tmp" uv run --python 3.15 --no-project --with . cdg term --list
 
   powershell-help:
     runs-on: windows-latest

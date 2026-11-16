@@ -17,7 +17,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import click
 import typer
 
 from codigest.main import app
@@ -132,10 +131,10 @@ def python_build() -> dict[str, dict]:
     """Command path -> {"hidden": bool, "options": [Option]}, hidden commands included."""
     found: dict[str, dict] = {}
 
-    def walk(command: click.Command, path: list[str], hidden: bool) -> None:
+    def walk(command: object, path: list[str], hidden: bool) -> None:
         options = []
         for param in command.params:
-            if not isinstance(param, click.Option):
+            if getattr(param, "param_type_name", None) != "option":
                 continue
             # A --flag/--no-flag pair is two options, as the Rust build defines it.
             for names in (param.opts, param.secondary_opts):
@@ -143,8 +142,8 @@ def python_build() -> dict[str, dict]:
                 if names:
                     options.append(_option(names, param.hidden))
         found[" ".join(path)] = {"hidden": hidden, "options": options}
-        if isinstance(command, click.Group):
-            for name, sub in command.commands.items():
+        if (subcommands := getattr(command, "commands", None)) is not None:
+            for name, sub in subcommands.items():
                 walk(sub, [*path, name], hidden or sub.hidden)
 
     walk(typer.main.get_command(app), [], False)

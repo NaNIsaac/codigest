@@ -20,7 +20,6 @@ import re
 import sys
 from pathlib import Path
 
-import click
 import typer
 
 from codigest.main import app
@@ -38,15 +37,15 @@ def cli_options() -> dict[str, set[str]]:
     """Every command path (hidden ones included) mapped to its option names."""
     found: dict[str, set[str]] = {}
 
-    def walk(command: click.Command, path: list[str]) -> None:
-        if isinstance(command, click.Group):
-            for name, sub in command.commands.items():
+    def walk(command: object, path: list[str]) -> None:
+        if (subcommands := getattr(command, "commands", None)) is not None:
+            for name, sub in subcommands.items():
                 walk(sub, [*path, name])
         if path:
             names = {
                 n
                 for p in command.params
-                if isinstance(p, click.Option)
+                if getattr(p, "param_type_name", None) == "option"
                 for n in (*p.opts, *p.secondary_opts)
             }
             found[" ".join(path)] = names - IGNORED

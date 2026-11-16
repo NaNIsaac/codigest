@@ -143,3 +143,22 @@ def test_list_format_json_outputs_rows_and_supports_ranges(tmp_path, monkeypatch
         {"index": 2, "time": "09:02", "exit_code": 0, "cwd": "/c", "command": "cmd3"},
     ]
     assert copied == []
+
+
+def test_list_without_n_shows_everything(tmp_path, monkeypatch):
+    _seed(
+        tmp_path,
+        monkeypatch,
+        [
+            ("cmd1", 0, "/a"),
+            ("cmd2", 1, "/b"),
+            ("cmd3", 0, "/c"),
+            ("cmd4", 2, "/d"),
+        ],
+    )
+
+    res = CliRunner().invoke(term.app, ["--list"])
+
+    assert res.exit_code == 0, res.output
+    for cmd in ("cmd1", "cmd2", "cmd3", "cmd4"):
+        assert cmd in res.output
