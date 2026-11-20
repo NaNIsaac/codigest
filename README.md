@@ -403,6 +403,14 @@ The code in every block is exactly as written in the file (`->`, `<`, `&` are no
 code copied out of it can be pasted back. A large `scan` with nobody to answer the size question
 stops with a hint instead of waiting; `-y` takes it all.
 
+## Documentation
+
+The [Codigest site](https://nanisaac.github.io/codigest/) is the full guide — installation, workflows, the command reference, security — in English and Korean. In this repository:
+
+- [Commands and options by build](docs/cli-matrix.md) — every command, flag and MCP tool in the Python and the Rust build, generated from each
+- [Using Codigest on itself](docs/dogfood.md) — notes from running `cdg` on real work in this repository and a few sibling projects
+- [Remote scan](docs/remote-scan.md) — `cdg scan` against a GitHub repository, in the Python CLI and the opt-in MCP tool (not yet in the Rust build)
+
 ## Reference
 
 - [All commands](#all-commands)
