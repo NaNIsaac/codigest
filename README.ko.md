@@ -377,6 +377,14 @@ cdg cap -- pytest -q && cdg pack   # 테스트 실행, 실패하면 pack에 고�
 복사한 코드를 그대로 붙여 넣을 수 있습니다. 대답해 줄 사람이 없을 때 큰 `scan`은 크기를 묻고
 기다리는 대신 안내와 함께 멈춥니다. 전부 받으려면 `-y`를 붙입니다.
 
+## 문서
+
+[Codigest 사이트](https://nanisaac.github.io/codigest/)는 영어와 한국어로 된 전체 안내입니다. 설치, 활용 예시, 명령어 레퍼런스, 보안이 모두 거기 있습니다. 이 저장소에는:
+
+- [빌드별 명령과 옵션](docs/cli-matrix.md) — Python 빌드와 Rust 빌드의 모든 명령, 플래그, MCP 도구를 각 빌드에서 뽑아 만든 표
+- [Codigest를 Codigest에 쓰기](docs/dogfood.md) — 이 저장소와 이웃 프로젝트의 실제 작업에 `cdg`를 돌린 기록
+- [원격 스캔](docs/remote-scan.md) — GitHub 저장소에 `cdg scan` (Python CLI와 선택형 MCP 도구, Rust 빌드에는 아직 없음)
+
 ## 참고 자료
 
 - [전체 명령](#전체-명령)
